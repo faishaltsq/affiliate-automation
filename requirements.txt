@@ -1,0 +1,9 @@
+# Core dependencies for Affiliate Content Automation Blueprint
+requests>=2.31.0
+pandas>=2.1.0
+praw>=7.7.1
+cloudinary>=1.38.0
+python-dotenv>=1.0.0
+playwright>=1.40.0
+yt-dlp>=2026.0.0
+tiktok-uploader>=1.2.0
