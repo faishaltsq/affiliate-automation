@@ -444,6 +444,7 @@ def _chat_with_threads_agent(user_message: str, msg_id: int, thread_id: int):
             ],
             "temperature": 0.7,
             "max_tokens": 1500,
+            "stream": False,
         }
         r = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
         r.raise_for_status()

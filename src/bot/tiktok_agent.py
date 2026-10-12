@@ -387,6 +387,7 @@ def _chat_with_tiktok_strategist(user_message: str, msg_id: int, thread_id: int)
             ],
             "max_tokens": 1500,
             "temperature": 0.7,
+            "stream": False,
         }
 
         resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=30)

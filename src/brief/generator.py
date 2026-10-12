@@ -56,6 +56,7 @@ def _llm(messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096)
         "messages": full_messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
+        "stream": False,
     }
     r = requests.post(OPENROUTER_URL, json=payload, headers=HEADERS, timeout=120)
     r.raise_for_status()
