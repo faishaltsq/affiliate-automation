@@ -30,12 +30,25 @@ API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 _PIPELINE_LOCK = threading.Lock()
 
 
+def _clean_text_for_telegram(text: str) -> str:
+    """Strip internal reasoning/think tags and clean text."""
+    if not text:
+        return ""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL)
+    return text.strip()
+
+
 def _send_reply(text: str, reply_to_message_id: Optional[int] = None, thread_id: Optional[int] = None):
-    """Send formatted HTML message to TikTok Telegram topic."""
+    """Send formatted HTML message to TikTok Telegram topic with plain text fallback."""
     target_thread = thread_id if thread_id is not None else TG_TIKTOK_THREAD_ID
+    cleaned = _clean_text_for_telegram(text)
+    if not cleaned:
+        return
+
     payload = {
         "chat_id": int(TG_AFFILIATE_CHAT_ID),
-        "text": text,
+        "text": cleaned,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
     }
@@ -45,7 +58,10 @@ def _send_reply(text: str, reply_to_message_id: Optional[int] = None, thread_id:
         payload["reply_to_message_id"] = reply_to_message_id
 
     try:
-        requests.post(f"{API}/sendMessage", json=payload, timeout=12)
+        r = requests.post(f"{API}/sendMessage", json=payload, timeout=15)
+        if not r.ok and ("can't parse entities" in r.text.lower() or "bad request" in r.text.lower()):
+            payload.pop("parse_mode", None)
+            requests.post(f"{API}/sendMessage", json=payload, timeout=15)
     except Exception as exc:
         logger.error("Failed to send message to TikTok topic: %s", exc)
 
@@ -105,47 +121,56 @@ def handle_tiktok_message(msg: dict, text: str, msg_id: int, thread_id: int):
 
 def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], Optional[str]]:
     """Detect if the user's conversational message intends to execute an action."""
-    # Check for upload triggers
-    upload_patterns = [
-        r"(?:tolong\s+)?(?:upload|post|unggah|gas|jalanin)\s+(?:1\s+)?(?:konten|video)(?:\s+(?:tentang|niche|kategori)?\s*(.*))?",
-        r"(?:upload|unggah|post)\s+sekarang(?:\s+(.*))?",
-        r"(?:cari(?:kan)?\s+dan\s+upload)\s+(.*)",
-    ]
-    for pat in upload_patterns:
-        m = re.search(pat, text_lower)
-        if m:
-            kw = m.group(1).strip() if m.lastindex and m.group(1) else None
-            # Filter filler words
-            if kw in ("dong", "nih", "ya", "dulu", "sekarang", ""):
-                kw = None
-            elif kw:
-                for filler in [" dong", " nih", " ya", " dulu", " sekarang"]:
-                    if kw.endswith(filler):
-                        kw = kw[:-len(filler)].strip()
-            return "upload", kw
+    cleaned = text_lower.strip()
 
-    # Check for dry run triggers
-    if any(k in text_lower for k in ["dry run", "dryrun", "tes render", "test render", "render aja tanpa upload"]):
-        # Extract keyword if mentioned
-        m = re.search(r"(?:dry\s*run|tes render)\s*(?:tentang|niche)?\s*(.*)", text_lower)
+    # 1. Quick acceptance (agree to upload default/preset)
+    if cleaned in ("bebas", "terserah", "acak", "random", "apa aja", "apa saja", "lanjut", "gas", "gass", "oke"):
+        return "upload", None
+
+    # 2. Dry run triggers
+    if any(k in cleaned for k in ["dry run", "dryrun", "tes render", "test render", "render aja", "tanpa upload"]):
+        m = re.search(r"(?:dry\s*run|tes render)\s*(?:tentang|niche|kategori)?\s*(.*)", cleaned)
         kw = m.group(1).strip() if m and m.group(1) else None
         if kw in ("dulu", "dong", "ya", ""):
             kw = None
         return "dryrun", kw
 
-    # Check for status triggers
-    if any(k in text_lower for k in [
+    # 3. Status triggers
+    if any(k in cleaned for k in [
         "cek status", "status tiktok", "video apa aja yang udah", "berapa video hari ini",
-        "video yang terupload", "riwayat upload", "history upload", "rekap upload"
+        "video yang terupload", "riwayat upload", "history upload", "rekap upload", "rekap video"
     ]):
         return "status", None
 
-    # Check for keyword triggers
-    if any(k in text_lower for k in ["daftar keyword", "list keyword", "kata kunci pencarian"]):
+    # 4. Keyword triggers
+    if any(k in cleaned for k in ["daftar keyword", "list keyword", "kata kunci pencarian"]):
         return "keywords", None
-    if text_lower.startswith("tambah keyword") or text_lower.startswith("tambahkan keyword"):
+    if cleaned.startswith("tambah keyword") or cleaned.startswith("tambahkan keyword"):
         kw = original_text.split(maxsplit=2)[-1].strip()
         return "keywords", f"add {kw}"
+
+    # 5. Natural Language Upload Triggers
+    patterns = [
+        r"(?:tolong\s+)?(?:cari(?:kan)?|minta|mau|ambil(?:kan)?)\s+video\s+(.*?)(?:\s+(?:dan|lalu|terus)\s+(?:upload|unggah|post))?$",
+        r"(?:tolong\s+)?(?:upload|unggah|post|gas|jalanin)\s+(?:1\s+)?(?:konten|video)\s*(.*?)$",
+        r"(?:cari(?:kan)?\s+dan\s+upload)\s+(.*)$",
+        r"video\s+(.*?)\s+(?:dong|nih|ya)$",
+    ]
+
+    for pat in patterns:
+        m = re.match(pat, cleaned)
+        if m:
+            kw = m.group(1).strip() if m.lastindex and m.group(1) else None
+            if kw:
+                for filler in [" dan upload", " lalu upload", " terus upload", " dong", " nih", " ya", " dulu", " sekarang", " aja", " saja"]:
+                    if kw.endswith(filler):
+                        kw = kw[:-len(filler)].strip()
+                for prep in ["tentang ", "niche ", "kategori "]:
+                    if kw.startswith(prep):
+                        kw = kw[len(prep):].strip()
+            if kw in ("", "dong", "nih", "ya", "dulu", "sekarang", "baru", "1"):
+                kw = None
+            return "upload", kw
 
     return None, None
 
@@ -344,6 +369,7 @@ def _chat_with_tiktok_strategist(user_message: str, msg_id: int, thread_id: int)
         f"- 3 Video terakhir:\n{recent_summary or 'Belum ada'}\n\n"
         "Instruksi Komunikasi:\n"
         "- Jawab langsung, to the point, actionable, santai namun berwawasan tinggi (Bahasa Indonesia).\n"
+        "- JANGAN PERNAH menyertakan tag internal <think> atau penalaran mentah dalam jawaban.\n"
         "- Jika user berdiskusi ide hook, judul safe zone, atau evaluasi niche, berikan rekomendasi konkrit yang siap pakai.\n"
         "- Jika user ingin menjalankan aksi, ingatkan bahwa mereka cukup bilang 'upload video mancing' atau 'coba dry run'."
     )
@@ -359,21 +385,28 @@ def _chat_with_tiktok_strategist(user_message: str, msg_id: int, thread_id: int)
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            "max_tokens": 500,
+            "max_tokens": 1500,
             "temperature": 0.7,
         }
 
-        resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=25)
+        resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=30)
+        reply_text = ""
         if resp.status_code == 200:
-            reply_text = resp.json()["choices"][0]["message"]["content"].strip()
-            _send_reply(reply_text, reply_to_message_id=msg_id, thread_id=thread_id)
-        else:
-            _send_reply(
-                "Halo! Aku siap bantu kurasi dan otomatisasi konten TikTok kamu. "
-                "Cukup ketik <i>'upload 1 video baru'</i> atau <i>'/status'</i> untuk kontrol langsung.",
-                reply_to_message_id=msg_id,
-                thread_id=thread_id,
+            data = resp.json()
+            choice = data.get("choices", [{}])[0]
+            msg_obj = choice.get("message", {})
+            raw_content = msg_obj.get("content") or msg_obj.get("reasoning_content") or ""
+            reply_text = _clean_text_for_telegram(raw_content)
+
+        if not reply_text:
+            reply_text = (
+                "Halo! Aku siap bantu kurasi dan otomatisasi konten TikTok kamu.\n\n"
+                "Kamu bisa minta langsung:\n"
+                "• <i>'cari video orang mancing dan upload'</i>\n"
+                "• <i>'coba dry run tes render video kayu'</i>\n"
+                "• Atau kirim <code>/upload</code>"
             )
+        _send_reply(reply_text, reply_to_message_id=msg_id, thread_id=thread_id)
     except Exception as exc:
         logger.error("LLM chat error in TikTok topic: %s", exc)
         _send_reply(

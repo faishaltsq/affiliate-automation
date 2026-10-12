@@ -67,7 +67,26 @@ def run_pipeline(
     db = VideoStateDB(config.get("db_path", "data/tiktok/state.db"))
     uploader = TikTokUploader(config.get("tiktok_cookies_path", "data/tiktok/cookies.txt"))
 
-    keywords = [keyword_override] if keyword_override else config.get("keywords", [])
+    if keyword_override:
+        kw_clean = keyword_override.strip()
+        search_candidates = []
+        if any(w in kw_clean.lower() for w in ["mancing", "ikan", "fish", "fishing"]):
+            search_candidates.extend([
+                "Outdoor Boys camping fishing 4K",
+                f"Outdoor Boys {kw_clean} 4K",
+                f"{kw_clean} fishing 4k outdoor",
+                f"{kw_clean} 4K",
+            ])
+        else:
+            search_candidates.append(f"{kw_clean} 4K")
+            search_candidates.append(kw_clean)
+        # Fallback to configured preset channels if needed
+        for pk in config.get("keywords", []):
+            if pk not in search_candidates:
+                search_candidates.append(pk)
+        keywords = search_candidates
+    else:
+        keywords = config.get("keywords", [])
     max_results = count if count is not None else config.get("videos_per_run", 1)
     max_duration = config.get("max_duration_seconds", 1800)
     clip_duration = config.get("clip_duration_seconds", 360)

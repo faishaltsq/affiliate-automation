@@ -56,12 +56,25 @@ THREADS_PATTERNS = [
 ]
 
 
+def _clean_text_for_telegram(text: str) -> str:
+    """Strip internal reasoning/think tags and clean text."""
+    if not text:
+        return ""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL)
+    return text.strip()
+
+
 def _send_reply(text: str, reply_to_message_id: Optional[int] = None, thread_id: Optional[int] = None):
-    """Sends a formatted reply back to Telegram Threads topic."""
+    """Sends a formatted reply back to Telegram Threads topic with fallback."""
     target_thread = thread_id if thread_id is not None else TG_THREADS_THREAD_ID
+    cleaned = _clean_text_for_telegram(text)
+    if not cleaned:
+        return
+
     payload = {
         "chat_id": int(TG_AFFILIATE_CHAT_ID),
-        "text": text,
+        "text": cleaned,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
     }
@@ -71,7 +84,10 @@ def _send_reply(text: str, reply_to_message_id: Optional[int] = None, thread_id:
         payload["reply_to_message_id"] = reply_to_message_id
 
     try:
-        requests.post(f"{API}/sendMessage", json=payload, timeout=12)
+        r = requests.post(f"{API}/sendMessage", json=payload, timeout=15)
+        if not r.ok and ("can't parse entities" in r.text.lower() or "bad request" in r.text.lower()):
+            payload.pop("parse_mode", None)
+            requests.post(f"{API}/sendMessage", json=payload, timeout=15)
     except Exception as e:
         logger.error("Failed to send reply to Threads topic: %s", e)
 
@@ -427,11 +443,17 @@ def _chat_with_threads_agent(user_message: str, msg_id: int, thread_id: int):
                 {"role": "user", "content": user_message},
             ],
             "temperature": 0.7,
-            "max_tokens": 600,
+            "max_tokens": 1500,
         }
         r = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
         r.raise_for_status()
-        reply_text = r.json()["choices"][0]["message"]["content"].strip()
+        data = r.json()
+        choice = data.get("choices", [{}])[0]
+        msg_obj = choice.get("message", {})
+        raw = msg_obj.get("content") or msg_obj.get("reasoning_content") or ""
+        reply_text = _clean_text_for_telegram(raw)
+        if not reply_text:
+            reply_text = "Siap! Ada ide konten atau link affiliate yang mau di-generate? Ketik /draft atau langsung kirim tautannya."
         _send_reply(reply_text, reply_to_message_id=msg_id, thread_id=thread_id)
 
     except Exception as e:
