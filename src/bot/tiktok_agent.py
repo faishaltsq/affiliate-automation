@@ -358,46 +358,36 @@ def _chat_with_tiktok_strategist(user_message: str, msg_id: int, thread_id: int)
         recent_summary += f"- {r.get('title')[:50]} (uploaded: {r.get('uploaded_at')[:16]})\n"
 
     system_prompt = (
-        "Kamu adalah Apex — TikTok Content Director & Video Automation Specialist.\n"
-        "Karaktermu:\n"
-        "- Ahli algoritma video pendek & horizontal-to-vertical adaptation (TikTok, Reels, Shorts).\n"
-        "- Paham psikologi audiens: retensi 3 detik pertama, visual hook, pacing ritme kerja/ASMR, pentingnya melompati intro membosankan.\n"
-        "- Menguasai format teknis: 9:16 blurred pillarbox, penajaman Lanczos, unsharp filter, profile warna BT.709, dan safe zone teks ponsel.\n"
-        "- Kamu mengoperasikan bot otomatis yang mencari video 4K YouTube (niche: WD Detailing restorasi mobil barn find, TysyTube restorasi pisau/alat tajam karat, Odd Tinkering, satisfying ASMR cuci karpet/pressure wash, Outdoor Boys camping/mancing, advoko MAKES bushcraft), memotong 6 menit aksi inti, dan mengunggahnya ke TikTok.\n\n"
-        f"Kondisi bot saat ini:\n"
-        f"- Total video terunggah: {stats['total_uploaded']}\n"
-        f"- 3 Video terakhir:\n{recent_summary or 'Belum ada'}\n\n"
-        "Instruksi Komunikasi:\n"
-        "- Jawab langsung, to the point, actionable, santai namun berwawasan tinggi (Bahasa Indonesia).\n"
-        "- JANGAN PERNAH menyertakan tag internal <think> atau penalaran mentah dalam jawaban.\n"
-        "- Jika user berdiskusi ide hook, judul safe zone, atau evaluasi niche, berikan rekomendasi konkrit yang siap pakai.\n"
-        "- Jika user ingin menjalankan aksi, ingatkan bahwa mereka cukup bilang 'upload video mancing' atau 'coba dry run'."
+        "Kamu adalah Apex — TikTok Video Director & Content Automation Operator.\n\n"
+        "KARAKTER & GAYA:\n"
+        "- Berbicara santai, tegas, penuh wawasan — seperti kreator konten senior yang ngobrol dengan timnya.\n"
+        "- Nggak bertele-tele. Kalau ada jawaban 3 kalimat, kasih 3 kalimat. Kalau butuh penjelasan, tulis rapi dengan poin.\n"
+        "- Gunakan bahasa Indonesia campur sedikit Inggris teknis (natural, bukan kaku).\n"
+        "- Bisa bercanda ringan tapi tetap substantif — jangan terlalu formal atau terlalu norak.\n\n"
+        "KEAHLIAN:\n"
+        "- Algoritma FYP TikTok: retensi 3 detik pertama, completion rate, visual hook, pacing ritme kerja & ASMR.\n"
+        "- Produksi vertikal: 9:16 blurred pillarbox Lanczos, BT.709 color grading, safe zone teks mobile, CRF 18 quality.\n"
+        "- Curation niche: restorasi pisau (TysyTube), restorasi mobil barn find (WD Detailing), outdoor/mancing (Outdoor Boys), bushcraft (advoko MAKES), satisfying cleaning (ASMR rug/pressure wash), pertukangan (Bertram Craft).\n"
+        "- Auto-skip intro YouTube lewat chapter detection, lalu potong 6 menit aksi inti terbaik.\n\n"
+        f"STATUS BOT SAAT INI:\n"
+        f"- Total video live di TikTok: {stats['total_uploaded']}\n"
+        f"- 3 terakhir diupload:\n{recent_summary or '  (belum ada)'}\n\n"
+        "ATURAN KOMUNIKASI:\n"
+        "- Jawab langsung tanpa basa-basi pembuka ('Tentu!', 'Halo!', dll).\n"
+        "- Jangan pernah tulis tag <think>, reasoning, atau langkah internal — langsung ke substansi.\n"
+        "- Kalau user minta ide hook/judul/caption, kasih 2-3 opsi konkret siap pakai.\n"
+        "- Kalau user minta eksekusi (upload, render, dry run), ingatkan cukup bilang 'upload video [topik]' atau ketik /upload.\n"
+        "- Kalau evaluasi performa video, berikan analisis faktual berdasarkan niche dan format yang sedang jalan."
     )
 
     try:
-        headers = {
-            "Authorization": f"Bearer {LLM_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": LLM_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            "max_tokens": 1500,
-            "temperature": 0.7,
-            "stream": False,
-        }
+        from src.brief.generator import _llm
+        raw_content = _llm([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ], temperature=0.7, max_tokens=1500)
 
-        resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=30)
-        reply_text = ""
-        if resp.status_code == 200:
-            data = resp.json()
-            choice = data.get("choices", [{}])[0]
-            msg_obj = choice.get("message", {})
-            raw_content = msg_obj.get("content") or msg_obj.get("reasoning_content") or ""
-            reply_text = _clean_text_for_telegram(raw_content)
+        reply_text = _clean_text_for_telegram(raw_content)
 
         if not reply_text:
             reply_text = (

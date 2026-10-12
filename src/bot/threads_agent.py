@@ -129,6 +129,12 @@ def handle_threads_message(msg: dict, text: str, msg_id: int, thread_id: int):
         elif cmd == "/topic":
             _cmd_topic(args, msg_id, thread_id)
             return
+        elif cmd == "/post_text":
+            _cmd_post_text(args, msg_id, thread_id)
+            return
+        elif cmd == "/post_photo":
+            _cmd_post_photo(args, msg_id, thread_id)
+            return
         elif cmd == "/affiliate":
             _cmd_affiliate(args, msg_id, thread_id)
             return
@@ -177,7 +183,9 @@ def _cmd_help(msg_id: int, thread_id: int):
         "/posts — 5 postingan terbaru &amp; metrik likes/replies\n"
         "/queue — Daftar link affiliate pending\n\n"
         "<b>📝 Konten &amp; Eksekusi</b>\n"
-        "/post — Force posting 1 konten organik sekarang\n"
+        "/post — Force posting 1 konten organik (auto format)\n"
+        "/post_text &lt;judul&gt; — Buat &amp; posting TEKS POLOS netizen\n"
+        "/post_photo &lt;judul&gt; — Buat &amp; posting dengan foto berita bersih\n"
         "/topic &lt;judul&gt; — Buat &amp; posting topik spesifik\n"
         "/affiliate &lt;url&gt; — Tempel link affiliate di konten viral\n"
         "/clearqueue — Bersihkan antrian affiliate\n\n"
@@ -307,14 +315,53 @@ def _cmd_topic(args: str, msg_id: int, thread_id: int):
     if not args:
         _send_reply("Format: <code>/topic &lt;topik atau berita&gt;</code>\nContoh: <code>/topic kenaikan pajak hiburan</code>", reply_to_message_id=msg_id, thread_id=thread_id)
         return
-    _send_reply(f"⚡ Sedang generate & memposting tentang: <i>{args}</i>...", reply_to_message_id=msg_id, thread_id=thread_id)
+    preview = (args[:50] + "...") if len(args) > 50 else args
+    _send_reply(f"⚡ Sedang memproses postingan tentang: <i>{preview}</i>...", reply_to_message_id=msg_id, thread_id=thread_id)
     try:
         from src.organic.publisher import execute_organic_post_custom
         result = execute_organic_post_custom(args)
         msg = (
             f"✅ <b>Berhasil Diposting ke Threads!</b>\n\n"
-            f"📌 <b>Topik:</b> <i>{args}</i>\n"
-            f"💬 <b>Konten:</b>\n<i>\"{result.get('content','')}\"</i>\n\n"
+            f"💬 <i>\"{result.get('content','')}\"</i>\n\n"
+            f"🆔 <b>Threads ID:</b> <code>{result.get('threads_id','')}</code>"
+        )
+        _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
+    except Exception as e:
+        _send_reply(f"⚠️ Error: {e}", reply_to_message_id=msg_id, thread_id=thread_id)
+
+
+def _cmd_post_text(args: str, msg_id: int, thread_id: int):
+    if not args:
+        _send_reply("Format: <code>/post_text &lt;topik atau isu&gt;</code>\nContoh: <code>/post_text pergerakan IHSG sesi 1</code>", reply_to_message_id=msg_id, thread_id=thread_id)
+        return
+    preview = (args[:50] + "...") if len(args) > 50 else args
+    _send_reply(f"💬 Sedang membuat postingan <b>TEKS POLOS</b> tentang: <i>{preview}</i>...", reply_to_message_id=msg_id, thread_id=thread_id)
+    try:
+        from src.organic.publisher import execute_organic_post_custom
+        result = execute_organic_post_custom(args, post_format="text_only")
+        msg = (
+            f"✅ <b>Berhasil Diposting ke Threads (Teks Polos)!</b>\n\n"
+            f"💬 <i>\"{result.get('content','')}\"</i>\n\n"
+            f"🆔 <b>Threads ID:</b> <code>{result.get('threads_id','')}</code>"
+        )
+        _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
+    except Exception as e:
+        _send_reply(f"⚠️ Error: {e}", reply_to_message_id=msg_id, thread_id=thread_id)
+
+
+def _cmd_post_photo(args: str, msg_id: int, thread_id: int):
+    if not args:
+        _send_reply("Format: <code>/post_photo &lt;topik atau isu&gt;</code>\nContoh: <code>/post_photo gempa garut bmkg</code>", reply_to_message_id=msg_id, thread_id=thread_id)
+        return
+    preview = (args[:50] + "...") if len(args) > 50 else args
+    _send_reply(f"📸 Sedang mencari foto berita bersih & posting tentang: <i>{preview}</i>...", reply_to_message_id=msg_id, thread_id=thread_id)
+    try:
+        from src.organic.publisher import execute_organic_post_custom
+        result = execute_organic_post_custom(args, post_format="with_image")
+        msg = (
+            f"✅ <b>Berhasil Diposting ke Threads (Dengan Foto)!</b>\n\n"
+            f"💬 <i>\"{result.get('content','')}\"</i>\n"
+            f"🖼️ <b>Foto:</b> {result.get('image_url','')}\n\n"
             f"🆔 <b>Threads ID:</b> <code>{result.get('threads_id','')}</code>"
         )
         _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
@@ -418,40 +465,36 @@ def _chat_with_threads_agent(user_message: str, msg_id: int, thread_id: int):
             recent_summary += f"- {p.get('topic')}: \"{p.get('content','')[:60]}...\"\n"
 
         system_prompt = (
-            f"Kamu adalah Apex — Social Media Growth Specialist & AI Operator untuk akun Threads Indonesia (@pochita9887).\n"
-            f"Karaktermu:\n"
-            f"- Sangat paham tren sosmed Indonesia, algoritma Threads Meta, strategi engagement, dan affiliate marketing.\n"
-            f"- Cerdas, santai, solutif, to the point, gaya bahasa asik (campuran santai dan pro).\n"
-            f"- Kamu mengoperasikan pipeline otomatis yang memposting 10-12 konten organik per hari dan menempel komentar affiliate di konten viral.\n\n"
-            f"Kondisi akun saat ini:\n"
-            f"- Postingan hari ini: {post_count}/12\n"
-            f"- Antrian affiliate: {len(pending)} pending\n"
-            f"- 3 Postingan terakhir:\n{recent_summary or 'Belum ada'}\n\n"
-            f"Jika user bertanya atau berdiskusi (ide konten, strategi, evaluasi, cara ningkatin views, dll), jawab actionable, cerdas, dan santai.\n"
-            f"Jika user minta bikinin draft konten, berikan 2-3 opsi draft tajam (statement/insight/reaksi, bukan cuma pertanyaan).\n"
-            f"Balas dalam Bahasa Indonesia. Jangan terlalu panjang."
+            "Kamu adalah Apex — Social Media Growth Specialist & AI Operator untuk akun Threads Indonesia (@pochita9887).\n\n"
+            "PERSONA & GAYA BICARA:\n"
+            "- Suara autentik netizen Threads Indonesia: hidup, tajam, cerdas, berbobot, tapi tetap santai (nggak kaku seperti humas korporat, juga nggak alay).\n"
+            "- Berani punya opini atau 'hot take' yang logis — bukan cuma merangkum berita netral yang membosankan.\n"
+            "- Hindari klise murahan: JANGAN bawa-bawa gosip artis, infotainment, drama selebgram, atau lelucon basi KRL Manggarai/kosan.\n"
+            "- Gaya tulisan netizen organik: kalimat pendek, punchy, ada jeda baris, minim jargon akademis, bahasa sehari-hari yang relatable.\n\n"
+            "4 PILAR KONTEN UTAMA:\n"
+            "  1. Bencana Alam, Cuaca Ekstrem & BMKG (info cepat, empatik, berbasis data riil).\n"
+            "  2. Sepak Bola (Timnas Indonesia, Premier League, UCL — fokus analisis taktik & dinamika panas, bukan provokasi buta).\n"
+            "  3. Teknologi, Gadget & Tren AI (dampak AI ke dunia kerja, tools baru, realita tech layoffs vs produktivitas).\n"
+            "  4. Pasar Keuangan, Saham & Ekonomi (IHSG, pergerakan rupiah, emiten lokal, sentimen The Fed, kripto makro).\n\n"
+            "MONETISASI AFFILIATE:\n"
+            "- Strategi: biarkan post organik meledak dulu (threshold ≥20 likes atau ≥10 reply), baru daemon menempelkan komentar affiliate kontekstual secara halus (seamless, bukan spam hard-selling).\n\n"
+            f"STATUS AKUN HARI INI:\n"
+            f"- Postingan organik aktif: {post_count}/12\n"
+            f"- Antrean link affiliate: {len(pending)} link pending\n"
+            f"- 3 post terakhir:\n{recent_summary or '  (belum ada)'}\n\n"
+            "ATURAN RESPON:\n"
+            "- Jawab to the point, jangan pakai pembuka basa-basi ('Tentu!', 'Halo!', 'Menarik sekali pertanyaannya').\n"
+            "- Kalau user minta draft konten, SELALU berikan 2-3 opsi variasi berbeda (misal: Opsi 1 = Kontroversial/Hot Take, Opsi 2 = Analisis/Data, Opsi 3 = Reaksi Spontan/Curhat Profesional).\n"
+            "- Tiap draft harus siap copas langsung ke Threads: sudah termasuk format jeda baris yang rapi.\n"
+            "- Kalau user minta posting, beri tahu mereka bisa langsung kirim: /post_text <topik> atau /post_photo <topik>."
         )
 
-        headers = {
-            "Authorization": f"Bearer {LLM_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": LLM_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            "temperature": 0.7,
-            "max_tokens": 1500,
-            "stream": False,
-        }
-        r = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        choice = data.get("choices", [{}])[0]
-        msg_obj = choice.get("message", {})
-        raw = msg_obj.get("content") or msg_obj.get("reasoning_content") or ""
+        from src.brief.generator import _llm
+        raw = _llm([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ], temperature=0.7, max_tokens=1500)
+
         reply_text = _clean_text_for_telegram(raw)
         if not reply_text:
             reply_text = "Siap! Ada ide konten atau link affiliate yang mau di-generate? Ketik /draft atau langsung kirim tautannya."

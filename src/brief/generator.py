@@ -11,7 +11,15 @@ import re
 import time
 import requests
 
-from src.config import LLM_API_KEY, LLM_MODEL, OPENROUTER_URL, DATA_DIR
+from src.config import (
+    LLM_API_KEY,
+    LLM_MODEL,
+    OPENROUTER_URL,
+    RUVICODE_BASE_URL,
+    RUVICODE_MODEL,
+    RUVICODE_API_KEY,
+    DATA_DIR,
+)
 from src.logger import get_logger
 from src.guardrails import (
     check_and_increment_openrouter,
@@ -23,47 +31,73 @@ from src.guardrails import (
 
 log = get_logger("brief")
 
-HEADERS = {
-    "Authorization": f"Bearer {LLM_API_KEY}",
-    "Content-Type": "application/json",
-}
 
-# ── LLM helper (guarded) ─────────────────────────────────────────────────────
-
-@retry_with_backoff(max_retries=2, base_delay=3.0)
-def _llm(messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096) -> str:
-    check_and_increment_openrouter()
-    time.sleep(2)  # rate-limit guard
-
-    # Ensure system prompt suppresses runaway reasoning tokens
-    system_msg = {
-        "role": "system",
-        "content": (
-            "You are a direct, concise assistant. "
-            "Output ONLY the final requested content. "
-            "Do NOT think step by step or write down reasoning. "
-            "Start your response immediately with the content."
-        ),
+def _call_provider(url: str, key: str, model: str, messages: list[dict], temperature: float, max_tokens: int) -> str:
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
     }
-    # Prepend system message if not already present
-    if not messages or messages[0].get("role") != "system":
-        full_messages = [system_msg] + messages
-    else:
-        full_messages = messages
-
     payload = {
-        "model": LLM_MODEL,
-        "messages": full_messages,
+        "model": model,
+        "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
     }
-    r = requests.post(OPENROUTER_URL, json=payload, headers=HEADERS, timeout=120)
+    r = requests.post(url, json=payload, headers=headers, timeout=60)
     r.raise_for_status()
-    content = r.json().get("choices", [{}])[0].get("message", {}).get("content")
-    if not content:
-        raise RuntimeError(f"LLM returned empty content: {r.json()}")
-    return content
+    data = r.json()
+    choices = data.get("choices", [])
+    if choices and "message" in choices[0]:
+        msg = choices[0]["message"]
+        content = msg.get("content") or msg.get("reasoning_content") or ""
+        if content:
+            return content.strip()
+    raise RuntimeError(f"Empty LLM output from {model}: {data}")
+
+
+# ── LLM helper (guarded with auto-fallback) ───────────────────────────────────
+
+@retry_with_backoff(max_retries=2, base_delay=2.0)
+def _llm(messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096) -> str:
+    check_and_increment_openrouter()
+
+    # Only inject a generic system prompt when the caller hasn't provided one.
+    # Bot agents (tiktok_agent, threads_agent) pass their own persona system prompt;
+    # overriding it here would destroy their character.
+    if not messages or messages[0].get("role") != "system":
+        system_msg = {
+            "role": "system",
+            "content": (
+                "You are a direct, concise assistant. "
+                "Output ONLY the final requested content. "
+                "Do NOT think step by step or write down reasoning. "
+                "Start your response immediately with the content."
+            ),
+        }
+        full_messages = [system_msg] + messages
+    else:
+        full_messages = messages
+
+    # 1. Primary: 9router local (Gemini 3.8 Flash High)
+    try:
+        return _call_provider(OPENROUTER_URL, LLM_API_KEY, LLM_MODEL, full_messages, temperature, max_tokens)
+    except Exception as e_primary:
+        log.warning(f"Primary 9router ({LLM_MODEL}) failed: {e_primary}. Attempting Ruvicode fallback...")
+
+    # 2. Fallback: Ruvicode (DeepSeek V4 Flash)
+    if RUVICODE_API_KEY:
+        try:
+            ruvi_url = f"{RUVICODE_BASE_URL.rstrip('/')}/chat/completions"
+            return _call_provider(ruvi_url, RUVICODE_API_KEY, RUVICODE_MODEL, full_messages, temperature, max_tokens)
+        except Exception as e_ruvi:
+            log.warning(f"Ruvicode ({RUVICODE_MODEL}) fallback failed: {e_ruvi}")
+
+    # 3. Final Fallback: 9router tokenrouter DeepSeek V4 Flash
+    try:
+        return _call_provider(OPENROUTER_URL, LLM_API_KEY, "tokenrouter/deepseek/deepseek-v4-flash", full_messages, temperature, max_tokens)
+    except Exception as e_final:
+        raise RuntimeError(f"All LLM providers failed. Primary: {e_primary}, Final: {e_final}")
 
 
 # ── 2.2 Generate Brief ───────────────────────────────────────────────────────

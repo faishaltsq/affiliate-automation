@@ -32,7 +32,7 @@ DB_PATH = DATA_DIR / "guardrails.db"
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 IMAGE_CACHE_DIR.mkdir(exist_ok=True)
 
-DAILY_OPENROUTER_LIMIT = 45
+DAILY_OPENROUTER_LIMIT = 999  # 9router local is unmetered; this is now just a logging counter
 MAX_STORAGE_BYTES = 20 * 1024 * 1024 * 1024  # 20 GB safety cap
 
 
@@ -67,28 +67,22 @@ init_guardrails_db()
 
 def check_and_increment_openrouter() -> int:
     """
-    Increments daily OpenRouter request counter.
-    Raises SystemExit / RuntimeError if daily ceiling (45) is hit.
-    Stays 100% free with 0 SaaS cost (SQLite-backed).
+    Tracks daily LLM request counter in SQLite.
+    Local 9router & Ruvicode are unmetered, so this purely logs usage.
     """
     today = date.today().isoformat()
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
     cur.execute("INSERT OR IGNORE INTO daily_counters (date, openrouter_requests) VALUES (?, 0)", (today,))
     cur.execute("SELECT openrouter_requests FROM daily_counters WHERE date = ?", (today,))
-    current = cur.fetchone()[0]
-
-    if current >= DAILY_OPENROUTER_LIMIT:
-        con.close()
-        msg = f"OpenRouter daily quota limit reached ({current}/{DAILY_OPENROUTER_LIMIT}). Pausing pipeline for today."
-        log.error(msg)
-        raise RuntimeError(msg)
+    row = cur.fetchone()
+    current = row[0] if row else 0
 
     new_val = current + 1
     cur.execute("UPDATE daily_counters SET openrouter_requests = ? WHERE date = ?", (new_val, today))
     con.commit()
     con.close()
-    log.info(f"OpenRouter requests today: {new_val}/{DAILY_OPENROUTER_LIMIT}")
+    log.info(f"LLM requests today: {new_val} (9router/Ruvicode)")
     return new_val
 
 
