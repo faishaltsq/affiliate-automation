@@ -259,15 +259,19 @@ def _cmd_help(msg_id: int, thread_id: int):
         "Kamu bisa ngobrol santai seperti dengan asisten produksi sungguhan:\n\n"
         "• <b>Instruksi Langsung:</b>\n"
         "  - <i>\"Upload 1 video mancing dong\"</i>\n"
+        "  - <i>\"Cari video pabrik satisfying full dan upload\"</i>\n"
         "  - <i>\"Coba dry run tes render video kayu\"</i>\n"
         "  - <i>\"Cek status upload hari ini\"</i>\n\n"
-        "• <b>Diskusi & Curation:</b>\n"
+        "• <b>Platform Upload:</b>\n"
+        "  - Setiap video otomatis diupload ke <b>TikTok</b> DAN <b>YouTube Shorts</b>\n"
+        "  - Tambah kata <i>\"full\"</i> untuk mode center crop (penuh di HP)\n\n"
+        "• <b>Diskusi &amp; Curation:</b>\n"
         "  - <i>\"Rekomendasi hook teks buat konten bangunan\"</i>\n"
         "  - <i>\"Gimana cara optimasi video 6 menit di TikTok?\"</i>\n\n"
         "• <b>Slash Commands:</b>\n"
-        "  - <code>/upload [keyword]</code> : Eksekusi download, render & upload.\n"
+        "  - <code>/upload [keyword]</code> : Eksekusi download, render &amp; upload ke TikTok + YouTube.\n"
         "  - <code>/dryrun [keyword]</code> : Tes render tanpa upload.\n"
-        "  - <code>/status</code> : Cek rekap & statistik video.\n"
+        "  - <code>/status</code> : Cek rekap &amp; statistik video.\n"
         "  - <code>/keywords</code> : Kelola kata kunci pencarian."
     )
     _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
@@ -302,7 +306,7 @@ def _trigger_pipeline_async(
             try:
                 def progress_cb(text: str):
                     # Notify significant steps back to Telegram topic
-                    if any(key in text for key in ["Melompati intro", "Merender", "Mengunggah", "Sukses"]):
+                    if any(key in text for key in ["Melompati intro", "Merender", "Mengunggah", "Sukses", "Shorts"]):
                         _send_reply(text, thread_id=thread_id)
 
                 res = run_pipeline(
@@ -311,6 +315,7 @@ def _trigger_pipeline_async(
                     keyword_override=keyword,
                     progress_callback=progress_cb,
                     fill_mode=fill_mode,
+                    upload_youtube=True,
                 )
 
                 if res.get("success"):
@@ -329,13 +334,15 @@ def _trigger_pipeline_async(
                             thread_id=thread_id,
                         )
                     else:
+                        yt_url = v.get("youtube_url", "")
+                        yt_line = f"\n📺 <b>YouTube Shorts:</b> <a href='{yt_url}'>{yt_url}</a>" if yt_url else "\n📺 <b>YouTube Shorts:</b> <i>Upload gagal atau dinonaktifkan</i>"
                         _send_reply(
-                            f"🎉 <b>Video Sukses Terunggah ke TikTok!</b>\n\n"
+                            f"🎉 <b>Video Sukses Terunggah!</b>\n\n"
                             f"📌 <b>Judul:</b> {title}\n"
                             f"👤 <b>Channel:</b> {channel}\n"
-                            f"⏱ <b>Durasi:</b> 360 detik (6 Menit Penuh Aksi)\n"
-                            f"✨ <b>Kualitas:</b> 1080x1920 HD (BT.709 High 4.2)\n\n"
-                            f"<i>Video sudah live di feed akun TikTok kamu.</i>",
+                            f"✨ <b>Kualitas:</b> 1080x1920 HD (BT.709 High 4.2)\n"
+                            f"🎵 <b>TikTok:</b> <i>Live di feed @pochitalkshop</i>"
+                            f"{yt_line}",
                             thread_id=thread_id,
                         )
                 else:

@@ -15,3 +15,5 @@ data/tiktok/cookies.txt
 logs/
 .hermes/
 data/tiktok/youtube_cookies.txt
+data/tiktok/youtube_client_secret.json
+data/tiktok/youtube_oauth.json

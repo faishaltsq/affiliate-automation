@@ -16,6 +16,7 @@ from src.tiktok.state import VideoStateDB
 from src.tiktok.uploader import TikTokUploader
 from src.tiktok.youtube import search_videos, download_video, get_action_start_time
 from src.tiktok.editor import process_video
+from src.tiktok.youtube_uploader import upload_shorts
 
 logger = logging.getLogger("tiktok.pipeline")
 
@@ -46,6 +47,7 @@ def run_pipeline(
     keyword_override: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
     fill_mode: bool = False,
+    upload_youtube: bool = True,
 ) -> dict:
     """
     Run the TikTok pipeline.
@@ -223,6 +225,29 @@ def run_pipeline(
             db.mark_uploaded(vid, title, channel)
             uploaded_videos.append({"id": vid, "title": title, "channel": channel, "path": edited_path})
             notify(f"✅ <b>Sukses terunggah ke TikTok:</b> <i>{title}</i>")
+
+            # Upload to YouTube Shorts
+            if upload_youtube:
+                notify("📺 Mengunggah ke YouTube Shorts...")
+                yt_desc = f"{title}\n\nOriginal by {channel}\n\n#Shorts #Viral #Satisfying"
+                yt_tags = ["Shorts", "Viral", "Satisfying"]
+                if channel:
+                    yt_tags.append(channel)
+                yt_result = upload_shorts(
+                    video_path=edited_path,
+                    title=title,
+                    description=yt_desc,
+                    tags=yt_tags,
+                )
+                if yt_result.get("success"):
+                    yt_url = yt_result.get("url", "")
+                    notify(f"✅ <b>Sukses terunggah ke YouTube Shorts:</b> <a href='{yt_url}'>{yt_result.get('title', title)}</a>")
+                    uploaded_videos[-1]["youtube_url"] = yt_url
+                    uploaded_videos[-1]["youtube_id"] = yt_result.get("video_id")
+                else:
+                    yt_err = yt_result.get("error", "Unknown error")
+                    notify(f"⚠️ YouTube Shorts upload gagal: {yt_err}")
+                    errors.append(f"YouTube upload gagal: {yt_err}")
         else:
             err = f"Upload TikTok gagal untuk {vid}"
             errors.append(err)
