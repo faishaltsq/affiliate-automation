@@ -69,8 +69,31 @@ def run_pipeline(
 
     if keyword_override:
         kw_clean = keyword_override.strip()
+        kw_lower = kw_clean.lower()
         search_candidates = []
-        if any(w in kw_clean.lower() for w in ["mancing", "ikan", "fish", "fishing"]):
+
+        if any(w in kw_lower for w in ["mobil", "car", "otomotif", "auto", "vehicle"]):
+            search_candidates.extend([
+                "WD Detailing abandoned car restoration barn find 4K",
+                "classic car restoration timelapse 4K",
+                f"{kw_clean} car restoration 4K",
+                f"{kw_clean} 4K",
+            ])
+        elif any(w in kw_lower for w in ["pisau", "knife", "pedang", "blade", "golok", "cleaver"]):
+            search_candidates.extend([
+                "TysyTube rusty knife restoration satisfying 4K",
+                "rusty knife restoration ASMR 4K",
+                f"{kw_clean} restoration 4K",
+                f"{kw_clean} 4K",
+            ])
+        elif any(w in kw_lower for w in ["satisfying", "bersih", "cuci", "karpet", "rug", "wash", "asmr"]):
+            search_candidates.extend([
+                "satisfying ASMR rug cleaning restoration 4K",
+                "satisfying pressure washing deep cleaning 4K",
+                "Odd Tinkering antique restoration satisfying 4K",
+                f"{kw_clean} satisfying 4K",
+            ])
+        elif any(w in kw_lower for w in ["mancing", "ikan", "fish", "fishing"]):
             search_candidates.extend([
                 "Outdoor Boys camping fishing 4K",
                 f"Outdoor Boys {kw_clean} 4K",
@@ -80,6 +103,7 @@ def run_pipeline(
         else:
             search_candidates.append(f"{kw_clean} 4K")
             search_candidates.append(kw_clean)
+
         # Fallback to configured preset channels if needed
         for pk in config.get("keywords", []):
             if pk not in search_candidates:
