@@ -14,3 +14,4 @@ data/tiktok/cookies.txt
 *.db
 logs/
 .hermes/
+data/tiktok/youtube_cookies.txt
