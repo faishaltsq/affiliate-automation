@@ -45,6 +45,7 @@ def run_pipeline(
     count: Optional[int] = None,
     keyword_override: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
+    fill_mode: bool = False,
 ) -> dict:
     """
     Run the TikTok pipeline.
@@ -187,7 +188,8 @@ def run_pipeline(
             notify(f"⏩ Melompati intro ke detik {start_time:.0f} (Bab: {action_ch or 'Aksi Utama'})...")
 
         # Edit to 9:16 portrait
-        notify(f"✂️ Merender 9:16 Lanczos + Unsharp (Durasi: {clip_duration}s)...")
+        mode_label = "Center Crop (Full HP 9:16)" if fill_mode else "Blurred Pillarbox (9:16 Lanczos)"
+        notify(f"✂️ Merender {mode_label} + Unsharp (Durasi: {clip_duration}s)...")
         edited_path = str(Path(output_dir) / f"{vid}_edited.mp4")
         try:
             process_video(
@@ -198,6 +200,7 @@ def run_pipeline(
                 crop_height=crop_h,
                 overlay_text=title,
                 start_time=start_time,
+                fill_mode=fill_mode,
             )
         except Exception as exc:
             err = f"Render FFmpeg gagal: {exc}"

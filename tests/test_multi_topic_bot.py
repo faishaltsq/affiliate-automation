@@ -7,20 +7,26 @@ from src.bot.tiktok_agent import _detect_intent
 
 def test_tiktok_intent_detection():
     # Upload intent
-    intent, kw = _detect_intent("upload 1 video mancing dong", "upload 1 video mancing dong")
+    intent, kw, fill = _detect_intent("upload 1 video mancing dong", "upload 1 video mancing dong")
     assert intent == "upload"
     assert kw == "mancing"
+    assert not fill
+
+    # Upload full screen intent
+    intent, kw, fill = _detect_intent("upload video mancing full screen di hp", "upload video mancing full screen di hp")
+    assert intent == "upload"
+    assert fill is True
 
     # Dry run intent
-    intent, kw = _detect_intent("coba tes render dry run video pertukangan", "coba tes render dry run video pertukangan")
+    intent, kw, fill = _detect_intent("coba tes render dry run video pertukangan", "coba tes render dry run video pertukangan")
     assert intent == "dryrun"
 
     # Status intent
-    intent, _ = _detect_intent("cek status upload hari ini", "cek status upload hari ini")
+    intent, _, fill = _detect_intent("cek status upload hari ini", "cek status upload hari ini")
     assert intent == "status"
 
     # Conversational non-action
-    intent, _ = _detect_intent("menurutmu video apa yang cocok buat niche kuliner?", "menurutmu video apa yang cocok buat niche kuliner?")
+    intent, _, _ = _detect_intent("menurutmu video apa yang cocok buat niche kuliner?", "menurutmu video apa yang cocok buat niche kuliner?")
     assert intent is None
 
 

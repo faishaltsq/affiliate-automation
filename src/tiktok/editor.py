@@ -72,11 +72,14 @@ def process_video(
     crop_height: int = 1920,
     overlay_text: str | None = None,
     start_time: float = 0.0,
+    fill_mode: bool = False,
 ) -> str:
     """Format video to 9:16 portrait for mobile screens without chopping content.
 
     Landscape videos (16:9) use ambient blurred pillarbox backgrounds with
     full-width sharp video centered, keeping 100% of the original framing.
+    If fill_mode=True, the video is center-cropped to fill the entire 9:16
+    frame (no blur bars), maximizing screen coverage on mobile.
     Portrait videos are scaled/padded to fit 1080x1920.
 
     Returns *output_path* on success; raises ``RuntimeError`` on failure.
@@ -90,31 +93,54 @@ def process_video(
     ss_args = ["-ss", str(start_time)] if start_time > 0 else []
 
     if in_w >= in_h:
-        # Landscape: Blurred pillarbox background + centered sharp 1080p
-        fc_parts = [
-            f"[0:v]scale={crop_width}:{crop_height}:force_original_aspect_ratio=increase,crop={crop_width}:{crop_height},boxblur=25:5[bg]",
-            f"[0:v]scale={crop_width}:-2:flags=lanczos,unsharp=5:5:0.8:5:5:0.4[fg]",
-            f"[bg][fg]overlay=0:({crop_height}-h)/2[merged]",
-        ]
-        if overlay_text:
-            safe_text = format_title_overlay(overlay_text)
-            fg_h = int(crop_width * in_h / in_w)
-            top_space = (crop_height - fg_h) // 2
-            # Center title vertically in the top blurred space, guaranteed above video content
-            title_y = max(240, (top_space - 100) // 2)
-            drawtext = (
-                f"[merged]drawtext=font='Arial'"
-                f":text='{safe_text}'"
-                ":fontcolor=white:fontsize=46:line_spacing=14"
-                f":x=(w-text_w)/2:y={title_y}"
-                ":box=1:boxcolor=black@0.7:boxborderw=18[v]"
-            )
-            fc_parts.append(drawtext)
-            map_label = "[v]"
+        if fill_mode:
+            # Center crop: scale up to fill 1080x1920 then crop center.
+            # Scale so height = 1920, then width will be > 1080 (for 16:9 source).
+            fc_parts = [
+                f"[0:v]scale=-2:{crop_height}:flags=lanczos,"
+                f"crop={crop_width}:{crop_height}:(iw-{crop_width})/2:0,"
+                f"unsharp=5:5:0.8:5:5:0.4[fg]",
+            ]
+            if overlay_text:
+                safe_text = format_title_overlay(overlay_text)
+                drawtext = (
+                    f"[fg]drawtext=font='Arial'"
+                    f":text='{safe_text}'"
+                    ":fontcolor=white:fontsize=46:line_spacing=14"
+                    f":x=(w-text_w)/2:y=80"
+                    ":box=1:boxcolor=black@0.7:boxborderw=18[v]"
+                )
+                fc_parts.append(drawtext)
+                map_label = "[v]"
+            else:
+                map_label = "[fg]"
+            filter_complex = ";".join(fc_parts)
         else:
-            map_label = "[merged]"
+            # Blurred pillarbox background + centered sharp 1080p
+            fc_parts = [
+                f"[0:v]scale={crop_width}:{crop_height}:force_original_aspect_ratio=increase,crop={crop_width}:{crop_height},boxblur=25:5[bg]",
+                f"[0:v]scale={crop_width}:-2:flags=lanczos,unsharp=5:5:0.8:5:5:0.4[fg]",
+                f"[bg][fg]overlay=0:({crop_height}-h)/2[merged]",
+            ]
+            if overlay_text:
+                safe_text = format_title_overlay(overlay_text)
+                fg_h = int(crop_width * in_h / in_w)
+                top_space = (crop_height - fg_h) // 2
+                # Center title vertically in the top blurred space, guaranteed above video content
+                title_y = max(240, (top_space - 100) // 2)
+                drawtext = (
+                    f"[merged]drawtext=font='Arial'"
+                    f":text='{safe_text}'"
+                    ":fontcolor=white:fontsize=46:line_spacing=14"
+                    f":x=(w-text_w)/2:y={title_y}"
+                    ":box=1:boxcolor=black@0.7:boxborderw=18[v]"
+                )
+                fc_parts.append(drawtext)
+                map_label = "[v]"
+            else:
+                map_label = "[merged]"
 
-        filter_complex = ";".join(fc_parts)
+            filter_complex = ";".join(fc_parts)
         cmd = [
             "ffmpeg", "-y",
             *ss_args,

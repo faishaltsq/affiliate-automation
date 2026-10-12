@@ -96,16 +96,16 @@ def handle_tiktok_message(msg: dict, text: str, msg_id: int, thread_id: int):
             pass
 
     # 2. Natural Language Intent Detection (Agentic Control)
-    intent, intent_arg = _detect_intent(text_lower, text)
+    intent, intent_arg, fill_mode = _detect_intent(text_lower, text)
 
     if intent == "upload":
         _trigger_pipeline_async(
-            dry_run=False, msg_id=msg_id, thread_id=thread_id, keyword=intent_arg
+            dry_run=False, msg_id=msg_id, thread_id=thread_id, keyword=intent_arg, fill_mode=fill_mode
         )
         return
     elif intent == "dryrun":
         _trigger_pipeline_async(
-            dry_run=True, msg_id=msg_id, thread_id=thread_id, keyword=intent_arg
+            dry_run=True, msg_id=msg_id, thread_id=thread_id, keyword=intent_arg, fill_mode=fill_mode
         )
         return
     elif intent == "status":
@@ -119,13 +119,21 @@ def handle_tiktok_message(msg: dict, text: str, msg_id: int, thread_id: int):
     _chat_with_tiktok_strategist(text, msg_id, thread_id)
 
 
-def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], Optional[str]]:
-    """Detect if the user's conversational message intends to execute an action."""
+def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], Optional[str], bool]:
+    """Detect if the user's conversational message intends to execute an action.
+
+    Returns (intent, intent_arg, fill_mode).
+    fill_mode=True when user wants full-screen vertical video (no blur bars).
+    """
     cleaned = text_lower.strip()
+
+    # Detect fill_mode (full screen vertical) keywords
+    fill_keywords = ["full", "penuh", "full screen", "fullscreen", "full hp", "full layar", "full di hp", "tanpa blur", "no blur", "crop penuh"]
+    fill_mode = any(k in cleaned for k in fill_keywords)
 
     # 1. Quick acceptance (agree to upload default/preset)
     if cleaned in ("bebas", "terserah", "acak", "random", "apa aja", "apa saja", "lanjut", "gas", "gass", "oke"):
-        return "upload", None
+        return "upload", None, fill_mode
 
     # 2. Dry run triggers
     if any(k in cleaned for k in ["dry run", "dryrun", "tes render", "test render", "render aja", "tanpa upload"]):
@@ -133,21 +141,21 @@ def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], 
         kw = m.group(1).strip() if m and m.group(1) else None
         if kw in ("dulu", "dong", "ya", ""):
             kw = None
-        return "dryrun", kw
+        return "dryrun", kw, fill_mode
 
     # 3. Status triggers
     if any(k in cleaned for k in [
         "cek status", "status tiktok", "video apa aja yang udah", "berapa video hari ini",
         "video yang terupload", "riwayat upload", "history upload", "rekap upload", "rekap video"
     ]):
-        return "status", None
+        return "status", None, False
 
     # 4. Keyword triggers
     if any(k in cleaned for k in ["daftar keyword", "list keyword", "kata kunci pencarian"]):
-        return "keywords", None
+        return "keywords", None, False
     if cleaned.startswith("tambah keyword") or cleaned.startswith("tambahkan keyword"):
         kw = original_text.split(maxsplit=2)[-1].strip()
-        return "keywords", f"add {kw}"
+        return "keywords", f"add {kw}", False
 
     # 5. Natural Language Upload Triggers
     patterns = [
@@ -170,9 +178,9 @@ def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], 
                         kw = kw[len(prep):].strip()
             if kw in ("", "dong", "nih", "ya", "dulu", "sekarang", "baru", "1"):
                 kw = None
-            return "upload", kw
+            return "upload", kw, fill_mode
 
-    return None, None
+    return None, None, False
 
 
 def _cmd_status(msg_id: int, thread_id: int):
@@ -266,7 +274,7 @@ def _cmd_help(msg_id: int, thread_id: int):
 
 
 def _trigger_pipeline_async(
-    dry_run: bool, msg_id: int, thread_id: int, keyword: Optional[str] = None
+    dry_run: bool, msg_id: int, thread_id: int, keyword: Optional[str] = None, fill_mode: bool = False
 ):
     """Run the TikTok pipeline in a detached thread so Telegram poller never freezes."""
     if _PIPELINE_LOCK.locked():
@@ -279,9 +287,10 @@ def _trigger_pipeline_async(
         return
 
     mode_text = "DRY RUN (Download & Render Saja)" if dry_run else "PRODUKSI (Download, Render & Upload TikTok)"
+    fill_text = " | 📱 Full Screen (Center Crop)" if fill_mode else ""
     kw_text = f"Topik/Keyword: <i>{keyword}</i>" if keyword else "Keyword: <i>Preset Otomatis</i>"
     _send_reply(
-        f"⚡ <b>Siap! Memulai TikTok Pipeline ({mode_text})</b>\n\n"
+        f"⚡ <b>Siap! Memulai TikTok Pipeline ({mode_text}{fill_text})</b>\n\n"
         f"🔍 {kw_text}\n"
         f"⏱ <i>Menganalisis chapters YouTube, auto-skip intro, dan merender vertikal 9:16...</i>",
         reply_to_message_id=msg_id,
@@ -301,6 +310,7 @@ def _trigger_pipeline_async(
                     count=1,
                     keyword_override=keyword,
                     progress_callback=progress_cb,
+                    fill_mode=fill_mode,
                 )
 
                 if res.get("success"):
