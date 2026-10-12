@@ -86,12 +86,23 @@ def run_pipeline(
                 f"{kw_clean} restoration 4K",
                 f"{kw_clean} 4K",
             ])
+        elif any(w in kw_lower for w in ["pabrik", "factory", "industrial", "manufaktur", "produksi", "assembly"]):
+            search_candidates.extend([
+                "satisfying factory production line 4K",
+                "satisfying industrial manufacturing process 4K",
+                "satisfying automated factory machines 4K",
+                "satisfying factory assembly line compilation 4K",
+                f"{kw_clean} 4K satisfying",
+            ])
         elif any(w in kw_lower for w in ["satisfying", "bersih", "cuci", "karpet", "rug", "wash", "asmr"]):
             search_candidates.extend([
+                "satisfying factory production line 4K",
                 "satisfying ASMR rug cleaning restoration 4K",
                 "satisfying pressure washing deep cleaning 4K",
+                "satisfying automated factory machines 4K",
                 "Odd Tinkering antique restoration satisfying 4K",
                 f"{kw_clean} satisfying 4K",
+                f"satisfying {kw_clean} 4K",
             ])
         elif any(w in kw_lower for w in ["mancing", "ikan", "fish", "fishing"]):
             search_candidates.extend([
@@ -125,16 +136,19 @@ def run_pipeline(
 
     videos = []
     seen_ids = set()
+    # Fetch 3x the required count as buffer against download failures
+    search_buffer = max((max_results or 1) * 3, 5)
     for kw in keywords:
-        results = search_videos([kw], max_results=max_results, max_duration=max_duration)
+        results = search_videos([kw], max_results=search_buffer, max_duration=max_duration)
         for v in results:
             if v["id"] not in seen_ids and not db.is_uploaded(v["id"]):
                 seen_ids.add(v["id"])
                 videos.append(v)
-        if len(videos) >= max_results:
+        if len(videos) >= search_buffer:
             break
 
-    videos = videos[:max_results]
+    # Keep more candidates than strictly needed, so failed downloads can be retried with the next
+    videos = videos[:search_buffer]
     if not videos:
         notify("⚠️ Tidak ditemukan kandidat video YouTube baru.")
         db.close()
@@ -146,6 +160,10 @@ def run_pipeline(
     errors = []
 
     for video in videos:
+        # Stop once we've hit the target number of successful uploads
+        if len(uploaded_videos) >= max_results:
+            break
+
         vid = video["id"]
         title = video.get("title", "")
         channel = video.get("channel", "")
