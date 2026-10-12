@@ -1,0 +1,384 @@
+"""tiktok_agent.py — Conversational AI Operator for TikTok Automation.
+
+Handles intent parsing, natural language commands, strategy consultation,
+and background execution of video search, render, and upload for TikTok.
+"""
+
+import json
+import logging
+import re
+import threading
+from typing import Optional
+import requests
+
+from src.config import (
+    TELEGRAM_BOT_TOKEN,
+    TG_AFFILIATE_CHAT_ID,
+    TG_TIKTOK_THREAD_ID,
+    LLM_API_KEY,
+    LLM_MODEL,
+    OPENROUTER_URL,
+)
+from src.tiktok.config import load_config, save_config
+from src.tiktok.state import VideoStateDB
+from src.tiktok.pipeline import run_pipeline
+
+logger = logging.getLogger("bot.tiktok_agent")
+API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+
+# Lock to ensure only one video render/upload pipeline runs at a time
+_PIPELINE_LOCK = threading.Lock()
+
+
+def _send_reply(text: str, reply_to_message_id: Optional[int] = None, thread_id: Optional[int] = None):
+    """Send formatted HTML message to TikTok Telegram topic."""
+    target_thread = thread_id if thread_id is not None else TG_TIKTOK_THREAD_ID
+    payload = {
+        "chat_id": int(TG_AFFILIATE_CHAT_ID),
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+    if target_thread:
+        payload["message_thread_id"] = int(target_thread)
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = reply_to_message_id
+
+    try:
+        requests.post(f"{API}/sendMessage", json=payload, timeout=12)
+    except Exception as exc:
+        logger.error("Failed to send message to TikTok topic: %s", exc)
+
+
+def handle_tiktok_message(msg: dict, text: str, msg_id: int, thread_id: int):
+    """Main router for messages inside TikTok topic."""
+    text_lower = text.lower().strip()
+
+    # 1. Direct Slash Commands
+    if text.startswith("/"):
+        parts = text.split(maxsplit=1)
+        cmd = parts[0].lower()
+        args = parts[1].strip() if len(parts) > 1 else ""
+
+        if cmd in ("/status", "/tiktok_status"):
+            _cmd_status(msg_id, thread_id)
+            return
+        elif cmd in ("/upload", "/post"):
+            _trigger_pipeline_async(dry_run=False, msg_id=msg_id, thread_id=thread_id, keyword=args or None)
+            return
+        elif cmd in ("/dryrun", "/test"):
+            _trigger_pipeline_async(dry_run=True, msg_id=msg_id, thread_id=thread_id, keyword=args or None)
+            return
+        elif cmd in ("/keywords", "/keyword"):
+            _cmd_keywords(args, msg_id, thread_id)
+            return
+        elif cmd in ("/help", "/start"):
+            _cmd_help(msg_id, thread_id)
+            return
+        else:
+            # Fallback to conversational handler even for unknown slash commands
+            pass
+
+    # 2. Natural Language Intent Detection (Agentic Control)
+    intent, intent_arg = _detect_intent(text_lower, text)
+
+    if intent == "upload":
+        _trigger_pipeline_async(
+            dry_run=False, msg_id=msg_id, thread_id=thread_id, keyword=intent_arg
+        )
+        return
+    elif intent == "dryrun":
+        _trigger_pipeline_async(
+            dry_run=True, msg_id=msg_id, thread_id=thread_id, keyword=intent_arg
+        )
+        return
+    elif intent == "status":
+        _cmd_status(msg_id, thread_id)
+        return
+    elif intent == "keywords":
+        _cmd_keywords(intent_arg or "", msg_id, thread_id)
+        return
+
+    # 3. Conversational AI Strategy Mode (Chat with TikTok Director)
+    _chat_with_tiktok_strategist(text, msg_id, thread_id)
+
+
+def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], Optional[str]]:
+    """Detect if the user's conversational message intends to execute an action."""
+    # Check for upload triggers
+    upload_patterns = [
+        r"(?:tolong\s+)?(?:upload|post|unggah|gas|jalanin)\s+(?:1\s+)?(?:konten|video)(?:\s+(?:tentang|niche|kategori)?\s*(.*))?",
+        r"(?:upload|unggah|post)\s+sekarang(?:\s+(.*))?",
+        r"(?:cari(?:kan)?\s+dan\s+upload)\s+(.*)",
+    ]
+    for pat in upload_patterns:
+        m = re.search(pat, text_lower)
+        if m:
+            kw = m.group(1).strip() if m.lastindex and m.group(1) else None
+            # Filter filler words
+            if kw in ("dong", "nih", "ya", "dulu", "sekarang", ""):
+                kw = None
+            elif kw:
+                for filler in [" dong", " nih", " ya", " dulu", " sekarang"]:
+                    if kw.endswith(filler):
+                        kw = kw[:-len(filler)].strip()
+            return "upload", kw
+
+    # Check for dry run triggers
+    if any(k in text_lower for k in ["dry run", "dryrun", "tes render", "test render", "render aja tanpa upload"]):
+        # Extract keyword if mentioned
+        m = re.search(r"(?:dry\s*run|tes render)\s*(?:tentang|niche)?\s*(.*)", text_lower)
+        kw = m.group(1).strip() if m and m.group(1) else None
+        if kw in ("dulu", "dong", "ya", ""):
+            kw = None
+        return "dryrun", kw
+
+    # Check for status triggers
+    if any(k in text_lower for k in [
+        "cek status", "status tiktok", "video apa aja yang udah", "berapa video hari ini",
+        "video yang terupload", "riwayat upload", "history upload", "rekap upload"
+    ]):
+        return "status", None
+
+    # Check for keyword triggers
+    if any(k in text_lower for k in ["daftar keyword", "list keyword", "kata kunci pencarian"]):
+        return "keywords", None
+    if text_lower.startswith("tambah keyword") or text_lower.startswith("tambahkan keyword"):
+        kw = original_text.split(maxsplit=2)[-1].strip()
+        return "keywords", f"add {kw}"
+
+    return None, None
+
+
+def _cmd_status(msg_id: int, thread_id: int):
+    """Format and send TikTok agent status card."""
+    cfg = load_config()
+    db = VideoStateDB(cfg["db_path"])
+    stats = db.get_stats(days=7)
+    recent = db.get_recent_uploads(4)
+    db.close()
+
+    total_uploaded = stats["total_uploaded"]
+    last_run = stats.get("last_run")
+    last_run_str = f"{last_run['run_at'][:19]} (uploaded: {last_run['videos_uploaded']})" if last_run else "Belum ada log"
+
+    recent_list_str = ""
+    for r in recent:
+        clean_title = r["title"][:45]
+        recent_list_str += f"• <code>{r['uploaded_at'][:16]}</code> — <b>{clean_title}</b>\n"
+
+    msg = (
+        "📊 <b>Status TikTok Automation Agent</b>\n\n"
+        f"🎬 <b>Total Video Terunggah:</b> {total_uploaded}\n"
+        f"⏱ <b>Durasi Klip Aktif:</b> {cfg.get('clip_duration_seconds', 360)} detik (6 Menit)\n"
+        f"📐 <b>Format Render:</b> 1080x1920 (9:16 Lanczos + Unsharp CRF 18)\n"
+        f"🔄 <b>Terakhir Dijalankan:</b> {last_run_str}\n\n"
+        f"<b>4 Video Terakhir:</b>\n{recent_list_str or '• Belum ada video'}\n\n"
+        f"💡 <i>Ketik 'upload 1 video baru' atau kirim /upload untuk eksekusi langsung.</i>"
+    )
+    _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
+
+
+def _cmd_keywords(args: str, msg_id: int, thread_id: int):
+    """View or update search keywords."""
+    cfg = load_config()
+    keywords = cfg.get("keywords", [])
+
+    if not args:
+        kw_list = "\n".join([f"• {k}" for k in keywords])
+        msg = (
+            "🔑 <b>Daftar Keyword Pencarian YouTube 4K:</b>\n\n"
+            f"{kw_list}\n\n"
+            "<i>Untuk menambah: <code>/keywords add &lt;nama keyword&gt;</code></i>\n"
+            "<i>Untuk menghapus: <code>/keywords remove &lt;nama keyword&gt;</code></i>"
+        )
+        _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
+        return
+
+    parts = args.split(maxsplit=1)
+    subcmd = parts[0].lower()
+    target = parts[1].strip() if len(parts) > 1 else ""
+
+    if subcmd == "add" and target:
+        if target not in keywords:
+            keywords.append(target)
+            cfg["keywords"] = keywords
+            save_config(cfg)
+            _send_reply(f"✅ Keyword berhasil ditambahkan: <b>{target}</b>", reply_to_message_id=msg_id, thread_id=thread_id)
+        else:
+            _send_reply(f"ℹ️ Keyword sudah ada di daftar: <b>{target}</b>", reply_to_message_id=msg_id, thread_id=thread_id)
+    elif subcmd in ("remove", "delete") and target:
+        if target in keywords:
+            keywords.remove(target)
+            cfg["keywords"] = keywords
+            save_config(cfg)
+            _send_reply(f"🗑 Keyword berhasil dihapus: <b>{target}</b>", reply_to_message_id=msg_id, thread_id=thread_id)
+        else:
+            _send_reply(f"⚠️ Keyword tidak ditemukan di daftar: <b>{target}</b>", reply_to_message_id=msg_id, thread_id=thread_id)
+    else:
+        _send_reply("Format: <code>/keywords add &lt;keyword&gt;</code> atau <code>/keywords remove &lt;keyword&gt;</code>", reply_to_message_id=msg_id, thread_id=thread_id)
+
+
+def _cmd_help(msg_id: int, thread_id: int):
+    """Show help guide for TikTok topic."""
+    msg = (
+        "🎬 <b>Panduan Kontrol TikTok Automation Agent:</b>\n\n"
+        "Kamu bisa ngobrol santai seperti dengan asisten produksi sungguhan:\n\n"
+        "• <b>Instruksi Langsung:</b>\n"
+        "  - <i>\"Upload 1 video mancing dong\"</i>\n"
+        "  - <i>\"Coba dry run tes render video kayu\"</i>\n"
+        "  - <i>\"Cek status upload hari ini\"</i>\n\n"
+        "• <b>Diskusi & Curation:</b>\n"
+        "  - <i>\"Rekomendasi hook teks buat konten bangunan\"</i>\n"
+        "  - <i>\"Gimana cara optimasi video 6 menit di TikTok?\"</i>\n\n"
+        "• <b>Slash Commands:</b>\n"
+        "  - <code>/upload [keyword]</code> : Eksekusi download, render & upload.\n"
+        "  - <code>/dryrun [keyword]</code> : Tes render tanpa upload.\n"
+        "  - <code>/status</code> : Cek rekap & statistik video.\n"
+        "  - <code>/keywords</code> : Kelola kata kunci pencarian."
+    )
+    _send_reply(msg, reply_to_message_id=msg_id, thread_id=thread_id)
+
+
+def _trigger_pipeline_async(
+    dry_run: bool, msg_id: int, thread_id: int, keyword: Optional[str] = None
+):
+    """Run the TikTok pipeline in a detached thread so Telegram poller never freezes."""
+    if _PIPELINE_LOCK.locked():
+        _send_reply(
+            "⏳ <b>Pipeline Sedang Berjalan!</b>\n"
+            "Harap tunggu hingga proses render dan upload video saat ini selesai.",
+            reply_to_message_id=msg_id,
+            thread_id=thread_id,
+        )
+        return
+
+    mode_text = "DRY RUN (Download & Render Saja)" if dry_run else "PRODUKSI (Download, Render & Upload TikTok)"
+    kw_text = f"Topik/Keyword: <i>{keyword}</i>" if keyword else "Keyword: <i>Preset Otomatis</i>"
+    _send_reply(
+        f"⚡ <b>Siap! Memulai TikTok Pipeline ({mode_text})</b>\n\n"
+        f"🔍 {kw_text}\n"
+        f"⏱ <i>Menganalisis chapters YouTube, auto-skip intro, dan merender vertikal 9:16...</i>",
+        reply_to_message_id=msg_id,
+        thread_id=thread_id,
+    )
+
+    def worker():
+        with _PIPELINE_LOCK:
+            try:
+                def progress_cb(text: str):
+                    # Notify significant steps back to Telegram topic
+                    if any(key in text for key in ["Melompati intro", "Merender", "Mengunggah", "Sukses"]):
+                        _send_reply(text, thread_id=thread_id)
+
+                res = run_pipeline(
+                    dry_run=dry_run,
+                    count=1,
+                    keyword_override=keyword,
+                    progress_callback=progress_cb,
+                )
+
+                if res.get("success"):
+                    videos = res.get("videos", [])
+                    v = videos[0] if videos else {}
+                    title = v.get("title", "Video Konten")
+                    channel = v.get("channel", "Official Creator")
+
+                    if dry_run:
+                        _send_reply(
+                            f"🧪 <b>Dry Run Selesai dengan Sukses!</b>\n\n"
+                            f"📌 <b>Judul:</b> {title}\n"
+                            f"👤 <b>Channel:</b> {channel}\n"
+                            f"📁 <b>Output Render:</b> <code>{v.get('path','')}</code>\n\n"
+                            f"<i>Visual telah dirender 9:16 Lanczos + Unsharp CRF 18 siap upload.</i>",
+                            thread_id=thread_id,
+                        )
+                    else:
+                        _send_reply(
+                            f"🎉 <b>Video Sukses Terunggah ke TikTok!</b>\n\n"
+                            f"📌 <b>Judul:</b> {title}\n"
+                            f"👤 <b>Channel:</b> {channel}\n"
+                            f"⏱ <b>Durasi:</b> 360 detik (6 Menit Penuh Aksi)\n"
+                            f"✨ <b>Kualitas:</b> 1080x1920 HD (BT.709 High 4.2)\n\n"
+                            f"<i>Video sudah live di feed akun TikTok kamu.</i>",
+                            thread_id=thread_id,
+                        )
+                else:
+                    errors_str = "; ".join(res.get("errors", [])) or "Kandidat video tidak ditemukan"
+                    _send_reply(
+                        f"⚠️ <b>Pipeline Selesai dengan Catatan:</b>\n{errors_str}",
+                        thread_id=thread_id,
+                    )
+            except Exception as e:
+                logger.exception("Pipeline worker failed: %s", e)
+                _send_reply(
+                    f"❌ <b>Terjadi Kendala saat Menjalankan Pipeline:</b>\n<code>{e}</code>",
+                    thread_id=thread_id,
+                )
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+
+
+def _chat_with_tiktok_strategist(user_message: str, msg_id: int, thread_id: int):
+    """Conversational AI mode: Answer questions as a seasoned TikTok Video Director & Operator."""
+    cfg = load_config()
+    db = VideoStateDB(cfg["db_path"])
+    stats = db.get_stats(days=7)
+    recent = db.get_recent_uploads(3)
+    db.close()
+
+    recent_summary = ""
+    for r in recent:
+        recent_summary += f"- {r.get('title')[:50]} (uploaded: {r.get('uploaded_at')[:16]})\n"
+
+    system_prompt = (
+        "Kamu adalah Apex — TikTok Content Director & Video Automation Specialist.\n"
+        "Karaktermu:\n"
+        "- Ahli algoritma video pendek & horizontal-to-vertical adaptation (TikTok, Reels, Shorts).\n"
+        "- Paham psikologi audiens: retensi 3 detik pertama, visual hook, pacing ritme kerja/ASMR, pentingnya melompati intro membosankan.\n"
+        "- Menguasai format teknis: 9:16 blurred pillarbox, penajaman Lanczos, unsharp filter, profile warna BT.709, dan safe zone teks ponsel.\n"
+        "- Kamu mengoperasikan bot otomatis yang mencari video 4K YouTube (niche: Outdoor Boys camping/mancing, TysyTube restorasi, advoko MAKES bushcraft, pertukangan kayu, masonry bata), memotong 6 menit aksi inti, dan mengunggahnya ke TikTok.\n\n"
+        f"Kondisi bot saat ini:\n"
+        f"- Total video terunggah: {stats['total_uploaded']}\n"
+        f"- 3 Video terakhir:\n{recent_summary or 'Belum ada'}\n\n"
+        "Instruksi Komunikasi:\n"
+        "- Jawab langsung, to the point, actionable, santai namun berwawasan tinggi (Bahasa Indonesia).\n"
+        "- Jika user berdiskusi ide hook, judul safe zone, atau evaluasi niche, berikan rekomendasi konkrit yang siap pakai.\n"
+        "- Jika user ingin menjalankan aksi, ingatkan bahwa mereka cukup bilang 'upload video mancing' atau 'coba dry run'."
+    )
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {LLM_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": LLM_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            "max_tokens": 500,
+            "temperature": 0.7,
+        }
+
+        resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=25)
+        if resp.status_code == 200:
+            reply_text = resp.json()["choices"][0]["message"]["content"].strip()
+            _send_reply(reply_text, reply_to_message_id=msg_id, thread_id=thread_id)
+        else:
+            _send_reply(
+                "Halo! Aku siap bantu kurasi dan otomatisasi konten TikTok kamu. "
+                "Cukup ketik <i>'upload 1 video baru'</i> atau <i>'/status'</i> untuk kontrol langsung.",
+                reply_to_message_id=msg_id,
+                thread_id=thread_id,
+            )
+    except Exception as exc:
+        logger.error("LLM chat error in TikTok topic: %s", exc)
+        _send_reply(
+            "Halo! Aku Apex, operator TikTok video kamu. "
+            "Ketik <code>/upload</code> untuk memproses video baru, atau <code>/status</code> untuk cek rekap.",
+            reply_to_message_id=msg_id,
+            thread_id=thread_id,
+        )
