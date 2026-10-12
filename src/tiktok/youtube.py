@@ -9,7 +9,17 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_COOKIES_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "tiktok" / "youtube_cookies.txt"
+
 _YTDLP = [sys.executable, "-m", "yt_dlp"]
+
+def _ytdlp_base() -> list[str]:
+    """Build base yt-dlp command with cookies and JS runtime if available."""
+    cmd = list(_YTDLP)
+    cmd.extend(["--js-runtimes", "node", "--remote-components", "ejs:github"])
+    if _COOKIES_PATH.exists():
+        cmd.extend(["--cookies", str(_COOKIES_PATH)])
+    return cmd
 
 
 ACTION_KEYWORDS = [
@@ -76,7 +86,7 @@ def search_videos(
     search_url = f"ytsearch{max_results * 5}:{query}"  # over-fetch to survive duration filter
 
     cmd = [
-        *_YTDLP,
+        *_ytdlp_base(),
         "--dump-json",
         "--flat-playlist",
         "--no-warnings",
@@ -150,7 +160,7 @@ def download_video(url: str, output_dir: str) -> str | None:
     outtmpl = str(out_dir / "%(id)s.%(ext)s")
 
     cmd = [
-        *_YTDLP,
+        *_ytdlp_base(),
         "--format", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
         "--merge-output-format", "mp4",
         "--output", outtmpl,
