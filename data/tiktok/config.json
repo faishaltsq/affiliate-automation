@@ -1,0 +1,21 @@
+{
+  "keywords": [
+    "Outdoor Boys camping fishing 4K",
+    "TysyTube Restoration satisfying 4K",
+    "advoko MAKES bushcraft shelter 4K",
+    "Bertram Craft and Wilderness relaxing 4K",
+    "satisfying bricklaying masonry craftsmanship 4K"
+  ],
+  "videos_per_run": 1,
+  "max_duration_seconds": 1800,
+  "clip_duration_seconds": 360,
+  "min_duration_seconds": 15,
+  "crop_width": 1080,
+  "crop_height": 1920,
+  "caption_template": "{title} #satisfying #relaxing #diy #outdoor #fyp",
+  "tiktok_cookies_path": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\cookies.txt",
+  "db_path": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\state.db",
+  "download_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\downloads",
+  "output_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\output",
+  "log_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\logs\\tiktok"
+}
