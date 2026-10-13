@@ -23,12 +23,16 @@ def _find_node() -> str:
     return "node"  # fallback to PATH
 
 
-def _ytdlp_base() -> list[str]:
-    """Build base yt-dlp command with cookies and JS runtime if available."""
+def _ytdlp_base(with_cookies: bool = True) -> list[str]:
+    """Build base yt-dlp command with IPv4 force, JS runtime, and optional cookies."""
     cmd = list(_YTDLP)
     node_path = _find_node()
-    cmd.extend(["--js-runtimes", f"node:{node_path}"])
-    if _COOKIES_PATH.exists():
+    cmd.extend([
+        "--force-ipv4",
+        "--js-runtimes", f"node:{node_path}",
+        "--remote-components", "ejs:github",
+    ])
+    if with_cookies and _COOKIES_PATH.exists() and _COOKIES_PATH.stat().st_size > 50:
         cmd.extend(["--cookies", str(_COOKIES_PATH)])
     return cmd
 
@@ -212,8 +216,25 @@ def download_video(url: str, output_dir: str) -> str | None:
         return None
 
     if result.returncode != 0:
-        logger.error("yt-dlp exited %d for %s:\n%s", result.returncode, url, result.stderr)
-        return None
+        logger.warning("yt-dlp download failed (code %d), retrying without cookies: %s", result.returncode, url)
+        retry_cmd = [
+            *_ytdlp_base(with_cookies=False),
+            "--format", "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best[height>=1080]/best",
+            "--merge-output-format", "mp4",
+            "--output", outtmpl,
+            "--no-warnings",
+            "--quiet",
+            url,
+        ]
+        try:
+            result = subprocess.run(retry_cmd, capture_output=True, text=True, timeout=600)
+        except Exception as exc:
+            logger.error("yt-dlp fallback download failed: %s", exc)
+            return None
+
+        if result.returncode != 0:
+            logger.error("yt-dlp exited %d for %s:\n%s", result.returncode, url, result.stderr)
+            return None
 
     video_id = _extract_video_id(url)
     if video_id:

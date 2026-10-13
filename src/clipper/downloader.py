@@ -196,8 +196,12 @@ def download_asset_videos(url: str, output_dir: str = "data/clippo/downloads") -
 
     # 4. Use yt-dlp for YouTube, Instagram, etc.
     import sys
+    node_path = _find_node()
     cmd = [
         sys.executable, "-m", "yt_dlp",
+        "--force-ipv4",
+        "--js-runtimes", f"node:{node_path}",
+        "--remote-components", "ejs:github",
         "--no-playlist",
         "-f", "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best[ext=mp4]/best",
         "--merge-output-format", "mp4",
@@ -207,10 +211,8 @@ def download_asset_videos(url: str, output_dir: str = "data/clippo/downloads") -
     ]
 
     if any(k in clean_url for k in ["youtube.com", "youtu.be"]) and os.path.exists(YTDLP_COOKIES):
-        node_path = _find_node()
         cmd.extend([
             "--cookies", YTDLP_COOKIES,
-            "--js-runtimes", f"node:{node_path}",
         ])
 
     cmd.append(clean_url)
