@@ -112,11 +112,3 @@ def send_clipper_menu(api: str, chat_id: int, thread_id: int):
     msg_id = _send_message(api, chat_id, thread_id, text, keyboard)
     if msg_id:
         logger.info("Clipper menu sent (msg_id=%d)", msg_id)
-
-
-def setup_all_menus(api: str, chat_id: int, tiktok_thread: int, threads_thread: int, clipper_thread: int):
-    """Send menu buttons to all 3 forum threads (no pinning)."""
-    send_tiktok_menu(api, chat_id, tiktok_thread)
-    send_threads_menu(api, chat_id, threads_thread)
-    send_clipper_menu(api, chat_id, clipper_thread)
-    logger.info("All thread menus sent.")

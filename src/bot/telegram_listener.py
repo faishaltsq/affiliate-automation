@@ -18,7 +18,7 @@ from src.affiliate.queue_manager import init_affiliate_queue
 from src.bot.tiktok_agent import handle_tiktok_message
 from src.bot.threads_agent import handle_threads_message
 from src.bot.clipper_agent import handle_clipper_message
-from src.bot.menu_buttons import setup_all_menus, send_tiktok_menu, send_threads_menu, send_clipper_menu
+from src.bot.menu_buttons import send_tiktok_menu, send_threads_menu, send_clipper_menu
 
 log = get_logger("tg_listener")
 
@@ -130,14 +130,7 @@ def run_telegram_listener():
         start_scheduler(interval_hours=interval)
         log.info("Scheduler started — pipeline every %.1fh", interval)
 
-    # Send & pin command menu buttons to each forum thread
-    setup_all_menus(
-        api=API,
-        chat_id=int(CHAT_ID),
-        tiktok_thread=int(TIKTOK_THREAD_ID),
-        threads_thread=int(THREADS_THREAD_ID),
-        clipper_thread=int(CLIPPER_THREAD_ID),
-    )
+    # Menu buttons are sent only on /menu command, not on startup
 
     # Flush old updates on startup
     try:
