@@ -18,6 +18,7 @@ from src.affiliate.queue_manager import init_affiliate_queue
 from src.bot.tiktok_agent import handle_tiktok_message
 from src.bot.threads_agent import handle_threads_message
 from src.bot.clipper_agent import handle_clipper_message
+from src.bot.menu_buttons import setup_all_menus, send_tiktok_menu, send_threads_menu, send_clipper_menu
 
 log = get_logger("tg_listener")
 
@@ -78,6 +79,42 @@ def handle_message(msg: dict):
             handle_threads_message(msg, text, msg_id, target_tid)
 
 
+def _answer_callback(callback_query_id: str):
+    """Acknowledge a callback query to stop the loading spinner on button."""
+    try:
+        requests.post(f"{API}/answerCallbackQuery", json={"callback_query_id": callback_query_id}, timeout=5)
+    except Exception:
+        pass
+
+
+def handle_callback_query(cbq: dict):
+    """Route inline button presses to the correct thread agent."""
+    cbq_id = cbq.get("id")
+    data = (cbq.get("data") or "").strip()
+    sender_msg = cbq.get("message", {})
+    thread_id = sender_msg.get("message_thread_id")
+    chat_id = str(sender_msg.get("chat", {}).get("id", ""))
+    msg_id = sender_msg.get("message_id")
+
+    _answer_callback(cbq_id)
+
+    if not data or not thread_id:
+        return
+
+    thread_str = str(thread_id)
+    log.info("Callback [Thread: %s] data=%s", thread_str, data)
+
+    # Build a synthetic message dict for the agent handlers
+    fake_msg = {"message_id": msg_id, "chat": sender_msg.get("chat", {}), "message_thread_id": thread_id}
+
+    if thread_str == CLIPPER_THREAD_ID:
+        handle_clipper_message(fake_msg, data, msg_id, thread_id)
+    elif thread_str == TIKTOK_THREAD_ID:
+        handle_tiktok_message(fake_msg, data, msg_id, thread_id)
+    elif thread_str == THREADS_THREAD_ID:
+        handle_threads_message(fake_msg, data, msg_id, thread_id)
+
+
 def run_telegram_listener():
     """Long-polling loop for Telegram incoming messages."""
     ensure_single_instance("telegram_listener")
@@ -92,6 +129,15 @@ def run_telegram_listener():
         interval = float(sched_cfg.get("interval_hours", 2))
         start_scheduler(interval_hours=interval)
         log.info("Scheduler started — pipeline every %.1fh", interval)
+
+    # Send & pin command menu buttons to each forum thread
+    setup_all_menus(
+        api=API,
+        chat_id=int(CHAT_ID),
+        tiktok_thread=int(TIKTOK_THREAD_ID),
+        threads_thread=int(THREADS_THREAD_ID),
+        clipper_thread=int(CLIPPER_THREAD_ID),
+    )
 
     # Flush old updates on startup
     try:
@@ -121,8 +167,25 @@ def run_telegram_listener():
             updates = r.json().get("result", [])
             for upd in updates:
                 offset = upd["update_id"] + 1
+                # Handle inline button press
+                if "callback_query" in upd:
+                    handle_callback_query(upd["callback_query"])
+                    continue
                 msg = upd.get("message") or upd.get("channel_post")
                 if msg:
+                    # Handle /menu command — resend button panel to current thread
+                    text = (msg.get("text") or "").strip().lower()
+                    if text == "/menu":
+                        tid = msg.get("message_thread_id")
+                        if tid:
+                            tid_str = str(tid)
+                            if tid_str == TIKTOK_THREAD_ID:
+                                send_tiktok_menu(API, int(CHAT_ID), tid)
+                            elif tid_str == THREADS_THREAD_ID:
+                                send_threads_menu(API, int(CHAT_ID), tid)
+                            elif tid_str == CLIPPER_THREAD_ID:
+                                send_clipper_menu(API, int(CHAT_ID), tid)
+                        continue
                     handle_message(msg)
 
         except Exception as e:
