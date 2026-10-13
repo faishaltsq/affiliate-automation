@@ -68,6 +68,34 @@ def _send_reply(text: str, reply_to_msg_id: Optional[int] = None, thread_id: Opt
         logger.error("Error sending Telegram reply: %s", e)
 
 
+def _send_video_file(video_path: str, caption: str, thread_id: Optional[int] = None):
+    """Send MP4 video file directly to Telegram topic if <= 50MB."""
+    if not BOT_TOKEN or not os.path.exists(video_path):
+        return
+    size_mb = os.path.getsize(video_path) / (1024 * 1024)
+    if size_mb > 50:
+        logger.warning("Video size %.1fMB exceeds Telegram 50MB limit, skipping sendVideo", size_mb)
+        return
+    tid = thread_id if thread_id is not None else CLIPPER_THREAD_ID
+    try:
+        with open(video_path, "rb") as vf:
+            r = requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo",
+                data={
+                    "chat_id": int(CHAT_ID),
+                    "message_thread_id": int(tid),
+                    "caption": caption[:1024],
+                    "parse_mode": "HTML",
+                },
+                files={"video": vf},
+                timeout=180,
+            )
+            if not r.ok:
+                logger.warning("Telegram sendVideo failed (%d): %s", r.status_code, r.text[:200])
+    except Exception as e:
+        logger.error("Error sending Telegram video: %s", e)
+
+
 def _cmd_campaigns(msg_id: int, thread_id: int):
     """List active Clippo campaigns sorted by CPM and budget."""
     _send_reply("🔍 Mengambil daftar campaign aktif dari Clippo...", reply_to_msg_id=msg_id, thread_id=thread_id)
@@ -155,9 +183,17 @@ def _cmd_accounts(msg_id: int, thread_id: int):
     _send_reply("\n".join(lines), reply_to_msg_id=msg_id, thread_id=thread_id)
 
 
-def _cmd_clip_async(campaign_id: str, source_url: Optional[str], target_accounts: Optional[list[str]], msg_id: int, thread_id: int):
+def _cmd_clip_async(
+    campaign_id: str,
+    source_url: Optional[str],
+    target_accounts: Optional[list[str]],
+    msg_id: int,
+    thread_id: int,
+    count: int = 1,
+    distribution: str = "distribute",
+):
     """Run clipper pipeline in background thread with live status message editing."""
-    _send_reply("⏳ <b>Memulai pipeline...</b>", reply_to_msg_id=msg_id, thread_id=thread_id)
+    _send_reply(f"⏳ <b>Memulai pipeline ({count} klip)...</b>", reply_to_msg_id=msg_id, thread_id=thread_id)
 
     def worker():
         # Send 1 status message, then keep editing it
@@ -200,7 +236,7 @@ def _cmd_clip_async(campaign_id: str, source_url: Optional[str], target_accounts
             import re as _re
             clean = _re.sub(r"<[^>]+>", "", text).strip()
             # Update last line if same step, else append
-            step_icons = ["✂️", "📋", "👤", "🤖", "📥", "🎬", "🚀", "✅", "❌", "⚠️"]
+            step_icons = ["✂️", "📋", "👤", "🤖", "📥", "🎬", "🚀", "✅", "❌", "⚠️", "🎯", "🎙️"]
             icon = next((ic for ic in step_icons if text.startswith(ic)), None)
             if icon and status_lines and any(status_lines[-1].startswith(ic) for ic in step_icons):
                 status_lines[-1] = text  # replace last step line
@@ -216,19 +252,34 @@ def _cmd_clip_async(campaign_id: str, source_url: Optional[str], target_accounts
                 source_url=source_url,
                 target_accounts=target_accounts,
                 progress_callback=progress_cb,
+                count=count,
+                distribution=distribution,
             )
             if res.get("success"):
+                # Send each generated video file to Telegram Topic 246
+                videos = res.get("videos", [])
+                if not videos and res.get("video_path"):
+                    videos = [{"video_path": res.get("video_path"), "hook": res.get("title", "")}]
+
+                for idx, v_item in enumerate(videos, 1):
+                    v_p = v_item.get("video_path")
+                    v_h = v_item.get("hook", f"Video #{idx}")
+                    cap = f"📹 <b>Video {idx}/{len(videos)}:</b> <i>\"{v_h}\"</i>\n🏷 Campaign: <code>{campaign_id}</code>"
+                    if v_p and os.path.exists(v_p):
+                        _send_video_file(v_p, cap, thread_id=thread_id)
+
                 upload_lines = []
                 for u in res.get("upload_results", []):
                     icon = "✅" if u.get("success") else "❌"
-                    upload_lines.append(f"{icon} <b>{u.get('account')}:</b>\n   <i>\"{u.get('caption', '')[:70]}...\"</i>")
+                    hook_info = f" [<i>\"{u.get('hook', '')[:30]}\"</i>]" if u.get("hook") else ""
+                    upload_lines.append(f"{icon} <b>{u.get('account')}:</b>{hook_info}\n   <i>\"{u.get('caption', '')[:70]}...\"</i>")
 
                 upload_summary = "\n".join(upload_lines)
                 final_msg = (
-                    f"🎉 <b>Klip Sukses Dibuat &amp; Terunggah!</b>\n\n"
+                    f"🎉 <b>{len(videos)} Klip Sukses Dibuat &amp; Terunggah!</b>\n\n"
                     f"📌 <b>Campaign:</b> {res.get('title')}\n"
                     f"💰 <b>Potensi CPM:</b> Rp {res.get('cpm', 0):,} / 1k views\n"
-                    f"👥 <b>Hasil Upload ({res.get('success_count')}/{res.get('total_accounts')} akun):</b>\n"
+                    f"👥 <b>Hasil Upload ({res.get('success_count')}/{len(res.get('upload_results', []))} unggahan):</b>\n"
                     f"{upload_summary}\n\n"
                     f"📝 <b>Hashtags:</b> {' '.join(res.get('hashtags', []))}\n"
                     f"👉 <i>Salin link video dari akun di atas dan submit di app.clippo.id/campaigns/{campaign_id}!</i>"
@@ -262,7 +313,9 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
             "<b>Campaign:</b>\n"
             "• <code>/campaigns</code> — Lihat daftar campaign aktif (CPM & sisa budget)\n"
             "• <code>/brief [id]</code> — Analisis AI syarat, do's & don'ts, serta ide hook\n"
-            "• <code>/clip [id]</code> — Upload ke semua akun aktif\n"
+            "• <code>/clip [id]</code> — Upload 1 klip ke semua akun aktif\n"
+            "• <code>/clip [id] 2</code> — Buat 2 klip dengan hook berbeda & bagi per akun\n"
+            "• <code>/clip [id] 3</code> — Buat 3 klip dengan hook berbeda & bagi per akun\n"
             "• <code>/clip [id] --account nama1,nama2</code> — Upload ke akun tertentu\n\n"
             "<b>Akun TikTok:</b>\n"
             "• <code>/accounts</code> — Lihat semua akun & statusnya\n"
@@ -332,15 +385,43 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
                 target_accounts = None
                 remaining = [x for x in remaining if x != "--all"]
 
+            # Parse count flag or positional number
+            count = 1
+            if "--count" in remaining:
+                c_idx = remaining.index("--count")
+                if c_idx + 1 < len(remaining) and remaining[c_idx + 1].isdigit():
+                    count = max(1, min(5, int(remaining[c_idx + 1])))
+                    remaining = remaining[:c_idx] + remaining[c_idx + 2:]
+            else:
+                digit_args = [x for x in remaining if x.isdigit()]
+                if digit_args:
+                    count = max(1, min(5, int(digit_args[0])))
+                    remaining = [x for x in remaining if x != digit_args[0]]
+
+            # Parse distribution flag
+            distribution = "distribute"
+            if "--all-accounts" in remaining:
+                distribution = "all"
+                remaining = [x for x in remaining if x != "--all-accounts"]
+
             # Remaining non-flag arg = source URL
             url_args = [x for x in remaining if not x.startswith("--")]
             if url_args:
                 source_url = url_args[0]
 
-            _cmd_clip_async(cid, source_url, target_accounts, msg_id, thread_id)
+            _cmd_clip_async(
+                cid,
+                source_url,
+                target_accounts,
+                msg_id,
+                thread_id,
+                count=count,
+                distribution=distribution,
+            )
         else:
             _send_reply(
-                "Ketik <code>/clip [campaign_id]</code> untuk upload ke semua akun aktif.\n"
+                "Ketik <code>/clip [campaign_id]</code> untuk upload 1 klip ke semua akun aktif.\n"
+                "Atau multi-klip: <code>/clip [id] 2</code> (buat 2 klip dengan hook berbeda).\n"
                 "Atau pilih akun: <code>/clip [id] --account nama1,nama2</code>",
                 reply_to_msg_id=msg_id, thread_id=thread_id
             )
