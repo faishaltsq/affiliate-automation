@@ -6,6 +6,9 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Union, List
 
+from src.clipper.framing import determine_framing_mode, CropConfig
+from src.clipper.subtitles import generate_clipper_subtitles, burn_subtitles_to_video
+
 logger = logging.getLogger("clipper.editor")
 
 FONT_PATH = "C\\:/Windows/Fonts/arialbd.ttf"
@@ -63,6 +66,23 @@ def has_audio_stream(video_path: str) -> bool:
         return False
 
 
+def get_video_dimensions(video_path: str) -> tuple[int, int]:
+    """Return video width and height in pixels via ffprobe."""
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=p=0:s=x",
+        video_path,
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        parts = res.stdout.strip().split("x")
+        return int(parts[0]), int(parts[1])
+    except Exception:
+        return 1920, 1080
+
+
 def render_clipper_video(
     input_path: Union[str, List[str]],
     output_dir: str = "data/clippo/output",
@@ -71,12 +91,15 @@ def render_clipper_video(
     hook_text: Optional[str] = None,
     cta_text: Optional[str] = None,
     fill_mode: bool = False,
+    climax_info: Optional[dict] = None,
+    auto_subtitles: bool = True,
 ) -> Optional[str]:
     """
     Render video into 1080x1920 9:16 format with high quality H.264 BT.709.
     If input_path is a list of footage paths, combines slices from ALL provided footages
     so that every footage file is represented in the final clip.
-    Optionally overlays hook text banner at top-center safe zone.
+    Optionally prepends a 3.5s punchline climax teaser as cold open and overlays hook text.
+    Burns synchronized running subtitles via faster-whisper.
     """
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +111,8 @@ def render_clipper_video(
             target_duration=duration_sec,
             hook_text=hook_text,
             fill_mode=fill_mode,
+            climax_info=climax_info,
+            auto_subtitles=auto_subtitles,
         )
 
     # Single video mode
@@ -170,10 +195,16 @@ def _render_clipper_multi_video(
     target_duration: float = 75.0,
     hook_text: Optional[str] = None,
     fill_mode: bool = False,
+    climax_info: Optional[dict] = None,
+    auto_subtitles: bool = True,
 ) -> Optional[str]:
     """
     Stitch slices from EVERY provided footage into a single cohesive 9:16 vertical video.
     Guarantees 100% of the provided footages are included in the clip.
+    If climax_info is present, prepends the climax punchline moment (3.5s) as the opening teaser hook,
+    followed by all footages in natural story sequence.
+    Applies adaptive 4:3 framing panned towards subject angle, with automatic 16:9 ambient fallback.
+    Burns synchronized running subtitles via faster-whisper.
     """
     # Strict validation: keep only playable video files
     valid_paths = [p for p in video_paths if is_valid_media_file(p)]
@@ -181,7 +212,7 @@ def _render_clipper_multi_video(
         logger.error("No valid video files found in multi-footage input: %s", video_paths)
         return None
 
-    if len(valid_paths) == 1:
+    if len(valid_paths) == 1 and not climax_info:
         return render_clipper_video(
             valid_paths[0],
             output_dir=output_dir,
@@ -189,6 +220,8 @@ def _render_clipper_multi_video(
             duration_sec=target_duration,
             hook_text=hook_text,
             fill_mode=fill_mode,
+            climax_info=climax_info,
+            auto_subtitles=auto_subtitles,
         )
 
     video_paths = valid_paths
@@ -196,53 +229,117 @@ def _render_clipper_multi_video(
     out_name = f"clip_multi_{n_clips}_{int(target_duration)}s.mp4"
     out_path = os.path.join(output_dir, out_name)
 
-    # Allocate duration per clip so total stays balanced
-    seg_dur = max(4.0, target_duration / n_clips)
+    # Determine framing geometry from first footage
+    in_w, in_h = get_video_dimensions(video_paths[0])
+    crop_cfg = determine_framing_mode(in_w, in_h)
+    logger.info("Framing mode selected: %s (reason: %s)", crop_cfg.mode, crop_cfg.reason)
 
     inputs = []
     filter_parts = []
     concat_inputs = []
+    idx = 0
+    effective_hook = hook_text
 
-    for i, path in enumerate(video_paths):
+    # 1. Cold open teaser: if climax_info provided, inject as segment #0
+    if climax_info and climax_info.get("target_file") and is_valid_media_file(climax_info["target_file"]):
+        teaser_file = climax_info["target_file"]
+        teaser_start = float(climax_info.get("climax_start", 0.0))
+        teaser_dur = float(climax_info.get("climax_duration", 3.5))
+        if climax_info.get("punchline_hook"):
+            effective_hook = climax_info["punchline_hook"]
+
+        inputs.extend(["-ss", f"{teaser_start:.2f}", "-t", f"{teaser_dur:.2f}", "-i", teaser_file])
+        a_filt = (
+            f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
+            if has_audio_stream(teaser_file)
+            else f"anullsrc=r=48000:cl=stereo,atrim=end={teaser_dur:.2f}[a{idx}]"
+        )
+        if fill_mode:
+            vf = (
+                f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
+                f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
+                f"{a_filt}"
+            )
+        elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
+            x_off = crop_cfg.x_offset
+            vf = (
+                f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
+                f"{a_filt}"
+            )
+        else:
+            vf = (
+                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
+                f"{a_filt}"
+            )
+        filter_parts.append(vf)
+        concat_inputs.append(f"[v{idx}][a{idx}]")
+        idx += 1
+
+    # 2. Sequential story progression: budget remaining time across ALL provided footages (1..N)
+    if climax_info and idx > 0:
+        rem_time = max(20.0, target_duration - float(climax_info.get("climax_duration", 3.5)))
+    else:
+        rem_time = target_duration
+
+    seg_dur = max(3.0, rem_time / n_clips)
+
+    for path in video_paths:
         file_dur = get_video_duration(path)
-        # Choose start offset (skip opening silence/dead time if video long enough)
         start_offset = min(4.0, max(0.0, file_dur - seg_dur - 1.0))
-        actual_seg = min(seg_dur, max(3.0, file_dur - start_offset))
+        actual_seg = min(seg_dur, max(2.5, file_dur - start_offset))
 
         inputs.extend(["-ss", f"{start_offset:.2f}", "-t", f"{actual_seg:.2f}", "-i", path])
 
         audio_filter = (
-            f"[{i}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{i}]"
+            f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
             if has_audio_stream(path)
-            else f"anullsrc=r=48000:cl=stereo,atrim=end={actual_seg:.2f}[a{i}]"
+            else f"anullsrc=r=48000:cl=stereo,atrim=end={actual_seg:.2f}[a{idx}]"
         )
 
         if fill_mode:
             vf = (
-                f"[{i}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
-                f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{i}];"
+                f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
+                f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
+                f"{audio_filter}"
+            )
+        elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
+            x_off = crop_cfg.x_offset
+            vf = (
+                f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
                 f"{audio_filter}"
             )
         else:
             vf = (
-                f"[{i}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{i}];"
-                f"[{i}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{i}];"
-                f"[bg{i}][fg{i}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{i}];"
+                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
                 f"{audio_filter}"
             )
         filter_parts.append(vf)
-        concat_inputs.append(f"[v{i}][a{i}]")
+        concat_inputs.append(f"[v{idx}][a{idx}]")
+        idx += 1
 
-    concat_chain = "".join(concat_inputs) + f"concat=n={n_clips}:v=1:a=1[basev][outa]"
+    total_inputs_count = idx
+    concat_chain = "".join(concat_inputs) + f"concat=n={total_inputs_count}:v=1:a=1[basev][outa]"
     filter_parts.append(concat_chain)
 
     last_v = "basev"
-    if hook_text:
-        esc_hook = hook_text.replace("'", "'\\''").replace(":", "\\:").upper()
+    if effective_hook:
+        esc_hook = effective_hook.replace("'", "'\\''").replace(":", "\\:").upper()
+        banner_y = 440 if crop_cfg.mode == "crop_4_3" else 520
         filter_parts.append(
             f"[{last_v}]drawtext=fontfile='{FONT_PATH}':text='{esc_hook}':"
-            f"fontcolor=white:fontsize=46:x=(w-text_w)/2:y=280:box=1:boxcolor=black@0.65:boxborderw=18:"
+            f"fontcolor=white:fontsize=46:x=(w-text_w)/2:y={banner_y}:box=1:boxcolor=black@0.65:boxborderw=18:"
             f"enable='between(t,0,3.5)'[outv]"
         )
         last_v = "outv"
@@ -280,6 +377,21 @@ def _render_clipper_multi_video(
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
         if res.returncode == 0 and os.path.exists(out_path):
             logger.info("Rendered multi-footage successfully: %s", out_path)
+
+            # Auto speech subtitles burning
+            if auto_subtitles:
+                try:
+                    ass_path = generate_clipper_subtitles(out_path, margin_v=crop_cfg.margin_v)
+                    if ass_path and os.path.exists(ass_path):
+                        burned_out = out_path.replace(".mp4", "_subbed.mp4")
+                        if burn_subtitles_to_video(out_path, ass_path, burned_out):
+                            os.replace(burned_out, out_path)
+                            logger.info("Subtitles burned successfully onto: %s", out_path)
+                        if os.path.exists(ass_path):
+                            os.remove(ass_path)
+                except Exception as sub_err:
+                    logger.warning("Subtitle burning error (continuing with base render): %s", sub_err)
+
             return out_path
         else:
             logger.error("FFmpeg multi-render failed: %s", res.stderr[-400:] if res.stderr else "Unknown")
