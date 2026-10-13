@@ -17,6 +17,7 @@ from src.singleton import ensure_single_instance
 from src.affiliate.queue_manager import init_affiliate_queue
 from src.bot.tiktok_agent import handle_tiktok_message
 from src.bot.threads_agent import handle_threads_message
+from src.bot.clipper_agent import handle_clipper_message
 
 log = get_logger("tg_listener")
 
@@ -34,6 +35,7 @@ BOT_TOKEN = _cfg.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = str(_cfg.get("TG_AFFILIATE_CHAT_ID", "-1003757350269"))
 THREADS_THREAD_ID = str(_cfg.get("TG_THREADS_THREAD_ID", _cfg.get("TG_AFFILIATE_THREAD_ID", "9")))
 TIKTOK_THREAD_ID = str(_cfg.get("TG_TIKTOK_THREAD_ID", "83"))
+CLIPPER_THREAD_ID = str(_cfg.get("TG_CLIPPER_THREAD_ID", "246"))
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -58,7 +60,9 @@ def handle_message(msg: dict):
     log.info("Incoming message [Chat: %s, Thread: %s, ID: %s]: %s", chat_id, thread_id, msg_id, text[:60])
 
     # Route based on thread_id
-    if thread_id == TIKTOK_THREAD_ID:
+    if thread_id == CLIPPER_THREAD_ID:
+        handle_clipper_message(msg, text, msg_id, int(thread_id))
+    elif thread_id == TIKTOK_THREAD_ID:
         handle_tiktok_message(msg, text, msg_id, int(thread_id))
     elif thread_id == THREADS_THREAD_ID:
         handle_threads_message(msg, text, msg_id, int(thread_id))

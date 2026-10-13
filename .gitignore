@@ -17,3 +17,6 @@ logs/
 data/tiktok/youtube_cookies.txt
 data/tiktok/youtube_client_secret.json
 data/tiktok/youtube_oauth.json
+data/clippo/cookies.txt
+data/clippo/downloads/
+data/clippo/output/
