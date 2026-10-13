@@ -89,6 +89,27 @@ def main():
             res = run_pipeline(dry_run=dry_run, count=count, keyword_override=kw)
             print(f"TikTok Pipeline Result: success={res['success']}, uploaded={res['uploaded']}, found={res['found']}")
 
+    elif cmd == "ops":
+        from src.content_ops.pipeline import run_batch_production
+        niche = "mancing"
+        if "--niche" in sys.argv:
+            try:
+                idx = sys.argv.index("--niche")
+                niche = sys.argv[idx + 1]
+            except (ValueError, IndexError):
+                pass
+        count = 3
+        if "--count" in sys.argv:
+            try:
+                idx = sys.argv.index("--count")
+                count = int(sys.argv[idx + 1])
+            except (ValueError, IndexError):
+                pass
+
+        print(f"=== Starting Content Operations [{niche}] — Target: {count} clips ===")
+        res = run_batch_production(niche=niche, target_count=count)
+        print(f"=== Content Ops Completed: {res['total_produced']} clips ready for scheduling! ===")
+
     elif cmd == "link":
         if len(sys.argv) < 3:
             print("Usage: python main.py link <affiliate_url> [optional_trend_hint]")
