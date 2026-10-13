@@ -12,7 +12,7 @@ from dotenv import dotenv_values
 from src.clipper.client import ClippoClient
 from src.clipper.brief_analyzer import analyze_campaign_brief
 from src.clipper.pipeline import run_clipper_pipeline
-from src.clipper.account_manager import list_accounts, get_account, set_account_active, register_account
+from src.clipper.account_manager import list_accounts, get_account, set_account_active, register_account, get_next_account_name
 
 logger = logging.getLogger("bot.clipper_agent")
 
@@ -227,18 +227,15 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
 
     elif t_lower.startswith("/addaccount"):
         parts = t_clean.split()
-        if len(parts) > 1:
-            acc_name = parts[1]
-            info = register_account(acc_name)
-            _send_reply(
-                f"✅ Akun <code>{acc_name}</code> terdaftar!\n\n"
-                f"Sekarang upload cookies-mu ke:\n"
-                f"<code>{info['cookies_path']}</code>\n\n"
-                f"Lalu aktifkan dengan:\n<code>/activate {acc_name}</code>",
-                reply_to_msg_id=msg_id, thread_id=thread_id
-            )
-        else:
-            _send_reply("Gunakan <code>/addaccount &lt;nama_folder&gt;</code>. Contoh: <code>/addaccount pochitaclip</code>", reply_to_msg_id=msg_id, thread_id=thread_id)
+        acc_name = parts[1] if len(parts) > 1 else get_next_account_name()
+        info = register_account(acc_name)
+        _send_reply(
+            f"✅ Folder akun <code>{acc_name}</code> berhasil disiapkan!\n\n"
+            f"Silakan letakkan cookies akunmu di:\n"
+            f"<code>{info['cookies_path']}</code>\n\n"
+            f"Setelah itu aktifkan dengan:\n<code>/activate {acc_name}</code>",
+            reply_to_msg_id=msg_id, thread_id=thread_id
+        )
 
     elif t_lower.startswith("/campaigns") or "daftar campaign" in t_lower or "list campaign" in t_lower:
         _cmd_campaigns(msg_id, thread_id)

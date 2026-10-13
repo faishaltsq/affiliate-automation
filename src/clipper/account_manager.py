@@ -77,8 +77,21 @@ def set_account_active(name: str, active: bool) -> bool:
         return False
 
 
-def register_account(name: str, display_name: str = "", username: str = "", style: str = "default") -> dict:
+def get_next_account_name() -> str:
+    """Find the next auto-incremented folder name like pochita_1, pochita_2, pochita_3..."""
+    if not ACCOUNTS_DIR.exists():
+        return "pochita_1"
+    existing = [d.name for d in ACCOUNTS_DIR.iterdir() if d.is_dir()]
+    i = 1
+    while f"pochita_{i}" in existing:
+        i += 1
+    return f"pochita_{i}"
+
+
+def register_account(name: str = "", display_name: str = "", username: str = "", style: str = "default") -> dict:
     """Create a new account directory with config (user still needs to add cookies.txt manually)."""
+    if not name or name.strip() == "":
+        name = get_next_account_name()
     acc_dir = ACCOUNTS_DIR / name
     acc_dir.mkdir(parents=True, exist_ok=True)
 
