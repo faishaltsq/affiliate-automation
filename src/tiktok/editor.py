@@ -118,8 +118,8 @@ def process_video(
         else:
             # Blurred pillarbox background + centered sharp 1080p
             fc_parts = [
-                f"[0:v]scale={crop_width}:{crop_height}:force_original_aspect_ratio=increase,crop={crop_width}:{crop_height},boxblur=25:5[bg]",
-                f"[0:v]scale={crop_width}:-2:flags=lanczos,unsharp=5:5:0.8:5:5:0.4[fg]",
+                f"[0:v]scale={crop_width}:{crop_height}:force_original_aspect_ratio=increase:flags=lanczos,crop={crop_width}:{crop_height},scale=270:480,boxblur=20:1,scale={crop_width}:{crop_height}[bg]",
+                f"[0:v]scale={crop_width}:-2:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg]",
                 f"[bg][fg]overlay=0:({crop_height}-h)/2[merged]",
             ]
             if overlay_text:

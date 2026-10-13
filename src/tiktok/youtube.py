@@ -189,7 +189,7 @@ def download_video(url: str, output_dir: str) -> str | None:
 
     cmd = [
         *_ytdlp_base(),
-        "--format", "bestvideo[width<=1080][height>=1080]+bestaudio/bestvideo[height>=720]+bestaudio/best[height>=720]/best",
+        "--format", "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best[height>=1080]/best",
         "--merge-output-format", "mp4",
         "--output", outtmpl,
         "--no-warnings",
