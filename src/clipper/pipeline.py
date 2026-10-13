@@ -8,7 +8,6 @@ from src.clipper.brief_analyzer import analyze_campaign_brief
 from src.clipper.downloader import download_asset_video
 from src.clipper.editor import render_clipper_video
 from src.tiktok.uploader import TikTokUploader
-from src.tiktok.youtube_uploader import upload_shorts
 
 logger = logging.getLogger("clipper.pipeline")
 
@@ -113,18 +112,7 @@ def run_clipper_pipeline(
     tiktok_caption = f"{title}\n\n{hook}\n\n{' '.join(hashtags)}"
     tiktok_ok = uploader.upload_video(edited_path, tiktok_caption)
 
-    # 7. Upload to YouTube Shorts
-    notify("📺 Mengunggah ke YouTube Shorts (pochitalk)...")
-    yt_tags = [h.replace("#", "") for h in hashtags] + ["Shorts", "Viral"]
-    yt_res = upload_shorts(
-        video_path=edited_path,
-        title=f"{title} - {hook[:30]}",
-        description=f"{title}\n\n{hook}\n\nCTA: {cta}\n\n{' '.join(hashtags)}",
-        tags=yt_tags,
-    )
-
-    yt_url = yt_res.get("url", "")
-    notify("✅ <b>Upload selesai!</b> Siap disubmit ke Clippo.")
+    notify("✅ <b>Upload TikTok selesai!</b> Siap disubmit ke Clippo.")
 
     return {
         "success": True,
@@ -132,7 +120,6 @@ def run_clipper_pipeline(
         "title": title,
         "cpm": cpm,
         "tiktok_uploaded": tiktok_ok,
-        "youtube_url": yt_url,
         "caption": tiktok_caption,
         "hashtags": hashtags,
         "brief": brief,

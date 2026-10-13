@@ -131,16 +131,13 @@ def _cmd_clip_async(campaign_id: str, source_url: Optional[str], msg_id: int, th
                 progress_callback=progress_cb,
             )
             if res.get("success"):
-                yt_url = res.get("youtube_url", "")
-                yt_line = f"\n📺 <b>YouTube Shorts:</b> <a href='{yt_url}'>{yt_url}</a>" if yt_url else ""
                 _send_reply(
-                    f"🎉 <b>Klip Sukses Dibuat & Terunggah!</b>\n\n"
+                    f"🎉 <b>Klip Sukses Dibuat & Terunggah ke TikTok!</b>\n\n"
                     f"📌 <b>Campaign:</b> {res.get('title')}\n"
                     f"💰 <b>Potensi CPM:</b> Rp {res.get('cpm', 0):,} / 1k views\n"
-                    f"🎵 <b>TikTok:</b> Live di @pochitalkshop"
-                    f"{yt_line}\n\n"
+                    f"🎵 <b>TikTok:</b> Live di @pochitalkshop\n\n"
                     f"📝 <b>Hashtags:</b> {' '.join(res.get('hashtags', []))}\n"
-                    f"👉 <i>Salin link video di atas dan submit di app.clippo.id/campaigns/{campaign_id}!</i>",
+                    f"👉 <i>Salin link video TikTok-mu dan submit di app.clippo.id/campaigns/{campaign_id}!</i>",
                     thread_id=thread_id,
                 )
             else:
@@ -161,11 +158,11 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
     if t_lower.startswith("/start") or t_lower == "/help":
         help_msg = (
             "✂️ <b>Clipper Automate Agent (Clippo.id & Creators)</b>\n\n"
-            "Bot ini otomatis mengambil campaign berbayar dari <b>Clippo.id</b>, menganalisis brief & aturan do's/don'ts, mengunduh bahan footage, merender 9:16 vertical clip, dan mengunggahnya ke TikTok + Shorts!\n\n"
+            "Bot ini otomatis mengambil campaign berbayar dari <b>Clippo.id</b>, menganalisis brief & aturan do's/don'ts, mengunduh bahan footage, merender 9:16 vertical clip, dan mengunggahnya ke TikTok!\n\n"
             "<b>Perintah Utama:</b>\n"
             "• <code>/campaigns</code> — Lihat daftar campaign Clippo aktif (CPM & sisa budget)\n"
             "• <code>/brief [campaign_id]</code> — Analisis AI syarat, do's & don'ts, serta ide hook\n"
-            "• <code>/clip [campaign_id] [opsional_url]</code> — Otomatis download, render & dual-upload\n\n"
+            "• <code>/clip [campaign_id] [opsional_url]</code> — Otomatis download, render & upload ke TikTok\n\n"
             "Kamu juga bisa ngobrol santai seputar strategi clipping, hook video, atau konsultasi konten!"
         )
         _send_reply(help_msg, reply_to_msg_id=msg_id, thread_id=thread_id)
