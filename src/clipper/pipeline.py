@@ -173,14 +173,19 @@ def run_clipper_pipeline(
             "source_url": target_url,
         }
 
+    import time as _time
+    t0 = _time.time()
     raw_path = download_asset_video(target_url)
+    dl_sec = _time.time() - t0
     if not raw_path or not os.path.exists(raw_path):
         err = f"Gagal mengunduh footage dari {target_url}"
         notify(f"❌ {err}")
         return {"success": False, "error": err, "brief": brief}
+    notify(f"📥 Download selesai ({dl_sec:.0f}s)")
 
     # 6. Render base video (once, shared)
     notify(f"🎬 Merender klip 9:16 HD (hook: <i>\"{hook[:45]}...\"</i>)...")
+    t1 = _time.time()
     clip_dur = min(float(detail.get("max_duration", 60)), 60.0)
     edited_path = render_clipper_video(
         input_path=raw_path,
@@ -189,10 +194,12 @@ def run_clipper_pipeline(
         cta_text=cta,
         fill_mode=fill_mode,
     )
+    render_sec = _time.time() - t1
     if not edited_path or not os.path.exists(edited_path):
         err = "Gagal merender video klip."
         notify(f"❌ {err}")
         return {"success": False, "error": err, "brief": brief}
+    notify(f"🎬 Render selesai ({render_sec:.0f}s)")
 
     # 7. Upload ke masing-masing akun dengan caption unik per akun
     results = []

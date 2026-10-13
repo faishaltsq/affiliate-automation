@@ -144,10 +144,59 @@ def _cmd_accounts(msg_id: int, thread_id: int):
 
 
 def _cmd_clip_async(campaign_id: str, source_url: Optional[str], target_accounts: Optional[list[str]], msg_id: int, thread_id: int):
-    """Run clipper pipeline in background thread."""
+    """Run clipper pipeline in background thread with live status message editing."""
+    _send_reply("⏳ <b>Memulai pipeline...</b>", reply_to_msg_id=msg_id, thread_id=thread_id)
+
     def worker():
+        # Send 1 status message, then keep editing it
+        status_msg_id: list[Optional[int]] = [None]
+        status_lines: list[str] = []
+
+        def _send_status(lines: list[str]) -> Optional[int]:
+            body = "\n".join(lines)
+            try:
+                if status_msg_id[0] is None:
+                    r = requests.post(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                        json={
+                            "chat_id": int(CHAT_ID),
+                            "message_thread_id": thread_id,
+                            "text": body,
+                            "parse_mode": "HTML",
+                        },
+                        timeout=10,
+                    )
+                    if r.ok:
+                        return r.json()["result"]["message_id"]
+                else:
+                    requests.post(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText",
+                        json={
+                            "chat_id": int(CHAT_ID),
+                            "message_id": status_msg_id[0],
+                            "text": body,
+                            "parse_mode": "HTML",
+                        },
+                        timeout=10,
+                    )
+            except Exception as e:
+                logger.warning("Status update failed: %s", e)
+            return status_msg_id[0]
+
         def progress_cb(text: str):
-            _send_reply(text, thread_id=thread_id)
+            # Strip HTML tags for line tracking
+            import re as _re
+            clean = _re.sub(r"<[^>]+>", "", text).strip()
+            # Update last line if same step, else append
+            step_icons = ["✂️", "📋", "👤", "🤖", "📥", "🎬", "🚀", "✅", "❌", "⚠️"]
+            icon = next((ic for ic in step_icons if text.startswith(ic)), None)
+            if icon and status_lines and any(status_lines[-1].startswith(ic) for ic in step_icons):
+                status_lines[-1] = text  # replace last step line
+            else:
+                status_lines.append(text)
+            mid = _send_status(status_lines)
+            if status_msg_id[0] is None and mid:
+                status_msg_id[0] = mid
 
         try:
             res = run_clipper_pipeline(
@@ -163,18 +212,24 @@ def _cmd_clip_async(campaign_id: str, source_url: Optional[str], target_accounts
                     upload_lines.append(f"{icon} <b>{u.get('account')}:</b>\n   <i>\"{u.get('caption', '')[:70]}...\"</i>")
 
                 upload_summary = "\n".join(upload_lines)
-                _send_reply(
-                    f"🎉 <b>Klip Sukses Dibuat & Terunggah!</b>\n\n"
+                final_msg = (
+                    f"🎉 <b>Klip Sukses Dibuat &amp; Terunggah!</b>\n\n"
                     f"📌 <b>Campaign:</b> {res.get('title')}\n"
                     f"💰 <b>Potensi CPM:</b> Rp {res.get('cpm', 0):,} / 1k views\n"
                     f"👥 <b>Hasil Upload ({res.get('success_count')}/{res.get('total_accounts')} akun):</b>\n"
                     f"{upload_summary}\n\n"
                     f"📝 <b>Hashtags:</b> {' '.join(res.get('hashtags', []))}\n"
-                    f"👉 <i>Salin link video dari akun di atas dan submit di app.clippo.id/campaigns/{campaign_id}!</i>",
-                    thread_id=thread_id,
+                    f"👉 <i>Salin link video dari akun di atas dan submit di app.clippo.id/campaigns/{campaign_id}!</i>"
                 )
+                # Edit final status message, then send dedicated success card
+                status_lines.clear()
+                status_lines.append("✅ <b>Pipeline selesai!</b>")
+                _send_status(status_lines)
+                _send_reply(final_msg, thread_id=thread_id)
             else:
-                _send_reply(f"⚠️ <b>Pipeline Gagal:</b> {res.get('error')}", thread_id=thread_id)
+                err_msg = f"⚠️ <b>Pipeline Gagal:</b> {res.get('error')}"
+                status_lines.append(err_msg)
+                _send_status(status_lines)
         except Exception as e:
             logger.exception("Worker error: %s", e)
             _send_reply(f"❌ <b>Error:</b> <code>{e}</code>", thread_id=thread_id)
