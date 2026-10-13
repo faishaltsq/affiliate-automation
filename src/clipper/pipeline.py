@@ -239,7 +239,7 @@ def run_clipper_pipeline(
             transcripts = transcribe_footage_clips(unique_footages[:12])
             if transcripts:
                 notify(f"🔍 Ditemukan {len(transcripts)} penggalan dialog; menganalisis punchline terbaik...")
-                climax_info = select_climax_punchline(title, transcripts)
+                climax_info = select_climax_punchline(title, transcripts, brief=brief)
                 if climax_info and climax_info.get("punchline_hook"):
                     notify(f"🎯 <b>Punchline Hook:</b> <i>\"{climax_info.get('punchline_hook')}\"</i> "
                            f"({os.path.basename(climax_info.get('target_file', ''))} @ {climax_info.get('climax_start')}s)")

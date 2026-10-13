@@ -73,7 +73,11 @@ def transcribe_footage_clips(video_paths: List[str], max_sample_sec: float = 25.
     return results
 
 
-def _query_punchline_llm(campaign_title: str, transcripts: List[Dict]) -> Optional[Dict]:
+def _query_punchline_llm(
+    campaign_title: str,
+    transcripts: List[Dict],
+    brief: Optional[Dict] = None,
+) -> Optional[Dict]:
     """Query LLM to identify the exact punchline/climax moment from footage transcripts."""
     if not LLM_API_KEY:
         logger.warning("HERMES_CUSTOM_LOCALHOST_20128_API_KEY not set for punchline LLM query.")
@@ -88,24 +92,40 @@ def _query_punchline_llm(campaign_title: str, transcripts: List[Dict]) -> Option
         formatted_lines.append(f"[{fn}] ({t['start']}s - {t['end']}s): \"{t['text']}\"")
     transcript_summary = "\n".join(formatted_lines[:50])
 
+    guidelines_text = ""
+    if brief:
+        dos = brief.get("dos", [])
+        donts = brief.get("donts", [])
+        focus = brief.get("main_focus", "")
+        guidelines_text = f"""
+Pedoman Campaign (Wajib Dipatuhi):
+- Do's: {', '.join(dos) if dos else '-'}
+- Don'ts: {', '.join(donts) if donts else '-'}
+- Main Focus: {focus or '-'}
+"""
+
     prompt = f"""Kamu adalah Video Editor & Hook Specialist untuk TikTok & Reels.
-Tugasmu: Dari transkrip bahan footage berikut, temukan momen PUNCHLINE / KLIMAKS paling menegangkan, seru, atau krusial yang benar-benar mewakili judul video ini.
+Tugasmu: Dari transkrip bahan footage berikut, temukan momen PUNCHLINE / KLIMAKS paling menarik, wow, atau krusial yang benar-benar mewakili isi video secara faktual.
 
 Judul Campaign: "{campaign_title}"
-
+{guidelines_text}
 Transkrip Bahan Video:
 {transcript_summary}
 
-Aturan Penting:
-1. Pilih 1 momen klimaks dengan durasi 3.0 sampai 4.0 detik yang paling cocok dijadikan 'COLD OPEN / HOOK TEASER' di detik 0 video.
-2. Buat hook text singkat (maksimal 6 kata, ALL CAPS) yang memancing rasa penasaran penonton.
-3. Output HANYA JSON murni tanpa markdown/backticks, dengan struktur berikut:
+Aturan Mutlak (Compliance & Factual Integrity):
+1. FAKTUIL & RELEVAN: Hook teks dan momen cuplikan HARUS 100% sesuai dengan apa yang benar-benar diucapkan dan terjadi di transkrip. Jangan berhalusinasi atau berasumsi.
+2. PATUHI GUIDELINES CAMPAIGN:
+   - Jika brief meminta edukasi/positif atau melarang kata-kata tipu/menyerang, DILARANG membuat hook sensasional negatif (seperti 'emas palsu', 'nangkep penipu', 'surat bermasalah') bila customer di video sebenarnya puas / jujur.
+   - Angkat angle nilai tinggi, keuntungan customer (misal: naik 2x lipat), transparansi timbangan/kadar, atau edukasi tanpa potongan.
+3. Pilih 1 momen klimaks dengan durasi 3.0 sampai 4.0 detik yang paling cocok dijadikan 'COLD OPEN / HOOK TEASER' di detik 0 video.
+4. Buat hook text singkat (maksimal 7 kata, ALL CAPS) yang memancing rasa penasaran penonton.
+5. Output HANYA JSON murni tanpa markdown/backticks, dengan struktur berikut:
 {{
     "target_filename": "nama_file_yang_dipilih.mp4",
     "climax_start": 10.5,
     "climax_duration": 3.5,
-    "punchline_hook": "DETIK-DETIK KETAHUAN EMAS PALSU!",
-    "reason": "Momen konfrontasi penjual tertangkap basah"
+    "punchline_hook": "JUAL EMAS DI SINI MALAH UNTUNG 2X LIPAT?!",
+    "reason": "Momen Juan mengungkap perhitungan harga naik 2 kali lipat"
 }}"""
 
     payload = {
@@ -150,12 +170,16 @@ Aturan Penting:
         return None
 
 
-def select_climax_punchline(campaign_title: str, transcripts: List[Dict]) -> Optional[Dict]:
-    """Select the best climax punchline from footage transcripts."""
+def select_climax_punchline(
+    campaign_title: str,
+    transcripts: List[Dict],
+    brief: Optional[Dict] = None,
+) -> Optional[Dict]:
+    """Select the best climax punchline from footage transcripts with campaign compliance."""
     if not transcripts:
         return None
 
-    res = _query_punchline_llm(campaign_title, transcripts)
+    res = _query_punchline_llm(campaign_title, transcripts, brief=brief)
     if res and res.get("target_file"):
         return res
 
@@ -165,7 +189,7 @@ def select_climax_punchline(campaign_title: str, transcripts: List[Dict]) -> Opt
         "target_file": first_item["file"],
         "climax_start": first_item.get("start", 0.0),
         "climax_duration": 3.5,
-        "punchline_hook": "PUNCHLINE MOMENT!",
+        "punchline_hook": "JUAL EMAS DI SINI MALAH UNTUNG 2X LIPAT?!",
         "reason": "Fallback to first transcript dialogue snippet.",
     }
 
