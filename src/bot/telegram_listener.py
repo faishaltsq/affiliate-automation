@@ -79,40 +79,95 @@ def handle_message(msg: dict):
             handle_threads_message(msg, text, msg_id, target_tid)
 
 
-def _answer_callback(callback_query_id: str):
-    """Acknowledge a callback query to stop the loading spinner on button."""
+def _answer_callback(callback_query_id: str, text: Optional[str] = None):
+    """Acknowledge a callback query to stop loading spinner and optionally show toast."""
     try:
-        requests.post(f"{API}/answerCallbackQuery", json={"callback_query_id": callback_query_id}, timeout=5)
+        payload = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text[:200]
+        requests.post(f"{API}/answerCallbackQuery", json=payload, timeout=5)
     except Exception:
         pass
+
+
+def _sync_telegram_commands():
+    """Register bot commands in Telegram UI specifically for this group."""
+    commands = [
+        {"command": "menu", "description": "Tampilkan panel tombol kontrol"},
+        {"command": "status", "description": "Cek status & jadwal pipeline"},
+        {"command": "upload", "description": "Download, render & upload TikTok + Shorts"},
+        {"command": "dryrun", "description": "Tes render video tanpa upload"},
+        {"command": "keywords", "description": "Daftar keyword TikTok satisfying"},
+        {"command": "campaigns", "description": "Daftar campaign aktif Clippo.id"},
+        {"command": "accounts", "description": "Daftar akun TikTok & status cookies"},
+        {"command": "trending", "description": "Cari produk trending affiliate"},
+        {"command": "help", "description": "Panduan lengkap perintah bot"},
+    ]
+    try:
+        requests.post(
+            f"{API}/setMyCommands",
+            json={"commands": commands, "scope": {"type": "chat", "chat_id": int(CHAT_ID)}},
+            timeout=10,
+        )
+    except Exception as e:
+        log.warning("Could not set bot commands: %s", e)
 
 
 def handle_callback_query(cbq: dict):
     """Route inline button presses to the correct thread agent."""
     cbq_id = cbq.get("id")
-    data = (cbq.get("data") or "").strip()
-    sender_msg = cbq.get("message", {})
+    raw_data = (cbq.get("data") or "").strip()
+    sender_msg = cbq.get("message") or {}
     thread_id = sender_msg.get("message_thread_id")
-    chat_id = str(sender_msg.get("chat", {}).get("id", ""))
+    chat_id = str(sender_msg.get("chat", {}).get("id", "")) or CHAT_ID
     msg_id = sender_msg.get("message_id")
 
-    _answer_callback(cbq_id)
+    # Determine destination topic and normalized command
+    target_thread = thread_id
+    cmd = raw_data
 
-    if not data or not thread_id:
+    if raw_data.startswith("tt:"):
+        target_thread = int(TIKTOK_THREAD_ID)
+        cmd = raw_data[3:]
+    elif raw_data.startswith("th:"):
+        target_thread = int(THREADS_THREAD_ID)
+        cmd = raw_data[3:]
+    elif raw_data.startswith("cl:"):
+        target_thread = int(CLIPPER_THREAD_ID)
+        cmd = raw_data[3:]
+    else:
+        # Backward-compatibility fallback for unprefixed callbacks
+        if not target_thread:
+            if any(raw_data.startswith(c) for c in ("/campaigns", "/accounts", "/addaccount")):
+                target_thread = int(CLIPPER_THREAD_ID)
+            elif any(raw_data.startswith(c) for c in ("/trending", "/affiliate", "/threads", "/queue")):
+                target_thread = int(THREADS_THREAD_ID)
+            else:
+                target_thread = int(TIKTOK_THREAD_ID)
+
+    if not cmd:
+        _answer_callback(cbq_id)
         return
 
-    thread_str = str(thread_id)
-    log.info("Callback [Thread: %s] data=%s", thread_str, data)
+    _answer_callback(cbq_id, f"Menjalankan {cmd}...")
 
-    # Build a synthetic message dict for the agent handlers
-    fake_msg = {"message_id": msg_id, "chat": sender_msg.get("chat", {}), "message_thread_id": thread_id}
+    target_thread_int = int(target_thread) if target_thread else int(TIKTOK_THREAD_ID)
+    target_thread_str = str(target_thread_int)
+    log.info("Callback [Thread: %s] cmd=%s (raw=%s)", target_thread_str, cmd, raw_data)
 
-    if thread_str == CLIPPER_THREAD_ID:
-        handle_clipper_message(fake_msg, data, msg_id, thread_id)
-    elif thread_str == TIKTOK_THREAD_ID:
-        handle_tiktok_message(fake_msg, data, msg_id, thread_id)
-    elif thread_str == THREADS_THREAD_ID:
-        handle_threads_message(fake_msg, data, msg_id, thread_id)
+    # Build synthetic message dict for agent handlers
+    fake_msg = {
+        "message_id": msg_id,
+        "chat": sender_msg.get("chat", {}),
+        "message_thread_id": target_thread_int,
+    }
+
+    if target_thread_str == CLIPPER_THREAD_ID:
+        handle_clipper_message(fake_msg, cmd, msg_id, target_thread_int)
+    elif target_thread_str == TIKTOK_THREAD_ID:
+        handle_tiktok_message(fake_msg, cmd, msg_id, target_thread_int)
+    elif target_thread_str == THREADS_THREAD_ID:
+        handle_threads_message(fake_msg, cmd, msg_id, target_thread_int)
 
 
 def run_telegram_listener():
@@ -134,6 +189,7 @@ def run_telegram_listener():
         log.info("Scheduler started — mode=%s (fyp_slots=%s)", sched_cfg.get("mode", "fyp"), sched_cfg.get("fyp_slots"))
 
     # Menu buttons are sent only on /menu command, not on startup
+    _sync_telegram_commands()
 
     # Flush old updates on startup
     try:
@@ -170,17 +226,19 @@ def run_telegram_listener():
                 msg = upd.get("message") or upd.get("channel_post")
                 if msg:
                     # Handle /menu command — resend button panel to current thread
-                    text = (msg.get("text") or "").strip().lower()
-                    if text == "/menu":
+                    raw_text = (msg.get("text") or "").strip()
+                    text_lower = raw_text.lower().split("@")[0].strip()
+                    if text_lower in ("/menu", "menu", "/panel", "/control", "/tombol"):
                         tid = msg.get("message_thread_id")
-                        if tid:
-                            tid_str = str(tid)
-                            if tid_str == TIKTOK_THREAD_ID:
-                                send_tiktok_menu(API, int(CHAT_ID), tid)
-                            elif tid_str == THREADS_THREAD_ID:
-                                send_threads_menu(API, int(CHAT_ID), tid)
-                            elif tid_str == CLIPPER_THREAD_ID:
-                                send_clipper_menu(API, int(CHAT_ID), tid)
+                        tid_str = str(tid) if tid else ""
+                        if tid_str == TIKTOK_THREAD_ID:
+                            send_tiktok_menu(API, int(CHAT_ID), int(tid))
+                        elif tid_str == THREADS_THREAD_ID:
+                            send_threads_menu(API, int(CHAT_ID), int(tid))
+                        elif tid_str == CLIPPER_THREAD_ID:
+                            send_clipper_menu(API, int(CHAT_ID), int(tid))
+                        else:
+                            send_tiktok_menu(API, int(CHAT_ID), int(TIKTOK_THREAD_ID))
                         continue
                     handle_message(msg)
 

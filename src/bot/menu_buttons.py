@@ -39,15 +39,15 @@ def send_tiktok_menu(api: str, chat_id: int, thread_id: int):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "📋 Status Bot", "callback_data": "/status"},
-                {"text": "📝 List Keyword", "callback_data": "/keywords"},
+                {"text": "📋 Status Bot", "callback_data": "tt:/status"},
+                {"text": "📝 List Keyword", "callback_data": "tt:/keywords"},
             ],
             [
-                {"text": "🎬 Upload Video", "callback_data": "/upload"},
-                {"text": "🧪 Dry Run", "callback_data": "/dryrun"},
+                {"text": "🎬 Upload Video", "callback_data": "tt:/upload"},
+                {"text": "🧪 Dry Run", "callback_data": "tt:/dryrun"},
             ],
             [
-                {"text": "❓ Bantuan Lengkap", "callback_data": "/help"},
+                {"text": "❓ Bantuan Lengkap", "callback_data": "tt:/help"},
             ],
         ]
     }
@@ -65,15 +65,15 @@ def send_threads_menu(api: str, chat_id: int, thread_id: int):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "📊 Cari Produk Trending", "callback_data": "/trending"},
-                {"text": "🔗 Link Afiliasi", "callback_data": "/affiliate"},
+                {"text": "📊 Cari Produk Trending", "callback_data": "th:/trending"},
+                {"text": "🔗 Link Afiliasi", "callback_data": "th:/affiliate"},
             ],
             [
-                {"text": "✍️ Buat Konten Threads", "callback_data": "/threads"},
-                {"text": "📋 Status Queue", "callback_data": "/queue"},
+                {"text": "✍️ Buat Konten Threads", "callback_data": "th:/threads"},
+                {"text": "📋 Status Queue", "callback_data": "th:/queue"},
             ],
             [
-                {"text": "❓ Bantuan Lengkap", "callback_data": "/help"},
+                {"text": "❓ Bantuan Lengkap", "callback_data": "th:/help"},
             ],
         ]
     }
@@ -91,12 +91,12 @@ def send_clipper_menu(api: str, chat_id: int, thread_id: int):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "🔥 Daftar Campaign", "callback_data": "/campaigns"},
-                {"text": "👥 Daftar Akun TikTok", "callback_data": "/accounts"},
+                {"text": "🔥 Daftar Campaign", "callback_data": "cl:/campaigns"},
+                {"text": "👥 Daftar Akun TikTok", "callback_data": "cl:/accounts"},
             ],
             [
-                {"text": "➕ Tambah Akun", "callback_data": "/addaccount"},
-                {"text": "❓ Bantuan Lengkap", "callback_data": "/help"},
+                {"text": "➕ Tambah Akun", "callback_data": "cl:/addaccount"},
+                {"text": "❓ Bantuan Lengkap", "callback_data": "cl:/help"},
             ],
         ]
     }

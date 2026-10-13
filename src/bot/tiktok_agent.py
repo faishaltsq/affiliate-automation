@@ -51,6 +51,7 @@ def _send_reply(text: str, reply_to_message_id: Optional[int] = None, thread_id:
         "text": cleaned,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
+        "allow_sending_without_reply": True,
     }
     if target_thread:
         payload["message_thread_id"] = int(target_thread)
@@ -73,7 +74,7 @@ def handle_tiktok_message(msg: dict, text: str, msg_id: int, thread_id: int):
     # 1. Direct Slash Commands
     if text.startswith("/"):
         parts = text.split(maxsplit=1)
-        cmd = parts[0].lower()
+        cmd = parts[0].lower().split("@")[0]
         args = parts[1].strip() if len(parts) > 1 else ""
 
         if cmd in ("/status", "/tiktok_status"):

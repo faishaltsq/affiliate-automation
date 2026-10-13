@@ -37,9 +37,11 @@ def _send_reply(text: str, reply_to_msg_id: Optional[int] = None, thread_id: Opt
     tid = thread_id if thread_id is not None else CLIPPER_THREAD_ID
     payload = {
         "chat_id": int(CHAT_ID),
-        "message_thread_id": tid,
+        "message_thread_id": int(tid),
         "text": text,
         "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+        "allow_sending_without_reply": True,
     }
     if reply_to_msg_id:
         payload["reply_to_message_id"] = reply_to_msg_id
@@ -48,10 +50,20 @@ def _send_reply(text: str, reply_to_msg_id: Optional[int] = None, thread_id: Opt
         r = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             json=payload,
-            timeout=10,
+            timeout=15,
         )
         if not r.ok:
-            logger.warning("Telegram send failed (%d): %s", r.status_code, r.text[:200])
+            if "can't parse entities" in r.text.lower() or "bad request" in r.text.lower():
+                payload.pop("parse_mode", None)
+                r2 = requests.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    json=payload,
+                    timeout=15,
+                )
+                if not r2.ok:
+                    logger.warning("Telegram retry send failed (%d): %s", r2.status_code, r2.text[:200])
+            else:
+                logger.warning("Telegram send failed (%d): %s", r.status_code, r.text[:200])
     except Exception as e:
         logger.error("Error sending Telegram reply: %s", e)
 
