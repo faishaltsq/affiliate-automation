@@ -1,4 +1,4 @@
-"""menu_buttons.py — Send and pin command menu buttons to each forum thread on startup."""
+"""menu_buttons.py — Send command menu buttons to each forum thread on startup."""
 
 import logging
 import requests
@@ -30,18 +30,6 @@ def _send_message(api: str, chat_id: int, thread_id: int, text: str, reply_marku
     return None
 
 
-def _pin_message(api: str, chat_id: int, message_id: int):
-    """Pin a message silently."""
-    try:
-        requests.post(
-            f"{api}/pinChatMessage",
-            json={"chat_id": chat_id, "message_id": message_id, "disable_notification": True},
-            timeout=10,
-        )
-    except Exception as e:
-        logger.warning("Pin failed: %s", e)
-
-
 def send_tiktok_menu(api: str, chat_id: int, thread_id: int):
     """Send command menu buttons to TikTok Automate thread (83)."""
     text = (
@@ -69,8 +57,7 @@ def send_tiktok_menu(api: str, chat_id: int, thread_id: int):
     }
     msg_id = _send_message(api, chat_id, thread_id, text, keyboard)
     if msg_id:
-        _pin_message(api, chat_id, msg_id)
-        logger.info("TikTok menu sent & pinned (msg_id=%d)", msg_id)
+        logger.info("TikTok menu sent (msg_id=%d)", msg_id)
 
 
 def send_threads_menu(api: str, chat_id: int, thread_id: int):
@@ -97,8 +84,7 @@ def send_threads_menu(api: str, chat_id: int, thread_id: int):
     }
     msg_id = _send_message(api, chat_id, thread_id, text, keyboard)
     if msg_id:
-        _pin_message(api, chat_id, msg_id)
-        logger.info("Threads menu sent & pinned (msg_id=%d)", msg_id)
+        logger.info("Threads menu sent (msg_id=%d)", msg_id)
 
 
 def send_clipper_menu(api: str, chat_id: int, thread_id: int):
@@ -125,12 +111,11 @@ def send_clipper_menu(api: str, chat_id: int, thread_id: int):
     }
     msg_id = _send_message(api, chat_id, thread_id, text, keyboard)
     if msg_id:
-        _pin_message(api, chat_id, msg_id)
-        logger.info("Clipper menu sent & pinned (msg_id=%d)", msg_id)
+        logger.info("Clipper menu sent (msg_id=%d)", msg_id)
 
 
 def setup_all_menus(api: str, chat_id: int, tiktok_thread: int, threads_thread: int, clipper_thread: int):
-    """Send and pin menu buttons to all 3 forum threads."""
+    """Send menu buttons to all 3 forum threads (no pinning)."""
     send_tiktok_menu(api, chat_id, tiktok_thread)
     send_threads_menu(api, chat_id, threads_thread)
     send_clipper_menu(api, chat_id, clipper_thread)
