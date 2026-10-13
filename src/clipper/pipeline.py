@@ -7,7 +7,7 @@ import requests
 from typing import Optional, Callable
 from src.clipper.client import ClippoClient
 from src.clipper.brief_analyzer import analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL
-from src.clipper.downloader import download_asset_video
+from src.clipper.downloader import download_asset_videos, download_asset_video
 from src.clipper.editor import render_clipper_video
 from src.clipper.account_manager import list_accounts, get_account
 from src.tiktok.uploader import TikTokUploader
@@ -61,9 +61,14 @@ def _generate_variant_caption(brief: dict, account_style: str, account_index: in
     return f"{fallback_hook} {' '.join(hashtags)}"
 
 
-def _ensure_hashtags(caption: str, hashtags: list[str]) -> str:
-    """Append any missing required hashtags to caption."""
+def _ensure_hashtags(caption: str, hashtags: list[str], tags: list[str] = None) -> str:
+    """Append any missing required hashtags and account tags to caption."""
     clean = caption.strip()
+    if tags:
+        for t in tags:
+            tag_name = t.strip("@")
+            if f"@{tag_name.lower()}" not in clean.lower():
+                clean += f" @{tag_name}"
     for tag in hashtags:
         if tag.lower() not in clean.lower():
             clean += f" {tag}"
@@ -105,6 +110,20 @@ def run_clipper_pipeline(
     cpm = detail.get("cpm", 0)
     hashtags = detail.get("hashtags", [])
     cta = detail.get("cta", "")
+
+    # Extract required brand/account tags from campaign
+    raw_data = detail.get("raw", {})
+    campaign_tags = []
+    for ct in raw_data.get("campaignTags", []):
+        tname = ct.get("tag", {}).get("name")
+        if tname:
+            campaign_tags.append(tname)
+    # Also check if Do's specifically mentions tagging an account (e.g. @jualemasidn)
+    for do_item in detail.get("dos", []):
+        for mention in re.findall(r'@([a-zA-Z0-9._]+)', do_item):
+            if mention not in campaign_tags:
+                campaign_tags.append(mention)
+
     notify(f"📋 <b>Campaign Ditemukan:</b> {title} (CPM: Rp {cpm:,})")
 
     # 2. Resolve target accounts
@@ -140,26 +159,20 @@ def run_clipper_pipeline(
     hook = brief.get("winning_hooks", [f"Wajib tahu ini: {title}"])[0]
     caption_rec = brief.get("caption_recommendation", f"{title}\n\n{' '.join(hashtags)}")
 
-    # 3. Determine Video Source
-    target_url = source_url
-    if not target_url:
+    # 4. Determine Video Sources (collect all available assets)
+    if source_url:
+        target_urls = [source_url]
+    else:
         assets = detail.get("assets", [])
-        # Look for required or youtube/tiktok assets
-        for a in assets:
-            u = a.get("url", "")
-            if any(k in u for k in ["youtube.com", "youtu.be", "tiktok.com", "instagram.com"]):
-                target_url = u
-                break
-        if not target_url and assets:
-            target_url = assets[0].get("url")
+        target_urls = [a.get("url") for a in assets if a.get("url")]
 
-    if not target_url:
+    if not target_urls:
         err = "Tidak ada bahan video yang dapat diunduh dari campaign ini."
         notify(f"⚠️ {err}")
         return {"success": False, "error": err, "brief": brief}
 
-    # 5. Download Footage (once, shared across all accounts)
-    notify(f"📥 Mengunduh footage dari: <code>{target_url[:60]}</code>")
+    # 5. Download Footage (guaranteeing all provided footages are acquired)
+    notify(f"📥 Mengunduh bahan footage campaign...")
     if dry_run:
         notify("🧪 Dry-run aktif: skip download, render, dan upload.")
         return {
@@ -170,26 +183,51 @@ def run_clipper_pipeline(
             "cpm": cpm,
             "accounts": [a["username"] for a in accounts],
             "brief": brief,
-            "source_url": target_url,
+            "source_url": target_urls[0],
         }
 
     import time as _time
     t0 = _time.time()
-    raw_path = download_asset_video(target_url)
+    all_footages = []
+    for u in target_urls:
+        notify(f"📥 Mengunduh footage dari: <code>{u[:60]}</code>")
+        vids = download_asset_videos(u)
+        all_footages.extend(vids)
+
+    # Deduplicate while preserving sequence order
+    seen_paths = set()
+    unique_footages = []
+    for p in all_footages:
+        if p not in seen_paths and os.path.exists(p):
+            seen_paths.add(p)
+            unique_footages.append(p)
+
     dl_sec = _time.time() - t0
-    if not raw_path or not os.path.exists(raw_path):
-        err = f"Gagal mengunduh footage dari {target_url}"
+    if not unique_footages:
+        err = f"Gagal mengunduh footage dari {target_urls}"
         notify(f"❌ {err}")
         return {"success": False, "error": err, "brief": brief}
-    notify(f"📥 Download selesai ({dl_sec:.0f}s)")
 
-    # 6. Render base video (once, shared)
-    notify(f"🎬 Merender klip 9:16 HD (hook: <i>\"{hook[:45]}...\"</i>)...")
+    notify(f"📥 Download selesai ({dl_sec:.0f}s): {len(unique_footages)} bahan footage siap disatukan.")
+
+    # 6. Render base video (ensuring ALL provided footages are included into the final clip)
+    min_dur = float(detail.get("min_duration", 15))
+    max_dur = float(detail.get("max_duration", 180))
+
+    if len(unique_footages) > 1:
+        # Multi-footage: include each file proportionally, bounded within campaign requirements
+        target_dur = max(min_dur, min(max_dur, max(60.0, len(unique_footages) * 6.8)))
+        notify(f"🎬 Merender klip 9:16 HD dari SEMUA {len(unique_footages)} footage ({target_dur:.0f}s)...")
+        input_for_render = unique_footages
+    else:
+        target_dur = min(max_dur, 60.0)
+        notify(f"🎬 Merender klip 9:16 HD (hook: <i>\"{hook[:45]}...\"</i>)...")
+        input_for_render = unique_footages[0]
+
     t1 = _time.time()
-    clip_dur = min(float(detail.get("max_duration", 60)), 60.0)
     edited_path = render_clipper_video(
-        input_path=raw_path,
-        duration_sec=clip_dur,
+        input_path=input_for_render,
+        duration_sec=target_dur,
         hook_text=hook,
         cta_text=cta,
         fill_mode=fill_mode,
@@ -199,7 +237,7 @@ def run_clipper_pipeline(
         err = "Gagal merender video klip."
         notify(f"❌ {err}")
         return {"success": False, "error": err, "brief": brief}
-    notify(f"🎬 Render selesai ({render_sec:.0f}s)")
+    notify(f"🎬 Render selesai ({render_sec:.0f}s): file siap di-upload!")
 
     # 7. Upload ke masing-masing akun dengan caption unik per akun
     results = []
@@ -212,9 +250,10 @@ def run_clipper_pipeline(
 
         # Akun pertama pakai caption_rec utama, akun berikutnya generate variasi unik
         if idx == 0:
-            caption = _ensure_hashtags(caption_rec, hashtags)
+            caption = _ensure_hashtags(caption_rec, hashtags, tags=campaign_tags)
         else:
             caption = _generate_variant_caption(brief, acc_style, idx)
+            caption = _ensure_hashtags(caption, hashtags, tags=campaign_tags)
 
         try:
             uploader = TikTokUploader(cookies)
