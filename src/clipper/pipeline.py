@@ -15,12 +15,15 @@ from src.tiktok.uploader import TikTokUploader
 logger = logging.getLogger("clipper.pipeline")
 
 
-def _generate_variant_caption(brief: dict, account_style: str, account_index: int) -> str:
+def _generate_variant_caption(brief: dict, account_style: str, account_index: int, custom_hook: Optional[str] = None) -> str:
     """Generate unique caption variant per account to avoid duplicate content flags."""
     title = brief.get("title", "")
     hashtags = brief.get("hashtags", [])
     hooks = brief.get("winning_hooks", [])
-    base_hook = hooks[min(account_index, len(hooks) - 1)] if hooks else title
+    if custom_hook:
+        base_hook = custom_hook
+    else:
+        base_hook = hooks[min(account_index, len(hooks) - 1)] if hooks else title
 
     style_hint = {
         "energetic": "gaya santai, penuh semangat, pakai emoji, dan emosi positif",
@@ -82,6 +85,8 @@ def run_clipper_pipeline(
     fill_mode: bool = False,
     target_accounts: Optional[list[str]] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
+    count: int = 1,
+    distribution: str = "distribute",
 ) -> dict:
     """
     Execute full clipper pipeline for a Clippo campaign.
@@ -184,13 +189,15 @@ def run_clipper_pipeline(
     # 5. Download Footage (guaranteeing all provided footages are acquired)
     notify(f"📥 Mengunduh bahan footage campaign...")
     if dry_run:
-        notify("🧪 Dry-run aktif: skip download, render, dan upload.")
+        notify(f"🧪 Dry-run aktif: skip download, render ({count} video), dan upload.")
         return {
             "success": True,
             "dry_run": True,
             "campaign_id": campaign_id,
             "title": title,
             "cpm": cpm,
+            "count": count,
+            "distribution": distribution,
             "accounts": [a["username"] for a in accounts],
             "brief": brief,
             "source_url": target_urls[0],
@@ -225,17 +232,85 @@ def run_clipper_pipeline(
     min_dur = float(detail.get("min_duration", 15))
     max_dur = float(detail.get("max_duration", 180))
 
-    climax_info = None
-    story_beats = None
+    from src.clipper.story_analyzer import (
+        natural_sort_paths,
+        build_story_narrative_beats,
+        build_multi_story_packages,
+    )
+    from src.clipper.punchline import (
+        transcribe_footage_clips,
+        select_climax_punchline,
+        select_multiple_climax_punchlines,
+    )
 
-    from src.clipper.story_analyzer import natural_sort_paths, build_story_narrative_beats
     unique_footages = natural_sort_paths(unique_footages)
+    rendered_videos = []
 
-    if len(unique_footages) > 1:
-        # Multi-footage: transcribe and extract climax punchline matching campaign title
-        notify("🎙️ Mentranskripsi dialog footage untuk mencari momen punchline/klimaks...")
+    # Find potential outro/closing clip from last footage or closing keywords
+    outro_file = None
+    for f in unique_footages:
+        f_name = os.path.basename(f).lower()
+        if "outro" in f_name or "closing" in f_name or f == unique_footages[-1]:
+            outro_file = f
+            break
+
+    if count > 1:
+        notify(f"🎙️ Mentranskripsi dialog footage untuk mencari {count} sudut pandang/hook berbeda...")
+        transcripts = []
         try:
-            from src.clipper.punchline import transcribe_footage_clips, select_climax_punchline
+            transcripts = transcribe_footage_clips(unique_footages[:12])
+        except Exception as p_err:
+            logger.warning("Footage transcription failed: %s", p_err)
+
+        punchlines = select_multiple_climax_punchlines(title, transcripts, count=count, brief=brief)
+        notify(f"🎯 Ditemukan {len(punchlines)} variasi hook cerita unik:")
+        for idx, p in enumerate(punchlines):
+            notify(f"   • Video {idx + 1}: <i>\"{p.get('punchline_hook')}\"</i> ({os.path.basename(p.get('target_file', ''))})")
+
+        packages = build_multi_story_packages(
+            footages=unique_footages,
+            punchlines=punchlines,
+            outro_file=outro_file,
+            target_duration=max(min_dur, min(max_dur, 90.0)),
+        )
+
+        for p_idx, pkg in enumerate(packages):
+            v_num = p_idx + 1
+            v_hook = pkg["punchline_hook"]
+            v_dur = max(min_dur, min(max_dur, pkg["estimated_duration"]))
+            v_beats = pkg["story_beats"]
+            v_input = [b["file"] for b in v_beats] if v_beats else unique_footages
+
+            notify(f"🎬 Merender Video {v_num}/{len(packages)} ({v_dur:.0f}s, hook: <i>\"{v_hook}\"</i>)...")
+            v_t0 = _time.time()
+            v_path = render_clipper_video(
+                input_path=v_input,
+                duration_sec=v_dur,
+                hook_text=v_hook,
+                cta_text=cta,
+                fill_mode=fill_mode,
+                climax_info=pkg["punchline_info"],
+                auto_subtitles=True,
+                story_beats=v_beats,
+            )
+            v_sec = _time.time() - v_t0
+            if v_path and os.path.exists(v_path):
+                notify(f"✅ Video {v_num}/{len(packages)} selesai dirender ({v_sec:.0f}s).")
+                rendered_videos.append({
+                    "video_path": v_path,
+                    "hook": v_hook,
+                    "duration": v_dur,
+                    "climax_info": pkg["punchline_info"],
+                })
+            else:
+                notify(f"⚠️ Video {v_num} gagal dirender.")
+
+    elif len(unique_footages) > 1:
+        # Multi-footage single video: transcribe and extract climax punchline matching campaign title
+        notify("🎙️ Mentranskripsi dialog footage untuk mencari momen punchline/klimaks...")
+        climax_info = None
+        story_beats = None
+        try:
             transcripts = transcribe_footage_clips(unique_footages[:12])
             if transcripts:
                 notify(f"🔍 Ditemukan {len(transcripts)} penggalan dialog; menganalisis punchline terbaik...")
@@ -244,22 +319,19 @@ def run_clipper_pipeline(
                     notify(f"🎯 <b>Punchline Hook:</b> <i>\"{climax_info.get('punchline_hook')}\"</i> "
                            f"({os.path.basename(climax_info.get('target_file', ''))} @ {climax_info.get('climax_start')}s)")
         except Exception as p_err:
-            logger.warning(f"Punchline detection failed, proceeding with normal hook: {p_err}")
+            logger.warning("Punchline detection failed, proceeding with normal hook: %s", p_err)
 
         target_dur = max(min_dur, min(max_dur, 90.0))
-
-        # Check if a single hero story footage was identified (e.g. specific customer confrontation)
         hero_file = climax_info.get("target_file") if climax_info else None
-        outro_file = None
-        # Find potential outro/closing clip from last footage or closing keywords
+        single_outro = None
         for f in unique_footages:
             f_name = os.path.basename(f).lower()
             if f != hero_file and ("outro" in f_name or "closing" in f_name or f == unique_footages[-1]):
-                outro_file = f
+                single_outro = f
 
         if hero_file and os.path.exists(hero_file):
             notify("🎬 Mengekstrak alur percakapan natural (skip basa-basi & menjaga keutuhan kalimat)...")
-            story_beats = build_story_narrative_beats(hero_file, outro_file=outro_file, target_duration=target_dur)
+            story_beats = build_story_narrative_beats(hero_file, outro_file=single_outro, target_duration=target_dur)
             if story_beats:
                 beats_sum = sum(b.get("duration", b.get("end", 0.0) - b.get("start", 0.0)) for b in story_beats)
                 teaser_pad = float(climax_info.get("climax_duration", 3.5)) if climax_info else 0.0
@@ -271,67 +343,132 @@ def run_clipper_pipeline(
         else:
             notify(f"🎬 Merender klip 9:16 HD dari {len(unique_footages)} footage ({target_dur:.0f}s)...")
             input_for_render = unique_footages
+
+        hook_to_use = climax_info.get("punchline_hook") if (climax_info and climax_info.get("punchline_hook")) else hook
+        t1 = _time.time()
+        edited_path = render_clipper_video(
+            input_path=input_for_render,
+            duration_sec=target_dur,
+            hook_text=hook_to_use,
+            cta_text=cta,
+            fill_mode=fill_mode,
+            climax_info=climax_info,
+            auto_subtitles=True,
+            story_beats=story_beats,
+        )
+        render_sec = _time.time() - t1
+        if edited_path and os.path.exists(edited_path):
+            rendered_videos.append({
+                "video_path": edited_path,
+                "hook": hook_to_use,
+                "duration": target_dur,
+                "climax_info": climax_info,
+            })
     else:
+        # Single footage single video
         target_dur = min(max_dur, 60.0)
         notify(f"🎬 Merender klip 9:16 HD (hook: <i>\"{hook[:45]}...\"</i>)...")
         input_for_render = unique_footages[0]
+        t1 = _time.time()
+        edited_path = render_clipper_video(
+            input_path=input_for_render,
+            duration_sec=target_dur,
+            hook_text=hook,
+            cta_text=cta,
+            fill_mode=fill_mode,
+            climax_info=None,
+            auto_subtitles=True,
+            story_beats=None,
+        )
+        render_sec = _time.time() - t1
+        if edited_path and os.path.exists(edited_path):
+            rendered_videos.append({
+                "video_path": edited_path,
+                "hook": hook,
+                "duration": target_dur,
+                "climax_info": None,
+            })
 
-    t1 = _time.time()
-    edited_path = render_clipper_video(
-        input_path=input_for_render,
-        duration_sec=target_dur,
-        hook_text=hook,
-        cta_text=cta,
-        fill_mode=fill_mode,
-        climax_info=climax_info,
-        auto_subtitles=True,
-        story_beats=story_beats,
-    )
-    render_sec = _time.time() - t1
-    if not edited_path or not os.path.exists(edited_path):
+    if not rendered_videos:
         err = "Gagal merender video klip."
         notify(f"❌ {err}")
         return {"success": False, "error": err, "brief": brief}
-    notify(f"🎬 Render selesai ({render_sec:.0f}s): file siap di-upload!")
 
-    # 7. Upload ke masing-masing akun dengan caption unik per akun
+    # 7. Upload ke masing-masing akun
     results = []
-    for idx, account in enumerate(accounts):
-        acc_username = account["username"]
-        acc_style = account.get("style", "default")
-        cookies = account["cookies_path"]
+    if distribution == "distribute" and len(rendered_videos) > 1:
+        # Distribute distinct video per account
+        for idx, account in enumerate(accounts):
+            acc_username = account["username"]
+            acc_style = account.get("style", "default")
+            cookies = account["cookies_path"]
 
-        notify(f"🚀 <b>Upload ke {acc_username}</b> ({idx + 1}/{len(accounts)})...")
+            v_item = rendered_videos[idx % len(rendered_videos)]
+            v_path = v_item["video_path"]
+            v_hook = v_item["hook"]
 
-        # Akun pertama pakai caption_rec utama, akun berikutnya generate variasi unik
-        if idx == 0:
-            caption = _ensure_hashtags(caption_rec, hashtags, tags=campaign_tags)
-        else:
-            caption = _generate_variant_caption(brief, acc_style, idx)
+            notify(f"🚀 <b>Upload ke {acc_username}</b> ({idx + 1}/{len(accounts)}) dengan video: \"{v_hook}\"...")
+            caption = _generate_variant_caption(brief, acc_style, idx, custom_hook=v_hook)
             caption = _ensure_hashtags(caption, hashtags, tags=campaign_tags)
 
-        try:
-            uploader = TikTokUploader(cookies)
-            ok = uploader.upload_video(edited_path, caption)
-            results.append({"account": acc_username, "success": ok, "caption": caption})
-            notify(f"{'✅' if ok else '❌'} {acc_username}: {'berhasil' if ok else 'gagal'}")
-        except Exception as e:
-            logger.error("Upload error for %s: %s", acc_username, e)
-            results.append({"account": acc_username, "success": False, "caption": caption, "error": str(e)})
-            notify(f"❌ {acc_username}: error — <code>{e}</code>")
+            try:
+                uploader = TikTokUploader(cookies)
+                ok = uploader.upload_video(v_path, caption)
+                results.append({
+                    "account": acc_username,
+                    "video_path": v_path,
+                    "hook": v_hook,
+                    "success": ok,
+                    "caption": caption
+                })
+                notify(f"{'✅' if ok else '❌'} {acc_username}: {'berhasil' if ok else 'gagal'}")
+            except Exception as e:
+                logger.error("Upload error for %s: %s", acc_username, e)
+                results.append({"account": acc_username, "video_path": v_path, "hook": v_hook, "success": False, "caption": caption, "error": str(e)})
+                notify(f"❌ {acc_username}: error — <code>{e}</code>")
+    else:
+        # Single video or all videos to all accounts
+        for v_item in rendered_videos:
+            v_path = v_item["video_path"]
+            v_hook = v_item["hook"]
+            for idx, account in enumerate(accounts):
+                acc_username = account["username"]
+                acc_style = account.get("style", "default")
+                cookies = account["cookies_path"]
+
+                notify(f"🚀 <b>Upload ke {acc_username}</b> (video: \"{v_hook}\")...")
+                if idx == 0 and len(rendered_videos) == 1:
+                    caption = _ensure_hashtags(caption_rec, hashtags, tags=campaign_tags)
+                else:
+                    caption = _generate_variant_caption(brief, acc_style, idx, custom_hook=v_hook)
+                    caption = _ensure_hashtags(caption, hashtags, tags=campaign_tags)
+
+                try:
+                    uploader = TikTokUploader(cookies)
+                    ok = uploader.upload_video(v_path, caption)
+                    results.append({"account": acc_username, "video_path": v_path, "hook": v_hook, "success": ok, "caption": caption})
+                    notify(f"{'✅' if ok else '❌'} {acc_username}: {'berhasil' if ok else 'gagal'}")
+                except Exception as e:
+                    logger.error("Upload error for %s: %s", acc_username, e)
+                    results.append({"account": acc_username, "video_path": v_path, "hook": v_hook, "success": False, "caption": caption, "error": str(e)})
+                    notify(f"❌ {acc_username}: error — <code>{e}</code>")
 
     success_count = sum(1 for r in results if r["success"])
-    notify(f"✅ <b>Selesai!</b> {success_count}/{len(accounts)} akun berhasil upload.")
+    notify(f"✅ <b>Selesai!</b> {success_count}/{len(results)} unggahan berhasil.")
 
+    primary_path = rendered_videos[0]["video_path"] if rendered_videos else None
     return {
         "success": success_count > 0,
         "campaign_id": campaign_id,
         "title": title,
         "cpm": cpm,
+        "count": len(rendered_videos),
+        "distribution": distribution,
+        "videos": rendered_videos,
         "upload_results": results,
         "success_count": success_count,
         "total_accounts": len(accounts),
         "hashtags": hashtags,
         "brief": brief,
-        "video_path": edited_path,
+        "video_path": primary_path,
     }
