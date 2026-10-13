@@ -35,7 +35,7 @@ def download_asset_video(url: str, output_dir: str = "data/clippo/downloads") ->
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "--no-playlist",
-        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "-f", "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best[ext=mp4]/best",
         "--merge-output-format", "mp4",
         "-o", os.path.join(output_dir, "%(id)s.%(ext)s"),
         "--no-warnings",

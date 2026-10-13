@@ -49,16 +49,15 @@ def render_clipper_video(
 
     # Base video filter (either Center Crop or Blurred Pillarbox)
     if fill_mode:
-        # Scale to height 1920, center-crop 1080
-        vf_base = "scale=-2:1920,crop=1080:1920:(iw-1080)/2:0"
+        # Scale 4K→1080x1920 pakai lanczos, lalu sharpen
+        vf_base = "scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:1.0:5:5:0.5"
         fc_arg = "-vf"
     else:
-        # Fast blurred background: scale down → blur → scale up, overlay sharp fg
-        # Much faster than boxblur=25:5 on full resolution
+        # Fast blurred background + sharp foreground
         vf_base = (
-            "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
             "scale=270:480,boxblur=20:1,scale=1080:1920[bg];"
-            "[0:v]scale=1080:-2:force_original_aspect_ratio=decrease[fg];"
+            "[0:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2"
         )
         fc_arg = "-filter_complex"
@@ -71,15 +70,16 @@ def render_clipper_video(
         "-i", input_path,
         fc_arg, vf_base,
         "-c:v", "libx264",
-        "-crf", "23",          # lighter encode, TikTok re-encodes anyway
-        "-preset", "ultrafast", # don't compete with scheduler FFmpeg for CPU
-        "-threads", "2",        # cap CPU usage
+        "-crf", "18",           # sama dengan tiktok/editor.py
+        "-preset", "veryfast",  # kualitas jauh lebih baik dari ultrafast
+        "-profile:v", "high",
+        "-level", "4.2",
         "-pix_fmt", "yuv420p",
         "-colorspace", "bt709",
         "-color_primaries", "bt709",
         "-color_trc", "bt709",
         "-c:a", "aac",
-        "-b:a", "128k",
+        "-b:a", "192k",
         "-ar", "48000",
         "-movflags", "+faststart",
         out_path,
