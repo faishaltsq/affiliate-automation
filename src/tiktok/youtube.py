@@ -74,15 +74,23 @@ def search_videos(
     keywords: list[str],
     max_results: int = 5,
     max_duration: int = 1800,
+    prefer_vertical: bool = True,
 ) -> list[dict]:
     """Search YouTube for videos matching keywords.
 
     Returns a deduplicated list of dicts:
         {"id": str, "title": str, "channel": str, "duration": int, "webpage_url": str}
 
+    When prefer_vertical=True (default), Shorts-style queries are used and
+    videos with portrait aspect ratio are prioritised. Landscape videos are
+    deprioritised (moved to end of list) so the pipeline almost always gets
+    ready-to-use vertical footage without heavy FFmpeg cropping.
     Videos longer than max_duration seconds are excluded.
     """
     query = " ".join(keywords)
+    # Force Shorts-style search: YouTube returns vertical Shorts for these queries
+    if prefer_vertical and "#shorts" not in query.lower():
+        query = query + " #shorts"
     search_url = f"ytsearch{max_results * 5}:{query}"  # over-fetch to survive duration filter
 
     cmd = [
@@ -129,6 +137,10 @@ def search_videos(
             continue
 
         seen_ids.add(video_id)
+        w = info.get("width") or 0
+        h = info.get("height") or 0
+        is_vert = (h > w) if (w > 0 and h > 0) else False
+
         videos.append(
             {
                 "id": video_id,
@@ -136,14 +148,19 @@ def search_videos(
                 "channel": info.get("channel") or info.get("uploader") or "",
                 "duration": int(duration) if duration else 0,
                 "chapters": info.get("chapters") or [],
+                "is_vertical": is_vert,
                 "webpage_url": info.get("webpage_url")
                 or info.get("url")
                 or f"https://www.youtube.com/watch?v={video_id}",
             }
         )
 
-        if len(videos) >= max_results:
+        if len(videos) >= max_results * 3:
             break
+
+    # Prioritise vertical (portrait) videos over landscape
+    if prefer_vertical:
+        videos.sort(key=lambda v: (not v.get("is_vertical", False),))
 
     return videos
 
@@ -161,7 +178,7 @@ def download_video(url: str, output_dir: str) -> str | None:
 
     cmd = [
         *_ytdlp_base(),
-        "--format", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "--format", "bestvideo[width<=1080][height>=1080]+bestaudio/bestvideo[height>=720]+bestaudio/best[height>=720]/best",
         "--merge-output-format", "mp4",
         "--output", outtmpl,
         "--no-warnings",

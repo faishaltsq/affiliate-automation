@@ -46,7 +46,7 @@ def run_pipeline(
     count: Optional[int] = None,
     keyword_override: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
-    fill_mode: bool = False,
+    fill_mode: bool = True,
     upload_youtube: bool = True,
 ) -> dict:
     """

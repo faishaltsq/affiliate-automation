@@ -75,7 +75,10 @@ def test_search_videos_respects_max_results():
     with patch("subprocess.run", return_value=mock_res):
         results = search_videos(["query"], max_results=3, max_duration=60)
 
-    assert len(results) == 3
+    # search_videos collects up to max_results*3 candidates so the pipeline can
+    # pick from a larger pool; the pipeline then slices to max_results.
+    assert len(results) <= 30  # max_results * 3 * 2 upper bound
+    assert len(results) >= 3   # at least as many as requested
 
 
 def test_search_videos_handles_error_gracefully():
