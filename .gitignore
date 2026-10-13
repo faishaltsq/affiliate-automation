@@ -20,3 +20,5 @@ data/tiktok/youtube_oauth.json
 data/clippo/cookies.txt
 data/clippo/downloads/
 data/clippo/output/
+data/tiktok/accounts/*/cookies.txt
+data/tiktok/accounts/**/cookies.txt
