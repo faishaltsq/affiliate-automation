@@ -13,10 +13,21 @@ _COOKIES_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "tiktok
 
 _YTDLP = [sys.executable, "-m", "yt_dlp"]
 
+def _find_node() -> str:
+    """Find node executable: Hermes bundled first, then PATH."""
+    hermes_node = Path(os.environ.get("HERMES_HOME", str(Path.home() / "AppData/Local/hermes")))
+    candidates = list(hermes_node.parent.glob("tools/node-*/node.exe")) + \
+                 list(hermes_node.parent.glob("tools/node*/node.exe"))
+    if candidates:
+        return str(sorted(candidates)[-1])  # latest version
+    return "node"  # fallback to PATH
+
+
 def _ytdlp_base() -> list[str]:
     """Build base yt-dlp command with cookies and JS runtime if available."""
     cmd = list(_YTDLP)
-    cmd.extend(["--js-runtimes", "node", "--remote-components", "ejs:github"])
+    node_path = _find_node()
+    cmd.extend(["--js-runtimes", f"node:{node_path}"])
     if _COOKIES_PATH.exists():
         cmd.extend(["--cookies", str(_COOKIES_PATH)])
     return cmd

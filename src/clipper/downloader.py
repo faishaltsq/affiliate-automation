@@ -12,6 +12,16 @@ logger = logging.getLogger("clipper.downloader")
 YTDLP_COOKIES = "data/tiktok/youtube_cookies.txt"
 
 
+def _find_node() -> str:
+    """Find node executable: Hermes bundled first, then PATH."""
+    hermes_node = Path(os.environ.get("HERMES_HOME", str(Path.home() / "AppData/Local/hermes")))
+    candidates = list(hermes_node.parent.glob("tools/node-*/node.exe")) + \
+                 list(hermes_node.parent.glob("tools/node*/node.exe"))
+    if candidates:
+        return str(sorted(candidates)[-1])
+    return "node"
+
+
 def download_asset_video(url: str, output_dir: str = "data/clippo/downloads") -> Optional[str]:
     """Download video from YouTube, TikTok, Instagram Reels, or direct URL via yt-dlp."""
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -20,9 +30,10 @@ def download_asset_video(url: str, output_dir: str = "data/clippo/downloads") ->
 
     clean_url = url.strip()
 
+    import sys
     # YouTube, TikTok, Instagram all supported by yt-dlp
     cmd = [
-        "yt-dlp",
+        sys.executable, "-m", "yt_dlp",
         "--no-playlist",
         "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "--merge-output-format", "mp4",
@@ -33,10 +44,10 @@ def download_asset_video(url: str, output_dir: str = "data/clippo/downloads") ->
 
     # Inject YouTube cookies if YouTube URL
     if any(k in clean_url for k in ["youtube.com", "youtu.be"]) and os.path.exists(YTDLP_COOKIES):
+        node_path = _find_node()
         cmd.extend([
             "--cookies", YTDLP_COOKIES,
-            "--js-runtimes", "node",
-            "--remote-components", "ejs:github",
+            "--js-runtimes", f"node:{node_path}",
         ])
 
     cmd.append(clean_url)
