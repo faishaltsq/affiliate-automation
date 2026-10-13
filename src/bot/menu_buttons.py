@@ -40,15 +40,11 @@ def send_tiktok_menu(api: str, chat_id: int, thread_id: int):
         "inline_keyboard": [
             [
                 {"text": "📋 Status Bot", "callback_data": "/status"},
-                {"text": "⚙️ Jadwal Upload", "callback_data": "/schedule"},
+                {"text": "📝 List Keyword", "callback_data": "/keywords"},
             ],
             [
                 {"text": "🎬 Upload Video", "callback_data": "/upload"},
                 {"text": "🧪 Dry Run", "callback_data": "/dryrun"},
-            ],
-            [
-                {"text": "🔄 Scheduler ON/OFF", "callback_data": "/togglescheduler"},
-                {"text": "📝 List Keyword", "callback_data": "/keywords"},
             ],
             [
                 {"text": "❓ Bantuan Lengkap", "callback_data": "/help"},
@@ -70,14 +66,13 @@ def send_threads_menu(api: str, chat_id: int, thread_id: int):
         "inline_keyboard": [
             [
                 {"text": "📊 Cari Produk Trending", "callback_data": "/trending"},
-                {"text": "🔗 Generate Link Afiliasi", "callback_data": "/affiliate"},
+                {"text": "🔗 Link Afiliasi", "callback_data": "/affiliate"},
             ],
             [
                 {"text": "✍️ Buat Konten Threads", "callback_data": "/threads"},
-                {"text": "📅 Jadwal Posting", "callback_data": "/schedule"},
+                {"text": "📋 Status Queue", "callback_data": "/queue"},
             ],
             [
-                {"text": "📋 Status Queue", "callback_data": "/status"},
                 {"text": "❓ Bantuan Lengkap", "callback_data": "/help"},
             ],
         ]
@@ -100,11 +95,7 @@ def send_clipper_menu(api: str, chat_id: int, thread_id: int):
                 {"text": "👥 Daftar Akun TikTok", "callback_data": "/accounts"},
             ],
             [
-                {"text": "📋 Analisis Brief", "callback_data": "/brief "},
-                {"text": "✂️ Buat & Upload Klip", "callback_data": "/clip "},
-            ],
-            [
-                {"text": "➕ Tambah Akun", "callback_data": "/addaccount "},
+                {"text": "➕ Tambah Akun", "callback_data": "/addaccount"},
                 {"text": "❓ Bantuan Lengkap", "callback_data": "/help"},
             ],
         ]

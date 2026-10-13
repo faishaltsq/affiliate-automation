@@ -138,6 +138,12 @@ def handle_threads_message(msg: dict, text: str, msg_id: int, thread_id: int):
         elif cmd == "/affiliate":
             _cmd_affiliate(args, msg_id, thread_id)
             return
+        elif cmd in ("/trending", "/trend"):
+            _cmd_affiliate("trending", msg_id, thread_id)
+            return
+        elif cmd == "/threads":
+            _cmd_post(msg_id, thread_id)
+            return
 
     # 2. Check for affiliate URLs in text
     found_aff_urls = []
