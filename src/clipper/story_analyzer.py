@@ -25,9 +25,15 @@ def build_story_narrative_beats(
     beats = []
     outro_dur = 0.0
     if outro_file and os.path.exists(outro_file):
-        outro_dur = 8.5
+        try:
+            from src.clipper.editor import get_video_duration
+            full_odur = get_video_duration(outro_file)
+            # Use full outro if <= 20s so explanation/CTA is never severed mid-sentence
+            outro_dur = round(full_odur, 2) if full_odur <= 20.0 else 15.0
+        except Exception:
+            outro_dur = 12.0
 
-    rem_hero_dur = max(25.0, target_duration - outro_dur)
+    rem_hero_dur = max(50.0, target_duration - outro_dur)
 
     try:
         from src.clipper.subtitles import _get_whisper_model, DEFAULT_INITIAL_PROMPT

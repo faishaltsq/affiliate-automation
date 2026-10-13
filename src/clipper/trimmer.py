@@ -26,8 +26,9 @@ def extract_dialogue_beats(
     min_beat_duration: float = 8.0,
 ) -> List[Dict]:
     """
-    Extract substantial, continuous dialogue beats (10–25s) from transcribed speech segments,
+    Extract substantial, continuous dialogue beats from transcribed speech segments,
     skipping opening pleasantries ('basa-basi') and maintaining conversational sentence boundaries.
+    Never cuts off mid-explanation: completes the current spoken sentence/thought before breaking.
     """
     if not segments:
         return []
@@ -51,15 +52,16 @@ def extract_dialogue_beats(
     current_beat_end = filtered[0]["end"]
     accumulated_duration = 0.0
 
-    max_beat_duration = min(30.0, target_duration)
     for s in filtered[1:]:
         pause = s["start"] - current_beat_end
         current_dur = current_beat_end - current_beat_start
-        # If pause between spoken sentences is natural (< 1.5s) AND current beat hasn't exceeded max duration
-        if pause < 1.5 and current_dur < max_beat_duration:
+        projected_dur = s["end"] - current_beat_start
+
+        # Keep merging if pause is short (< 1.6s) AND projected beat does not severely overshoot target
+        if pause < 1.6 and (projected_dur <= target_duration * 1.15 or current_dur < min_beat_duration):
             current_beat_end = s["end"]
         else:
-            # Beat boundary
+            # Beat boundary at natural pause
             dur = current_beat_end - current_beat_start
             if dur >= min_beat_duration:
                 beats.append({"start": round(current_beat_start, 2), "end": round(current_beat_end, 2), "duration": round(dur, 2)})
@@ -70,11 +72,9 @@ def extract_dialogue_beats(
             current_beat_start = s["start"]
             current_beat_end = s["end"]
 
-    # Append the last accumulated beat
+    # Append trailing beat only if accumulated duration is still well below target
     dur = current_beat_end - current_beat_start
-    if dur >= 3.0 and accumulated_duration < target_duration:
-        # Only append trailing beat if it doesn't severely overshoot target duration
-        if accumulated_duration == 0 or (accumulated_duration + dur <= target_duration * 1.15):
-            beats.append({"start": round(current_beat_start, 2), "end": round(current_beat_end, 2), "duration": round(dur, 2)})
+    if dur >= 3.0 and accumulated_duration < target_duration * 0.85:
+        beats.append({"start": round(current_beat_start, 2), "end": round(current_beat_end, 2), "duration": round(dur, 2)})
 
     return beats

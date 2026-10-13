@@ -246,7 +246,7 @@ def run_clipper_pipeline(
         except Exception as p_err:
             logger.warning(f"Punchline detection failed, proceeding with normal hook: {p_err}")
 
-        target_dur = max(min_dur, min(max_dur, 65.0))
+        target_dur = max(min_dur, min(max_dur, 90.0))
 
         # Check if a single hero story footage was identified (e.g. specific customer confrontation)
         hero_file = climax_info.get("target_file") if climax_info else None
@@ -260,6 +260,10 @@ def run_clipper_pipeline(
         if hero_file and os.path.exists(hero_file):
             notify("🎬 Mengekstrak alur percakapan natural (skip basa-basi & menjaga keutuhan kalimat)...")
             story_beats = build_story_narrative_beats(hero_file, outro_file=outro_file, target_duration=target_dur)
+            if story_beats:
+                beats_sum = sum(b.get("duration", b.get("end", 0.0) - b.get("start", 0.0)) for b in story_beats)
+                teaser_pad = float(climax_info.get("climax_duration", 3.5)) if climax_info else 0.0
+                target_dur = max(min_dur, min(max_dur, beats_sum + teaser_pad))
 
         if story_beats and len(story_beats) > 0:
             notify(f"🎬 Merender klip 9:16 HD ({target_dur:.0f}s) dengan dialog natural & subtitle sinkron...")
