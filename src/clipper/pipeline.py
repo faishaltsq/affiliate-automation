@@ -225,10 +225,25 @@ def run_clipper_pipeline(
     min_dur = float(detail.get("min_duration", 15))
     max_dur = float(detail.get("max_duration", 180))
 
+    climax_info = None
     if len(unique_footages) > 1:
+        # Multi-footage: transcribe and extract climax punchline matching campaign title
+        notify("🎙️ Mentranskripsi dialog footage untuk mencari momen punchline/klimaks...")
+        try:
+            from src.clipper.punchline import transcribe_footage_clips, select_climax_punchline
+            transcripts = transcribe_footage_clips(unique_footages[:12])
+            if transcripts:
+                notify(f"🔍 Ditemukan {len(transcripts)} penggalan dialog; menganalisis punchline terbaik...")
+                climax_info = select_climax_punchline(title, transcripts)
+                if climax_info and climax_info.get("punchline_hook"):
+                    notify(f"🎯 <b>Punchline Hook:</b> <i>\"{climax_info.get('punchline_hook')}\"</i> "
+                           f"({os.path.basename(climax_info.get('target_file', ''))} @ {climax_info.get('climax_start')}s)")
+        except Exception as p_err:
+            logger.warning(f"Punchline detection failed, proceeding with normal hook: {p_err}")
+
         # Multi-footage: include each file proportionally, bounded within campaign requirements
         target_dur = max(min_dur, min(max_dur, max(60.0, len(unique_footages) * 6.8)))
-        notify(f"🎬 Merender klip 9:16 HD dari SEMUA {len(unique_footages)} footage ({target_dur:.0f}s)...")
+        notify(f"🎬 Merender klip 9:16 HD dari SEMUA {len(unique_footages)} footage ({target_dur:.0f}s) dengan adaptive framing & subtitle...")
         input_for_render = unique_footages
     else:
         target_dur = min(max_dur, 60.0)
@@ -242,6 +257,8 @@ def run_clipper_pipeline(
         hook_text=hook,
         cta_text=cta,
         fill_mode=fill_mode,
+        climax_info=climax_info,
+        auto_subtitles=True,
     )
     render_sec = _time.time() - t1
     if not edited_path or not os.path.exists(edited_path):

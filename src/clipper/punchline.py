@@ -5,11 +5,23 @@ import tempfile
 import subprocess
 from typing import List, Dict, Optional
 
+from pathlib import Path
+from dotenv import dotenv_values
+
 logger = logging.getLogger("clipper.punchline")
 
-LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "http://localhost:20128/v1/chat/completions")
-LLM_API_KEY = os.getenv("HERMES_CUSTOM_LOCALHOST_20128_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "ag/gemini-3.8-flash-high")
+HERMES_HOME = os.getenv("HERMES_HOME", os.path.expanduser("~/.hermes"))
+_h_env = dotenv_values(Path(HERMES_HOME) / ".env")
+_p_env = dotenv_values(Path(__file__).parent.parent.parent / ".env")
+_ALL = {**_h_env, **_p_env}
+
+LLM_ENDPOINT = os.environ.get("OPENROUTER_BASE_URL") or _ALL.get("OPENROUTER_BASE_URL", "http://localhost:20128/v1/chat/completions")
+LLM_API_KEY = (
+    os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    or _ALL.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    or ""
+)
+LLM_MODEL = os.environ.get("OPENROUTER_MODEL") or _ALL.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
 
 
 def transcribe_footage_clips(video_paths: List[str], max_sample_sec: float = 25.0) -> List[Dict]:
@@ -100,6 +112,7 @@ Aturan Penting:
         "model": LLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
+        "stream": False,
     }
 
     try:
