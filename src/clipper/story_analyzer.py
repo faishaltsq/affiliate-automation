@@ -1,7 +1,10 @@
 import re
 import os
+import logging
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
+
+logger = logging.getLogger("clipper.story_analyzer")
 
 def natural_sort_paths(paths: List[str]) -> List[str]:
     """Sort paths numerically so that part 2 comes before part 10."""
@@ -147,3 +150,46 @@ def select_story_footages(campaign_title: str, transcripts_by_file: Dict[str, st
             break
 
     return natural_sort_paths(chosen)
+
+
+def build_multi_story_packages(
+    footages: List[str],
+    punchlines: List[Dict],
+    outro_file: Optional[str] = None,
+    target_duration: float = 65.0,
+) -> List[Dict]:
+    """
+    Build independent story video packages for each punchline angle.
+    Each package contains:
+    - hero_file: video file focused on this story
+    - punchline_info: climax teaser info (climax_start, climax_duration, target_file)
+    - punchline_hook: hook text for the top banner
+    - story_beats: sequential narrative dialogue slices ending with outro
+    - estimated_duration: sum of beat durations + teaser duration
+    """
+    packages = []
+    for idx, p in enumerate(punchlines):
+        hero_file = p.get("target_file")
+        if not hero_file or not os.path.exists(hero_file):
+            hero_file = footages[idx % len(footages)]
+
+        beats = build_story_narrative_beats(
+            hero_file=hero_file,
+            outro_file=outro_file,
+            target_duration=target_duration,
+        )
+
+        teaser_dur = float(p.get("climax_duration", 3.5))
+        beats_dur = sum(b.get("duration", b.get("end", 0.0) - b.get("start", 0.0)) for b in beats)
+        est_dur = beats_dur + teaser_dur
+
+        packages.append({
+            "index": idx + 1,
+            "hero_file": hero_file,
+            "punchline_info": p,
+            "punchline_hook": p.get("punchline_hook", f"INFO EMAS #{idx+1}"),
+            "story_beats": beats,
+            "estimated_duration": round(est_dur, 2),
+        })
+
+    return packages
