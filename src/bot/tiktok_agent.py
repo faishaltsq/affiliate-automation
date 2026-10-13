@@ -200,11 +200,16 @@ def _cmd_status(msg_id: int, thread_id: int):
         clean_title = r["title"][:45]
         recent_list_str += f"• <code>{r['uploaded_at'][:16]}</code> — <b>{clean_title}</b>\n"
 
+    from src.tiktok.scheduler import is_running as sched_is_running
+    sched_status = "🟢 Aktif (tiap 2 jam)" if sched_is_running() else "🔴 Nonaktif"
+
     msg = (
         "📊 <b>Status TikTok Automation Agent</b>\n\n"
         f"🎬 <b>Total Video Terunggah:</b> {total_uploaded}\n"
+        f"⏰ <b>Scheduler:</b> {sched_status}\n"
         f"⏱ <b>Durasi Klip Aktif:</b> {cfg.get('clip_duration_seconds', 360)} detik (6 Menit)\n"
         f"📐 <b>Format Render:</b> 1080x1920 (9:16 Lanczos + Unsharp CRF 18)\n"
+        f"📺 <b>Dual Upload:</b> TikTok + YouTube Shorts\n"
         f"🔄 <b>Terakhir Dijalankan:</b> {last_run_str}\n\n"
         f"<b>4 Video Terakhir:</b>\n{recent_list_str or '• Belum ada video'}\n\n"
         f"💡 <i>Ketik 'upload 1 video baru' atau kirim /upload untuk eksekusi langsung.</i>"

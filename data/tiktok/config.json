@@ -5,11 +5,19 @@
     "TysyTube rusty knife restoration satisfying 4K",
     "rusty knife restoration ASMR 4K",
     "Odd Tinkering antique restoration satisfying 4K",
-    "satisfying ASMR rug cleaning restoration 4K",
+    "vintage watch restoration Rolex Seiko ASMR 4K",
+    "satisfying ASMR rug cleaning deep restoration 4K",
     "satisfying pressure washing deep cleaning 4K",
-    "Outdoor Boys camping fishing 4K",
-    "advoko MAKES bushcraft shelter 4K",
-    "satisfying bricklaying masonry craftsmanship 4K"
+    "Outdoor Boys camping fishing catch cook 4K",
+    "advoko MAKES bushcraft shelter log cabin 4K",
+    "satisfying bricklaying masonry craftsmanship 4K",
+    "Japanese carpentry traditional joinery kanawa tsugi 4K",
+    "satisfying woodturning epoxy resin bowl lathe 4K",
+    "damascus steel sword knife forging blacksmith 4K",
+    "satisfying CNC metal milling machining timelapse 4K",
+    "aquascaping aquarium setup nature timelapse 4K",
+    "primitive survival tool building secret underground house 4K",
+    "sneaker shoe restoration deep cleaning ASMR 4K"
   ],
   "videos_per_run": 1,
   "max_duration_seconds": 1800,
@@ -22,5 +30,9 @@
   "db_path": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\state.db",
   "download_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\downloads",
   "output_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\output",
-  "log_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\logs\\tiktok"
+  "log_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\logs\\tiktok",
+  "scheduler": {
+    "enabled": true,
+    "interval_hours": 2
+  }
 }

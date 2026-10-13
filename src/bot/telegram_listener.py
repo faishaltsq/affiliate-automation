@@ -13,6 +13,7 @@ import requests
 from dotenv import dotenv_values
 
 from src.logger import get_logger
+from src.singleton import ensure_single_instance
 from src.affiliate.queue_manager import init_affiliate_queue
 from src.bot.tiktok_agent import handle_tiktok_message
 from src.bot.threads_agent import handle_threads_message
@@ -75,7 +76,18 @@ def handle_message(msg: dict):
 
 def run_telegram_listener():
     """Long-polling loop for Telegram incoming messages."""
+    ensure_single_instance("telegram_listener")
     init_affiliate_queue()
+
+    # Start scheduler
+    from src.tiktok.config import load_config
+    from src.tiktok.scheduler import start_scheduler
+    cfg = load_config()
+    sched_cfg = cfg.get("scheduler", {})
+    if sched_cfg.get("enabled", True):
+        interval = float(sched_cfg.get("interval_hours", 2))
+        start_scheduler(interval_hours=interval)
+        log.info("Scheduler started — pipeline every %.1fh", interval)
 
     # Flush old updates on startup
     try:

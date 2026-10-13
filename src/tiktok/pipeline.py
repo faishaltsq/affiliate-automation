@@ -124,7 +124,14 @@ def run_pipeline(
                 search_candidates.append(pk)
         keywords = search_candidates
     else:
-        keywords = config.get("keywords", [])
+        import random
+        all_keywords = config.get("keywords", [])
+        # Shuffle to vary niches across scheduled runs, pick 3 random keywords
+        if len(all_keywords) > 3:
+            keywords = random.sample(all_keywords, 3)
+        else:
+            keywords = list(all_keywords)
+            random.shuffle(keywords)
     max_results = count if count is not None else config.get("videos_per_run", 1)
     max_duration = config.get("max_duration_seconds", 1800)
     clip_duration = config.get("clip_duration_seconds", 360)
