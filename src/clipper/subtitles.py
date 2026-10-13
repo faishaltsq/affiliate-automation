@@ -7,16 +7,53 @@ from typing import Optional
 logger = logging.getLogger("clipper.subtitles")
 
 _WHISPER_MODEL = None
+DEFAULT_INITIAL_PROMPT = (
+    "Jual Emas Indonesia, toko emas, surat emas, emas asli, emas palsu, "
+    "kadar emas, 24 karat, timbangan, nota emas, suratnya, cek emas."
+)
 
 
-def _get_whisper_model():
+def _get_whisper_model(model_size: str = "base"):
     """Singleton getter for Whisper model."""
     global _WHISPER_MODEL
     if _WHISPER_MODEL is None:
         from faster_whisper import WhisperModel
-        logger.info("Loading faster-whisper (tiny) on CPU...")
-        _WHISPER_MODEL = WhisperModel("tiny", device="cpu", compute_type="int8")
+        logger.info(f"Loading faster-whisper ({model_size}) on CPU...")
+        _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8")
     return _WHISPER_MODEL
+
+
+def wrap_word_timed_subtitles(words, max_words: int = 4):
+    """
+    Chunk word-level timestamps into natural 3-5 word subtitle phrases
+    that appear and disappear tightly with each spoken word.
+    """
+    chunks = []
+    current_chunk = []
+    for w in words:
+        clean_text = getattr(w, "word", str(w)).strip()
+        if not clean_text:
+            continue
+        current_chunk.append(w)
+        if len(current_chunk) >= max_words or clean_text.endswith((".", "!", "?", ",")):
+            start_t = round(float(current_chunk[0].start), 2)
+            end_t = round(float(current_chunk[-1].end), 2)
+            # Ensure positive duration
+            if end_t <= start_t:
+                end_t = start_t + 0.3
+            text = " ".join(getattr(x, "word", str(x)).strip() for x in current_chunk)
+            chunks.append({"start": start_t, "end": end_t, "text": text})
+            current_chunk = []
+
+    if current_chunk:
+        start_t = round(float(current_chunk[0].start), 2)
+        end_t = round(float(current_chunk[-1].end), 2)
+        if end_t <= start_t:
+            end_t = start_t + 0.3
+        text = " ".join(getattr(x, "word", str(x)).strip() for x in current_chunk)
+        chunks.append({"start": start_t, "end": end_t, "text": text})
+
+    return chunks
 
 
 def format_ass_timestamp(seconds: float) -> str:
@@ -40,9 +77,11 @@ def generate_clipper_subtitles(
     video_path: str,
     out_ass: Optional[str] = None,
     margin_v: int = 480,
+    initial_prompt: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Extract audio and generate ASS subtitle file with layout-aware vertical margin.
+    Extract audio and generate ASS subtitle file with layout-aware vertical margin
+    and synchronized word-timed subtitles.
     """
     if not os.path.exists(video_path):
         logger.error(f"Video file not found: {video_path}")
@@ -51,8 +90,10 @@ def generate_clipper_subtitles(
     if not out_ass:
         out_ass = os.path.splitext(video_path)[0] + ".ass"
 
+    prompt = initial_prompt or DEFAULT_INITIAL_PROMPT
+
     try:
-        model = _get_whisper_model()
+        model = _get_whisper_model("base")
     except Exception as e:
         logger.warning(f"Could not load faster-whisper: {e}")
         return None
@@ -76,7 +117,13 @@ def generate_clipper_subtitles(
             return None
 
         try:
-            segments, _ = model.transcribe(audio_path, language="id", beam_size=1)
+            segments, _ = model.transcribe(
+                audio_path,
+                language="id",
+                beam_size=1,
+                word_timestamps=True,
+                initial_prompt=prompt,
+            )
             segments = list(segments)
         except Exception as e:
             logger.error(f"Whisper transcription failed: {e}")
@@ -102,12 +149,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
     for seg in segments:
-        text = _escape_ass_text(seg.text)
-        if not text:
-            continue
-        start_ts = format_ass_timestamp(seg.start)
-        end_ts = format_ass_timestamp(seg.end)
-        events.append(f"Dialogue: 0,{start_ts},{end_ts},ClipperDefault,,0,0,0,,{text}")
+        # If word timestamps are present, create tightly synchronized 3-5 word dialogue lines
+        words_list = getattr(seg, "words", None)
+        if words_list and isinstance(words_list, list):
+            chunks = wrap_word_timed_subtitles(words_list, max_words=4)
+            for c in chunks:
+                txt = _escape_ass_text(c["text"])
+                if txt:
+                    s_ts = format_ass_timestamp(c["start"])
+                    e_ts = format_ass_timestamp(c["end"])
+                    events.append(f"Dialogue: 0,{s_ts},{e_ts},ClipperDefault,,0,0,0,,{txt}")
+        else:
+            text = _escape_ass_text(getattr(seg, "text", ""))
+            if not text:
+                continue
+            start_ts = format_ass_timestamp(seg.start)
+            end_ts = format_ass_timestamp(seg.end)
+            events.append(f"Dialogue: 0,{start_ts},{end_ts},ClipperDefault,,0,0,0,,{text}")
 
     if not events:
         return None
