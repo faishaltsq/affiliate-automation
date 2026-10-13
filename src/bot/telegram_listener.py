@@ -121,8 +121,10 @@ def handle_callback_query(cbq: dict):
     thread_id = sender_msg.get("message_thread_id")
     chat_id = str(sender_msg.get("chat", {}).get("id", "")) or CHAT_ID
     msg_id = sender_msg.get("message_id")
+    user_info = cbq.get("from", {}).get("username") or cbq.get("from", {}).get("first_name", "user")
 
-    # Determine destination topic and normalized command
+    log.info("Callback Query received from @%s: data='%s', msg_id=%s, thread=%s", user_info, raw_data, msg_id, thread_id)
+
     target_thread = thread_id
     cmd = raw_data
 
@@ -136,14 +138,16 @@ def handle_callback_query(cbq: dict):
         target_thread = int(CLIPPER_THREAD_ID)
         cmd = raw_data[3:]
     else:
-        # Backward-compatibility fallback for unprefixed callbacks
-        if not target_thread:
-            if any(raw_data.startswith(c) for c in ("/campaigns", "/accounts", "/addaccount")):
-                target_thread = int(CLIPPER_THREAD_ID)
-            elif any(raw_data.startswith(c) for c in ("/trending", "/affiliate", "/threads", "/queue")):
-                target_thread = int(THREADS_THREAD_ID)
-            else:
-                target_thread = int(TIKTOK_THREAD_ID)
+        # Backward-compatibility fallback for older unprefixed button callbacks
+        cmd = raw_data
+        if thread_id:
+            target_thread = int(thread_id)
+        elif any(raw_data.startswith(c) for c in ("/campaigns", "/accounts", "/addaccount")):
+            target_thread = int(CLIPPER_THREAD_ID)
+        elif any(raw_data.startswith(c) for c in ("/trending", "/affiliate", "/threads", "/queue")):
+            target_thread = int(THREADS_THREAD_ID)
+        else:
+            target_thread = int(TIKTOK_THREAD_ID)
 
     if not cmd:
         _answer_callback(cbq_id)
@@ -153,21 +157,27 @@ def handle_callback_query(cbq: dict):
 
     target_thread_int = int(target_thread) if target_thread else int(TIKTOK_THREAD_ID)
     target_thread_str = str(target_thread_int)
-    log.info("Callback [Thread: %s] cmd=%s (raw=%s)", target_thread_str, cmd, raw_data)
+    log.info("Dispatching callback to Thread %s: cmd=%s (raw=%s)", target_thread_str, cmd, raw_data)
 
     # Build synthetic message dict for agent handlers
     fake_msg = {
         "message_id": msg_id,
         "chat": sender_msg.get("chat", {}),
         "message_thread_id": target_thread_int,
+        "from": cbq.get("from", {}),
     }
 
-    if target_thread_str == CLIPPER_THREAD_ID:
-        handle_clipper_message(fake_msg, cmd, msg_id, target_thread_int)
-    elif target_thread_str == TIKTOK_THREAD_ID:
-        handle_tiktok_message(fake_msg, cmd, msg_id, target_thread_int)
-    elif target_thread_str == THREADS_THREAD_ID:
-        handle_threads_message(fake_msg, cmd, msg_id, target_thread_int)
+    try:
+        if target_thread_str == CLIPPER_THREAD_ID:
+            handle_clipper_message(fake_msg, cmd, msg_id, target_thread_int)
+        elif target_thread_str == TIKTOK_THREAD_ID:
+            handle_tiktok_message(fake_msg, cmd, msg_id, target_thread_int)
+        elif target_thread_str == THREADS_THREAD_ID:
+            handle_threads_message(fake_msg, cmd, msg_id, target_thread_int)
+        else:
+            log.warning("Unknown target thread %s for callback %s", target_thread_str, raw_data)
+    except Exception as exc:
+        log.error("Error executing callback command '%s': %s", cmd, exc, exc_info=True)
 
 
 def run_telegram_listener():
@@ -191,27 +201,38 @@ def run_telegram_listener():
     # Menu buttons are sent only on /menu command, not on startup
     _sync_telegram_commands()
 
-    # Flush old updates on startup
+    # Flush old updates on startup while ensuring allowed_updates is set
     try:
-        r = requests.get(f"{API}/getUpdates", params={"offset": -1, "timeout": 0}, timeout=10)
+        r = requests.post(
+            f"{API}/getUpdates",
+            json={"offset": -1, "timeout": 0, "allowed_updates": ["message", "callback_query"]},
+            timeout=10
+        )
         updates = r.json().get("result", [])
         if updates:
             flush_offset = updates[-1]["update_id"] + 1
-            requests.get(f"{API}/getUpdates", params={"offset": flush_offset, "timeout": 0}, timeout=10)
+            requests.post(
+                f"{API}/getUpdates",
+                json={"offset": flush_offset, "timeout": 0, "allowed_updates": ["message", "callback_query"]},
+                timeout=10
+            )
             log.info("Flushed %d old update(s)", len(updates))
     except Exception as exc:
         log.warning("Flush updates failed: %s", exc)
 
-    log.info("Telegram Bot Listener running... Topic 83=TikTok, Topic 9=Threads")
+    log.info("Telegram Bot Listener running... Topic 83=TikTok, Topic 9=Threads, Topic 246=Clipper")
 
     offset = None
     while True:
         try:
-            params = {"timeout": 30}
+            payload = {
+                "timeout": 30,
+                "allowed_updates": ["message", "callback_query"],
+            }
             if offset:
-                params["offset"] = offset
+                payload["offset"] = offset
 
-            r = requests.get(f"{API}/getUpdates", params=params, timeout=40)
+            r = requests.post(f"{API}/getUpdates", json=payload, timeout=40)
             if not r.ok:
                 time.sleep(5)
                 continue
