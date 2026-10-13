@@ -4,12 +4,42 @@ import os
 import re
 import json
 import logging
+from pathlib import Path
 from typing import Optional
 import requests
+from dotenv import dotenv_values
 
 logger = logging.getLogger("clipper.brief_analyzer")
+
+HERMES_HOME = os.environ.get("HERMES_HOME", str(Path.home() / "AppData" / "Local" / "hermes"))
+_h_env = dotenv_values(Path(HERMES_HOME) / ".env")
+_p_env = dotenv_values(Path(__file__).parent.parent.parent / ".env")
+_ALL = {**_h_env, **_p_env}
+
 LLM_URL = os.environ.get("OPENROUTER_BASE_URL", "http://localhost:20128/v1/chat/completions")
 MODEL = os.environ.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
+LLM_API_KEY = (
+    os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    or _ALL.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    or ""
+)
+
+
+def _extract_first_hook(hooks_raw: str) -> str:
+    """Extract the first clean hook line from raw campaign hook text."""
+    if not hooks_raw:
+        return ""
+    # Try to find quoted hooks first
+    quoted = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]{10,})["\u201c\u201d]', hooks_raw)
+    if quoted:
+        return quoted[0].strip()
+    # Otherwise take the first meaningful line
+    for line in hooks_raw.split("\n"):
+        line = line.strip()
+        line = re.sub(r'^[\d\)\.\-\*]+\s*', '', line)  # strip numbering
+        if len(line) > 10 and not line.lower().startswith(("bisa digunakan", "hook", "angle", "dll", "winning")):
+            return line.strip('"\'')
+    return hooks_raw.split("\n")[0][:80]
 
 
 def analyze_campaign_brief(campaign_detail: dict) -> dict:
@@ -52,14 +82,15 @@ def analyze_campaign_brief(campaign_detail: dict) -> dict:
 
     analysis_res = {
         "summary": f"Campaign {title}",
-        "winning_hooks": [hooks_raw] if hooks_raw else [f"Wajib tahu ini tentang {title}!"],
+        "winning_hooks": [_extract_first_hook(hooks_raw)] if hooks_raw else [f"Wajib tahu ini tentang {title}!"],
         "key_requirements": dos[:5] if dos else ["Gunakan materi yang disediakan"],
         "forbidden_items": donts[:5] if donts else ["Dilarang reupload tanpa edit"],
         "cta_text": cta or "Cek sekarang juga!",
-        "caption_recommendation": f"{title} | {' '.join(hashtags)}",
+        "caption_recommendation": f"{title}\n\n{' '.join(hashtags)}",
     }
 
     try:
+        headers = {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
         r = requests.post(
             LLM_URL,
             json={
@@ -71,6 +102,7 @@ def analyze_campaign_brief(campaign_detail: dict) -> dict:
                 "stream": False,
                 "temperature": 0.3,
             },
+            headers=headers,
             timeout=18,
         )
         if r.ok:

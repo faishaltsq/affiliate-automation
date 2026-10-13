@@ -109,7 +109,13 @@ def run_clipper_pipeline(
     # 6. Upload to TikTok
     notify("🚀 Mengunggah ke TikTok @pochitalkshop...")
     uploader = TikTokUploader("data/tiktok/cookies.txt")
-    tiktok_caption = f"{title}\n\n{hook}\n\n{' '.join(hashtags)}"
+    # Pakai caption_recommendation dari AI yang sudah rapi, bukan dump hook mentah
+    clean_caption = caption_rec.strip()
+    # Pastikan hashtags terpasang jika belum ada di caption_rec
+    for tag in hashtags:
+        if tag.lower() not in clean_caption.lower():
+            clean_caption += f" {tag}"
+    tiktok_caption = clean_caption
     tiktok_ok = uploader.upload_video(edited_path, tiktok_caption)
 
     notify("✅ <b>Upload TikTok selesai!</b> Siap disubmit ke Clippo.")
