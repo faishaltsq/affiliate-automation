@@ -27,6 +27,42 @@ def get_video_duration(video_path: str) -> float:
         return 60.0
 
 
+def is_valid_media_file(video_path: str) -> bool:
+    """Check if file exists and contains a valid, readable video stream."""
+    if not video_path or not os.path.exists(video_path):
+        return False
+    try:
+        if os.path.getsize(video_path) < 10000:
+            return False
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=codec_type",
+            "-of", "csv=p=0",
+            video_path,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        return res.returncode == 0 and "video" in res.stdout.lower()
+    except Exception:
+        return False
+
+
+def has_audio_stream(video_path: str) -> bool:
+    """Check if video file has an audio stream."""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=codec_type",
+            "-of", "csv=p=0",
+            video_path,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        return res.returncode == 0 and "audio" in res.stdout.lower()
+    except Exception:
+        return False
+
+
 def render_clipper_video(
     input_path: Union[str, List[str]],
     output_dir: str = "data/clippo/output",
@@ -139,6 +175,23 @@ def _render_clipper_multi_video(
     Stitch slices from EVERY provided footage into a single cohesive 9:16 vertical video.
     Guarantees 100% of the provided footages are included in the clip.
     """
+    # Strict validation: keep only playable video files
+    valid_paths = [p for p in video_paths if is_valid_media_file(p)]
+    if not valid_paths:
+        logger.error("No valid video files found in multi-footage input: %s", video_paths)
+        return None
+
+    if len(valid_paths) == 1:
+        return render_clipper_video(
+            valid_paths[0],
+            output_dir=output_dir,
+            start_sec=0.0,
+            duration_sec=target_duration,
+            hook_text=hook_text,
+            fill_mode=fill_mode,
+        )
+
+    video_paths = valid_paths
     n_clips = len(video_paths)
     out_name = f"clip_multi_{n_clips}_{int(target_duration)}s.mp4"
     out_path = os.path.join(output_dir, out_name)
@@ -158,11 +211,17 @@ def _render_clipper_multi_video(
 
         inputs.extend(["-ss", f"{start_offset:.2f}", "-t", f"{actual_seg:.2f}", "-i", path])
 
+        audio_filter = (
+            f"[{i}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{i}]"
+            if has_audio_stream(path)
+            else f"anullsrc=r=48000:cl=stereo,atrim=end={actual_seg:.2f}[a{i}]"
+        )
+
         if fill_mode:
             vf = (
                 f"[{i}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
                 f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{i}];"
-                f"[{i}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{i}]"
+                f"{audio_filter}"
             )
         else:
             vf = (
@@ -170,7 +229,7 @@ def _render_clipper_multi_video(
                 f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{i}];"
                 f"[{i}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{i}];"
                 f"[bg{i}][fg{i}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{i}];"
-                f"[{i}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{i}]"
+                f"{audio_filter}"
             )
         filter_parts.append(vf)
         concat_inputs.append(f"[v{i}][a{i}]")

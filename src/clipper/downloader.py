@@ -67,6 +67,11 @@ def _download_cloud_or_archive(url: str, output_dir: str) -> List[str]:
     clean_url = url.strip()
     download_url = clean_url
 
+    # Skip non-downloadable cloud folder links
+    if "drive.google.com/drive/folders" in clean_url:
+        logger.warning("Google Drive folder links cannot be downloaded directly via HTTP: %s", clean_url)
+        return []
+
     # Nextcloud public share format: .../index.php/s/<token> -> .../index.php/s/<token>/download
     if "/index.php/s/" in clean_url and not clean_url.rstrip("/").endswith("/download"):
         download_url = clean_url.rstrip("/") + "/download"
@@ -87,16 +92,21 @@ def _download_cloud_or_archive(url: str, output_dir: str) -> List[str]:
                     filename = m.group(1).strip()
 
             content_type = resp.headers.get("content-type", "").lower()
+            if "text/html" in content_type or "text/plain" in content_type:
+                logger.warning("Direct download URL returned web page HTML (%s), skipping.", content_type)
+                return []
+
+            chunk_iter = resp.iter_content(chunk_size=65536)
+            first_chunk = next(chunk_iter, b"")
+            if not first_chunk or first_chunk.startswith(b"<!DOCTYPE") or first_chunk.startswith(b"<html"):
+                logger.warning("Response content is HTML markup, skipping non-media response.")
+                return []
+
             is_zip_hint = (
                 "zip" in content_type or
                 (filename and filename.lower().endswith(".zip")) or
                 clean_url.lower().endswith(".zip")
             )
-
-            chunk_iter = resp.iter_content(chunk_size=65536)
-            first_chunk = next(chunk_iter, b"")
-            if not first_chunk:
-                return []
 
             is_zip = is_zip_hint or first_chunk.startswith(b"PK\x03\x04")
 
@@ -138,8 +148,16 @@ def _download_cloud_or_archive(url: str, output_dir: str) -> List[str]:
                     for chunk in chunk_iter:
                         f.write(chunk)
 
-                if video_path.exists() and video_path.stat().st_size > 100000:
+                from src.clipper.editor import is_valid_media_file
+                if is_valid_media_file(str(video_path)):
                     return [str(video_path)]
+                else:
+                    logger.warning("Downloaded file %s is not a valid video file, removing.", video_path)
+                    try:
+                        video_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    return []
     except Exception as e:
         logger.warning("Cloud/archive download error for %s: %s", url, e)
 

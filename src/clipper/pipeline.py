@@ -164,7 +164,17 @@ def run_clipper_pipeline(
         target_urls = [source_url]
     else:
         assets = detail.get("assets", [])
-        target_urls = [a.get("url") for a in assets if a.get("url")]
+        # Separate video footage assets from non-footage guidelines
+        footage_assets = []
+        for a in assets:
+            u = a.get("url", "")
+            dname = a.get("display_name", "").lower()
+            if not u:
+                continue
+            if any(w in dname for w in ["guideline", "panduan", "brief", "aturan", "syarat", "doc"]):
+                continue
+            footage_assets.append(u)
+        target_urls = footage_assets if footage_assets else [a.get("url") for a in assets if a.get("url")]
 
     if not target_urls:
         err = "Tidak ada bahan video yang dapat diunduh dari campaign ini."
@@ -194,11 +204,12 @@ def run_clipper_pipeline(
         vids = download_asset_videos(u)
         all_footages.extend(vids)
 
-    # Deduplicate while preserving sequence order
+    # Deduplicate while preserving sequence order, ensuring strictly valid video media files
+    from src.clipper.editor import is_valid_media_file
     seen_paths = set()
     unique_footages = []
     for p in all_footages:
-        if p not in seen_paths and os.path.exists(p):
+        if p not in seen_paths and os.path.exists(p) and is_valid_media_file(p):
             seen_paths.add(p)
             unique_footages.append(p)
 

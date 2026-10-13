@@ -24,6 +24,7 @@ def test_download_asset_videos_cached(tmp_path):
 def test_render_clipper_video_multi_footage_mock():
     with patch("src.clipper.editor.subprocess.run") as mock_run, \
          patch("src.clipper.editor.get_video_duration", return_value=30.0), \
+         patch("src.clipper.editor.is_valid_media_file", return_value=True), \
          patch("os.path.exists", return_value=True):
         mock_run.return_value = MagicMock(returncode=0)
 
@@ -34,9 +35,29 @@ def test_render_clipper_video_multi_footage_mock():
         )
         assert out is not None
         assert "clip_multi_3_60s.mp4" in out
-        # Verify ffmpeg called with concat=n=3
+
+
+def test_render_clipper_video_filters_invalid_media():
+    def fake_is_valid(path):
+        return "invalid" not in path
+
+    with patch("src.clipper.editor.subprocess.run") as mock_run, \
+         patch("src.clipper.editor.get_video_duration", return_value=30.0), \
+         patch("src.clipper.editor.is_valid_media_file", side_effect=fake_is_valid), \
+         patch("os.path.exists", return_value=True):
+        mock_run.return_value = MagicMock(returncode=0)
+
+        out = render_clipper_video(
+            input_path=["foot1.mp4", "invalid_page.mp4", "foot2.mp4"],
+            duration_sec=60.0,
+            hook_text="EDUKASI EMAS",
+        )
+        assert out is not None
+        # Must have filtered out invalid_page and kept only 2 valid clips
+        assert "clip_multi_2_60s.mp4" in out
+        # Verify ffmpeg called with concat=n=2 (only valid files)
         call_args = mock_run.call_args[0][0]
         assert "-filter_complex" in call_args
         fc = call_args[call_args.index("-filter_complex") + 1]
-        assert "concat=n=3:v=1:a=1" in fc
+        assert "concat=n=2:v=1:a=1" in fc
         assert "EDUKASI EMAS" in fc
