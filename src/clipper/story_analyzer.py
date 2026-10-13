@@ -9,6 +9,80 @@ def natural_sort_paths(paths: List[str]) -> List[str]:
         return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", Path(p).name)]
     return sorted(paths, key=_key)
 
+import tempfile
+import subprocess
+from src.clipper.trimmer import extract_dialogue_beats
+
+def build_story_narrative_beats(
+    hero_file: str,
+    outro_file: Optional[str] = None,
+    target_duration: float = 65.0,
+) -> List[Dict]:
+    """
+    Extract natural, continuous dialogue beats from the hero story video
+    and append outro concluding beat if available.
+    """
+    beats = []
+    outro_dur = 0.0
+    if outro_file and os.path.exists(outro_file):
+        outro_dur = 8.5
+
+    rem_hero_dur = max(25.0, target_duration - outro_dur)
+
+    try:
+        from src.clipper.subtitles import _get_whisper_model, DEFAULT_INITIAL_PROMPT
+        model = _get_whisper_model("base")
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_wav = tmp.name
+
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", hero_file, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", tmp_wav],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+
+        segs, _ = model.transcribe(
+            tmp_wav,
+            language="id",
+            initial_prompt=DEFAULT_INITIAL_PROMPT,
+            beam_size=1,
+        )
+        segments = [{"start": s.start, "end": s.end, "text": s.text} for s in segs]
+        try:
+            os.remove(tmp_wav)
+        except Exception:
+            pass
+
+        raw_beats = extract_dialogue_beats(segments, target_duration=rem_hero_dur)
+        for b in raw_beats:
+            beats.append({
+                "file": hero_file,
+                "start": b["start"],
+                "end": b["end"],
+                "duration": b["duration"],
+            })
+    except Exception as e:
+        logger.warning(f"Could not build automated narrative beats: {e}")
+        # Fallback to single chunk
+        beats.append({
+            "file": hero_file,
+            "start": 0.0,
+            "end": rem_hero_dur,
+            "duration": rem_hero_dur,
+        })
+
+    if outro_file and os.path.exists(outro_file):
+        beats.append({
+            "file": outro_file,
+            "start": 0.0,
+            "end": outro_dur,
+            "duration": outro_dur,
+        })
+
+    return beats
+
+
 def select_story_footages(campaign_title: str, transcripts_by_file: Dict[str, str]) -> List[str]:
     """
     Select the primary coherent story footage and matching outro/supporting clips,

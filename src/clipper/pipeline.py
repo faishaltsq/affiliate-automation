@@ -221,11 +221,16 @@ def run_clipper_pipeline(
 
     notify(f"📥 Download selesai ({dl_sec:.0f}s): {len(unique_footages)} bahan footage siap disatukan.")
 
-    # 6. Render base video (ensuring ALL provided footages are included into the final clip)
+    # 6. Render base video with natural dialogue continuity and adaptive framing
     min_dur = float(detail.get("min_duration", 15))
     max_dur = float(detail.get("max_duration", 180))
 
     climax_info = None
+    story_beats = None
+
+    from src.clipper.story_analyzer import natural_sort_paths, build_story_narrative_beats
+    unique_footages = natural_sort_paths(unique_footages)
+
     if len(unique_footages) > 1:
         # Multi-footage: transcribe and extract climax punchline matching campaign title
         notify("🎙️ Mentranskripsi dialog footage untuk mencari momen punchline/klimaks...")
@@ -241,10 +246,27 @@ def run_clipper_pipeline(
         except Exception as p_err:
             logger.warning(f"Punchline detection failed, proceeding with normal hook: {p_err}")
 
-        # Multi-footage: include each file proportionally, bounded within campaign requirements
-        target_dur = max(min_dur, min(max_dur, max(60.0, len(unique_footages) * 6.8)))
-        notify(f"🎬 Merender klip 9:16 HD dari SEMUA {len(unique_footages)} footage ({target_dur:.0f}s) dengan adaptive framing & subtitle...")
-        input_for_render = unique_footages
+        target_dur = max(min_dur, min(max_dur, 65.0))
+
+        # Check if a single hero story footage was identified (e.g. specific customer confrontation)
+        hero_file = climax_info.get("target_file") if climax_info else None
+        outro_file = None
+        # Find potential outro/closing clip from last footage or closing keywords
+        for f in unique_footages:
+            f_name = os.path.basename(f).lower()
+            if f != hero_file and ("outro" in f_name or "closing" in f_name or f == unique_footages[-1]):
+                outro_file = f
+
+        if hero_file and os.path.exists(hero_file):
+            notify("🎬 Mengekstrak alur percakapan natural (skip basa-basi & menjaga keutuhan kalimat)...")
+            story_beats = build_story_narrative_beats(hero_file, outro_file=outro_file, target_duration=target_dur)
+
+        if story_beats and len(story_beats) > 0:
+            notify(f"🎬 Merender klip 9:16 HD ({target_dur:.0f}s) dengan dialog natural & subtitle sinkron...")
+            input_for_render = [b["file"] for b in story_beats]
+        else:
+            notify(f"🎬 Merender klip 9:16 HD dari {len(unique_footages)} footage ({target_dur:.0f}s)...")
+            input_for_render = unique_footages
     else:
         target_dur = min(max_dur, 60.0)
         notify(f"🎬 Merender klip 9:16 HD (hook: <i>\"{hook[:45]}...\"</i>)...")
@@ -259,6 +281,7 @@ def run_clipper_pipeline(
         fill_mode=fill_mode,
         climax_info=climax_info,
         auto_subtitles=True,
+        story_beats=story_beats,
     )
     render_sec = _time.time() - t1
     if not edited_path or not os.path.exists(edited_path):

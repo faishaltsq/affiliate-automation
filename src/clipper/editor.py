@@ -93,18 +93,19 @@ def render_clipper_video(
     fill_mode: bool = False,
     climax_info: Optional[dict] = None,
     auto_subtitles: bool = True,
+    story_beats: Optional[List[dict]] = None,
 ) -> Optional[str]:
     """
     Render video into 1080x1920 9:16 format with high quality H.264 BT.709.
-    If input_path is a list of footage paths, combines slices from ALL provided footages
-    so that every footage file is represented in the final clip.
+    If input_path is a list of footage paths, combines slices from provided footages.
+    If story_beats is provided, stitches dialogue beats preserving sentence integrity.
     Optionally prepends a 3.5s punchline climax teaser as cold open and overlays hook text.
     Burns synchronized running subtitles via faster-whisper.
     """
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # Multi-footage stitching mode
-    if isinstance(input_path, list) and len(input_path) > 1:
+    if isinstance(input_path, list) and (len(input_path) > 1 or story_beats):
         return _render_clipper_multi_video(
             video_paths=input_path,
             output_dir=output_dir,
@@ -113,6 +114,7 @@ def render_clipper_video(
             fill_mode=fill_mode,
             climax_info=climax_info,
             auto_subtitles=auto_subtitles,
+            story_beats=story_beats,
         )
 
     # Single video mode
@@ -197,12 +199,12 @@ def _render_clipper_multi_video(
     fill_mode: bool = False,
     climax_info: Optional[dict] = None,
     auto_subtitles: bool = True,
+    story_beats: Optional[List[dict]] = None,
 ) -> Optional[str]:
     """
-    Stitch slices from EVERY provided footage into a single cohesive 9:16 vertical video.
-    Guarantees 100% of the provided footages are included in the clip.
-    If climax_info is present, prepends the climax punchline moment (3.5s) as the opening teaser hook,
-    followed by all footages in natural story sequence.
+    Stitch slices from provided footages into a single cohesive 9:16 vertical video.
+    If story_beats is provided, assembles dialogue beats preserving sentence integrity.
+    If climax_info is present, prepends the climax punchline moment (3.5s) as the opening teaser hook.
     Applies adaptive 4:3 framing panned towards subject angle, with automatic 16:9 ambient fallback.
     Burns synchronized running subtitles via faster-whisper.
     """
@@ -212,7 +214,7 @@ def _render_clipper_multi_video(
         logger.error("No valid video files found in multi-footage input: %s", video_paths)
         return None
 
-    if len(valid_paths) == 1 and not climax_info:
+    if len(valid_paths) == 1 and not climax_info and not story_beats:
         return render_clipper_video(
             valid_paths[0],
             output_dir=output_dir,
@@ -281,53 +283,95 @@ def _render_clipper_multi_video(
         concat_inputs.append(f"[v{idx}][a{idx}]")
         idx += 1
 
-    # 2. Sequential story progression: budget remaining time across ALL provided footages (1..N)
-    if climax_info and idx > 0:
-        rem_time = max(20.0, target_duration - float(climax_info.get("climax_duration", 3.5)))
+    # 2. Sequential story progression
+    if story_beats and len(story_beats) > 0:
+        for beat in story_beats:
+            b_path = beat["file"]
+            b_start = float(beat.get("start", 0.0))
+            b_dur = float(beat.get("duration", beat.get("end", b_start + 10.0) - b_start))
+            if b_dur <= 0.5:
+                continue
+            inputs.extend(["-ss", f"{b_start:.2f}", "-t", f"{b_dur:.2f}", "-i", b_path])
+
+            audio_filter = (
+                f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
+                if has_audio_stream(b_path)
+                else f"anullsrc=r=48000:cl=stereo,atrim=end={b_dur:.2f}[a{idx}]"
+            )
+
+            if fill_mode:
+                vf = (
+                    f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
+                    f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
+                    f"{audio_filter}"
+                )
+            elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
+                x_off = crop_cfg.x_offset
+                vf = (
+                    f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                    f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
+                    f"{audio_filter}"
+                )
+            else:
+                vf = (
+                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                    f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                    f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
+                    f"{audio_filter}"
+                )
+            filter_parts.append(vf)
+            concat_inputs.append(f"[v{idx}][a{idx}]")
+            idx += 1
     else:
-        rem_time = target_duration
-
-    seg_dur = max(3.0, rem_time / n_clips)
-
-    for path in video_paths:
-        file_dur = get_video_duration(path)
-        start_offset = min(4.0, max(0.0, file_dur - seg_dur - 1.0))
-        actual_seg = min(seg_dur, max(2.5, file_dur - start_offset))
-
-        inputs.extend(["-ss", f"{start_offset:.2f}", "-t", f"{actual_seg:.2f}", "-i", path])
-
-        audio_filter = (
-            f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
-            if has_audio_stream(path)
-            else f"anullsrc=r=48000:cl=stereo,atrim=end={actual_seg:.2f}[a{idx}]"
-        )
-
-        if fill_mode:
-            vf = (
-                f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
-                f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
-                f"{audio_filter}"
-            )
-        elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
-            x_off = crop_cfg.x_offset
-            vf = (
-                f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
-                f"{audio_filter}"
-            )
+        if climax_info and idx > 0:
+            rem_time = max(20.0, target_duration - float(climax_info.get("climax_duration", 3.5)))
         else:
-            vf = (
-                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
-                f"{audio_filter}"
+            rem_time = target_duration
+
+        seg_dur = max(3.0, rem_time / n_clips)
+
+        for path in video_paths:
+            file_dur = get_video_duration(path)
+            start_offset = min(4.0, max(0.0, file_dur - seg_dur - 1.0))
+            actual_seg = min(seg_dur, max(2.5, file_dur - start_offset))
+
+            inputs.extend(["-ss", f"{start_offset:.2f}", "-t", f"{actual_seg:.2f}", "-i", path])
+
+            audio_filter = (
+                f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
+                if has_audio_stream(path)
+                else f"anullsrc=r=48000:cl=stereo,atrim=end={actual_seg:.2f}[a{idx}]"
             )
-        filter_parts.append(vf)
-        concat_inputs.append(f"[v{idx}][a{idx}]")
-        idx += 1
+
+            if fill_mode:
+                vf = (
+                    f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
+                    f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
+                    f"{audio_filter}"
+                )
+            elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
+                x_off = crop_cfg.x_offset
+                vf = (
+                    f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                    f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
+                    f"{audio_filter}"
+                )
+            else:
+                vf = (
+                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+                    f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+                    f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
+                    f"{audio_filter}"
+                )
+            filter_parts.append(vf)
+            concat_inputs.append(f"[v{idx}][a{idx}]")
+            idx += 1
 
     total_inputs_count = idx
     concat_chain = "".join(concat_inputs) + f"concat=n={total_inputs_count}:v=1:a=1[basev][outa]"
