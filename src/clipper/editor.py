@@ -50,15 +50,18 @@ def render_clipper_video(
     # Base video filter (either Center Crop or Blurred Pillarbox)
     if fill_mode:
         # Scale to height 1920, center-crop 1080
-        vf_base = "scale=-2:1920,crop=1080:1920:(iw-1080)/2:0,unsharp=5:5:0.8:5:5:0.4"
+        vf_base = "scale=-2:1920,crop=1080:1920:(iw-1080)/2:0"
+        fc_arg = "-vf"
     else:
-        # Blurred background + sharp centered original
+        # Fast blurred background: scale down → blur → scale up, overlay sharp fg
+        # Much faster than boxblur=25:5 on full resolution
         vf_base = (
             "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-            "boxblur=25:5[bg];"
-            "[0:v]scale=1080:-2:force_original_aspect_ratio=decrease,unsharp=5:5:0.8:5:5:0.4[fg];"
+            "scale=270:480,boxblur=20:1,scale=1080:1920[bg];"
+            "[0:v]scale=1080:-2:force_original_aspect_ratio=decrease[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2"
         )
+        fc_arg = "-filter_complex"
 
     cmd = [
         "ffmpeg",
@@ -66,16 +69,17 @@ def render_clipper_video(
         "-ss", str(start_sec),
         "-t", str(actual_dur),
         "-i", input_path,
-        "-filter_complex" if not fill_mode else "-vf", vf_base,
+        fc_arg, vf_base,
         "-c:v", "libx264",
-        "-crf", "18",
-        "-preset", "veryfast",
+        "-crf", "23",          # lighter encode, TikTok re-encodes anyway
+        "-preset", "ultrafast", # don't compete with scheduler FFmpeg for CPU
+        "-threads", "2",        # cap CPU usage
         "-pix_fmt", "yuv420p",
         "-colorspace", "bt709",
         "-color_primaries", "bt709",
         "-color_trc", "bt709",
         "-c:a", "aac",
-        "-b:a", "192k",
+        "-b:a", "128k",
         "-ar", "48000",
         "-movflags", "+faststart",
         out_path,
@@ -83,7 +87,7 @@ def render_clipper_video(
 
     try:
         logger.info("Rendering clipper video: %s (%.1fs - %.1fs)", input_path, start_sec, actual_dur)
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=900)  # 15 min hard cap
         if res.returncode == 0 and os.path.exists(out_path):
             logger.info("Rendered successfully: %s", out_path)
             return out_path
