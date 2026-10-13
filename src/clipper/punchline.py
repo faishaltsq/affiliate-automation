@@ -3,6 +3,7 @@ import json
 import logging
 import tempfile
 import subprocess
+import requests
 from typing import List, Dict, Optional
 
 from pathlib import Path
@@ -192,6 +193,118 @@ def select_climax_punchline(
         "punchline_hook": "JUAL EMAS DI SINI MALAH UNTUNG 2X LIPAT?!",
         "reason": "Fallback to first transcript dialogue snippet.",
     }
+
+
+def select_multiple_climax_punchlines(
+    campaign_title: str,
+    transcripts: List[Dict],
+    count: int = 2,
+    brief: Optional[Dict] = None,
+) -> List[Dict]:
+    """Select count distinct climax punchlines from footage transcripts."""
+    if not transcripts:
+        return []
+
+    count = max(1, min(count, 5))
+    if count == 1:
+        single = select_climax_punchline(campaign_title, transcripts, brief=brief)
+        return [single] if single else []
+
+    # Prompt LLM for list of distinct angles
+    if LLM_API_KEY:
+        formatted_lines = []
+        for t in transcripts:
+            fn = t.get("filename", os.path.basename(t.get("file", "")))
+            formatted_lines.append(f"[{fn}] ({t['start']}s - {t['end']}s): \"{t['text']}\"")
+        transcript_summary = "\n".join(formatted_lines[:60])
+
+        guidelines_text = ""
+        if brief:
+            dos = brief.get("dos", [])
+            donts = brief.get("donts", [])
+            guidelines_text = f"Do's: {', '.join(dos)}\nDon'ts: {', '.join(donts)}"
+
+        prompt = f"""Kamu adalah Video Editor & Hook Specialist untuk TikTok & Reels.
+Tugasmu: Dari transkrip bahan footage berikut, pilih {count} MOMEN PUNCHLINE / SUDUT PANDANG (ANGLES) BERBEDA untuk dibuat menjadi {count} video klip terpisah dengan HOOK yang BERBEDA-BEDA.
+
+Judul Campaign: "{campaign_title}"
+{guidelines_text}
+
+Transkrip Bahan Video:
+{transcript_summary}
+
+Aturan:
+1. Setiap video HARUS memiliki sudut pandang/topik yang berbeda (misal Video 1: keuntungan naik 2x, Video 2: emas tanpa surat/warisan, Video 3: potongan toko vs tanpa potongan).
+2. Jika ada beberapa file footage berbeda, prioritaskan memilih footage file yang berbeda untuk tiap angle!
+3. Hook singkat (maks 7 kata, ALL CAPS), faktual, dan patuhi brief (edukasi, jangan tuduh palsu/penipu bila di video tidak ada).
+4. Output HANYA JSON array murni tanpa markdown:
+[
+  {{
+    "target_filename": "nama_file.mp4",
+    "climax_start": 10.5,
+    "climax_duration": 3.5,
+    "punchline_hook": "HOOK 1",
+    "reason": "Alasan sudut pandang 1"
+  }},
+  ...
+]"""
+        try:
+            resp = requests.post(
+                LLM_ENDPOINT,
+                headers={"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"},
+                json={"model": LLM_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "stream": False},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                raw_txt = resp.json()["choices"][0]["message"]["content"].strip()
+                if raw_txt.startswith("```"):
+                    raw_txt = raw_txt.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+                data = json.loads(raw_txt)
+                if isinstance(data, list) and len(data) > 0:
+                    results = []
+                    for item in data[:count]:
+                        target_fn = item.get("target_filename", "")
+                        matched_path = None
+                        for t in transcripts:
+                            if target_fn and (target_fn in t.get("file", "") or target_fn in t.get("filename", "")):
+                                matched_path = t["file"]
+                                break
+                        item["target_file"] = matched_path or transcripts[min(len(results), len(transcripts) - 1)]["file"]
+                        results.append(item)
+                    if len(results) >= count:
+                        return results
+        except Exception as e:
+            logger.warning("Multi-punchline LLM query failed: %s", e)
+
+    # Heuristic fallback across available transcripts
+    results = []
+    seen_files = set()
+    for t in transcripts:
+        if t["file"] not in seen_files:
+            seen_files.add(t["file"])
+            idx_num = len(results) + 1
+            results.append({
+                "target_file": t["file"],
+                "climax_start": t.get("start", 0.0),
+                "climax_duration": 3.5,
+                "punchline_hook": f"INFO PENTING EMAS #{idx_num}!",
+                "reason": f"Fallback footage {os.path.basename(t['file'])}",
+            })
+            if len(results) == count:
+                break
+
+    # If still not enough, repeat with timestamp offsets
+    while len(results) < count and transcripts:
+        fallback_t = transcripts[len(results) % len(transcripts)]
+        results.append({
+            "target_file": fallback_t["file"],
+            "climax_start": fallback_t.get("start", 0.0),
+            "climax_duration": 3.5,
+            "punchline_hook": f"INFO MENARIK EMAS #{len(results) + 1}!",
+            "reason": "Offset fallback",
+        })
+
+    return results
 
 
 def extract_climax_teaser(video_path: str, start_sec: float, duration_sec: float, out_path: str) -> bool:
