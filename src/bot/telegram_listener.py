@@ -126,9 +126,12 @@ def run_telegram_listener():
     cfg = load_config()
     sched_cfg = cfg.get("scheduler", {})
     if sched_cfg.get("enabled", True):
-        interval = float(sched_cfg.get("interval_hours", 2))
-        start_scheduler(interval_hours=interval)
-        log.info("Scheduler started — pipeline every %.1fh", interval)
+        start_scheduler(
+            mode=sched_cfg.get("mode", "fyp"),
+            fyp_slots=sched_cfg.get("fyp_slots", ["12:00", "16:30", "19:30"]),
+            interval_hours=float(sched_cfg.get("interval_hours", 2)),
+        )
+        log.info("Scheduler started — mode=%s (fyp_slots=%s)", sched_cfg.get("mode", "fyp"), sched_cfg.get("fyp_slots"))
 
     # Menu buttons are sent only on /menu command, not on startup
 

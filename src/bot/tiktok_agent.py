@@ -146,7 +146,8 @@ def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], 
     # 3. Status triggers
     if any(k in cleaned for k in [
         "cek status", "status tiktok", "video apa aja yang udah", "berapa video hari ini",
-        "video yang terupload", "riwayat upload", "history upload", "rekap upload", "rekap video"
+        "video yang terupload", "riwayat upload", "history upload", "rekap upload", "rekap video",
+        "jadwal", "scheduler", "kapan upload", "jam berapa upload", "jadwal fyp", "slot fyp"
     ]):
         return "status", None, False
 
@@ -200,8 +201,8 @@ def _cmd_status(msg_id: int, thread_id: int):
         clean_title = r["title"][:45]
         recent_list_str += f"• <code>{r['uploaded_at'][:16]}</code> — <b>{clean_title}</b>\n"
 
-    from src.tiktok.scheduler import is_running as sched_is_running
-    sched_status = "🟢 Aktif (tiap 2 jam)" if sched_is_running() else "🔴 Nonaktif"
+    from src.tiktok.scheduler import get_status_str as sched_status_str
+    sched_status = sched_status_str()
 
     msg = (
         "📊 <b>Status TikTok Automation Agent</b>\n\n"

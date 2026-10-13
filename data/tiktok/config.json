@@ -34,6 +34,12 @@
   "log_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\logs\\tiktok",
   "scheduler": {
     "enabled": true,
-    "interval_hours": 2
+    "mode": "fyp",
+    "fyp_slots": [
+      "12:00",
+      "16:30",
+      "19:30"
+    ],
+    "interval_hours": 4
   }
 }
