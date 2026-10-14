@@ -19,12 +19,29 @@ REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "affiliate_trend_bot")
 
-# ── LLM (Ruvicode / DeepSeek) ────────────────────────
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-LLM_API_KEY = os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-v4-flash")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.ruvicode.com/v1")
-OPENROUTER_URL = f"{LLM_BASE_URL}/chat/completions"
+# ── LLM (9router / Ruvicode fallback) ────────────────
+HERMES_ENV_PATH = Path.home() / "AppData" / "Local" / "hermes" / ".env"
+_hermes_env = {}
+if HERMES_ENV_PATH.exists():
+    from dotenv import dotenv_values
+    _hermes_env = dotenv_values(HERMES_ENV_PATH)
+
+# Primary: 9router local antigravity gemini 3.8 flash
+LLM_BASE_URL = os.getenv("LLM_BASE_URL") or _hermes_env.get("NINEROUTER_BASE_URL") or "http://localhost:20128/v1"
+LLM_MODEL = os.getenv("LLM_MODEL") or "ag/gemini-3.8-flash-high"
+LLM_API_KEY = (
+    os.getenv("LLM_API_KEY")
+    or os.getenv("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    or _hermes_env.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    or "local-secret"
+)
+
+# Fallback 1: Ruvicode DeepSeek V4 Flash
+RUVICODE_BASE_URL = os.getenv("RUVICODE_BASE_URL") or "https://api.ruvicode.com/v1"
+RUVICODE_MODEL = os.getenv("RUVICODE_MODEL") or "deepseek-v4.1-flash"
+RUVICODE_API_KEY = os.getenv("RUVICODE_API_KEY") or _hermes_env.get("RUVICODE_API_KEY") or ""
+
+OPENROUTER_URL = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
 
 # ── Image Gen ──────────────────────────────────────────
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN", "")
@@ -61,6 +78,11 @@ TG_AFFILIATE_CHAT_ID = os.getenv("TG_AFFILIATE_CHAT_ID", "-1003757350269")
 TG_AFFILIATE_THREAD_ID = os.getenv("TG_AFFILIATE_THREAD_ID", "9")
 TG_THREADS_THREAD_ID = os.getenv("TG_THREADS_THREAD_ID", TG_AFFILIATE_THREAD_ID)
 TG_TIKTOK_THREAD_ID = os.getenv("TG_TIKTOK_THREAD_ID", "83")
+
+# ── Discord / Motionklip ──────────────────────────────
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
+MOTIONKLIP_GUILD_ID = os.getenv("MOTIONKLIP_GUILD_ID", "")
+MOTIONKLIP_CHANNELS = [x.strip() for x in os.getenv("MOTIONKLIP_CHANNELS", "").split(",") if x.strip()]
 
 # ── Monitoring (Optional) ─────────────────────────────
 AHREFS_TOKEN = os.getenv("AHREFS_TOKEN", "")
