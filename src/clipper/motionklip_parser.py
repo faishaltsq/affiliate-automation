@@ -98,11 +98,14 @@ def _extract_hashtags(text: str) -> list[str]:
 
 
 def _extract_urls(text: str) -> list[str]:
-    """Extract all HTTP/HTTPS links from text."""
+    """Extract all valid HTTP/HTTPS media/footage links from text, ignoring form/chat links."""
     urls = []
     seen = set()
+    ignored_domains = ["forms.gle", "discord.com/channels", "docs.google.com/forms"]
     for raw in re.findall(r'https?://[^\s<>"\')]+', text):
-        cleaned = re.sub(r'[.,;!?)>\]]+$', '', raw)
+        cleaned = re.sub(r'[*.,;!?)>\]]+$', '', raw)
+        if any(ign in cleaned for ign in ignored_domains):
+            continue
         if cleaned and cleaned not in seen:
             seen.add(cleaned)
             urls.append(cleaned)
@@ -218,12 +221,21 @@ def parse_discord_campaign_message(raw_msg: dict) -> dict:
     elif embeds and embeds[0].get("title"):
         title = embeds[0]["title"].strip()
     else:
-        # Fallback to first non-empty line of content
-        lines = [re.sub(r'[*_#~`]', '', l).strip() for l in content.splitlines() if l.strip()]
-        if lines:
-            title = lines[0]
+        # Check for markdown header in embeds or content (e.g. "# Apiipp X Motion Klip")
+        h_match = re.search(r'^\s*#+\s+([^\n#<]+)', full_text, re.MULTILINE)
+        if h_match and not any(ign in h_match.group(1).lower() for ign in ["content info", "rules", "watermark", "tag discord", "everyone"]):
+            title = h_match.group(1).strip()
         else:
-            title = "Motionklip Campaign"
+            # Fallback to first non-empty line of content, ignoring @everyone / @here
+            lines = [
+                re.sub(r'[*_#~`]', '', l).strip()
+                for l in content.splitlines()
+                if l.strip() and not any(tag in l.lower() for tag in ["@everyone", "@here"])
+            ]
+            if lines:
+                title = lines[0]
+            else:
+                title = "Motionklip Campaign"
 
     # 2. CPM
     cpm = _extract_cpm(full_text)
@@ -251,8 +263,8 @@ def parse_discord_campaign_message(raw_msg: dict) -> dict:
             elif any(k in fname for k in ["do's", "dos", "syarat", "ketentuan", "aturan"]):
                 dos.extend([_clean_bullet(l) for l in fval.splitlines() if _clean_bullet(l)])
 
-    # If empty or supplementary, extract from text content
-    text_dos, text_donts = _extract_dos_and_donts_from_text(content)
+    # If empty or supplementary, extract from full text (embed descriptions + content)
+    text_dos, text_donts = _extract_dos_and_donts_from_text(full_text)
     if text_dos:
         for item in text_dos:
             if item not in dos:

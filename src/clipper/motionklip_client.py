@@ -1,6 +1,7 @@
 """motionklip_client.py — Discord REST API client for Motionklip clipping campaigns."""
 
 import time
+import re
 import logging
 from typing import Optional, Any
 import requests
@@ -67,7 +68,10 @@ class MotionklipClient:
 
             # Filter for channels matching campaign-related keywords
             discovered = []
-            keywords = ["campaign", "brief", "active", "info", "sayembara", "lomba", "clip"]
+            keywords = [
+                "announcement", "campaign", "brief", "active", "info",
+                "sayembara", "lomba", "clip", "bahan-dan-rules"
+            ]
             for ch in channels_data:
                 ch_name = ch.get("name", "").lower()
                 ch_type = ch.get("type", 0)
@@ -75,10 +79,131 @@ class MotionklipClient:
                 if ch_type in (0, 5, 15) and any(k in ch_name for k in keywords):
                     discovered.append(str(ch["id"]))
 
-            logger.info("Auto-discovered %d Motionklip campaign channels: %s", len(discovered), discovered)
+            # Sort channels by snowflake ID descending (newest channels first)
+            discovered.sort(key=lambda cid: int(cid) if cid.isdigit() else 0, reverse=True)
+            logger.info("Auto-discovered %d Motionklip campaign channels", len(discovered))
             return discovered
         except Exception as e:
             logger.warning("Error discovering guild channels: %s", e)
+            return []
+
+    def _fetch_from_guild_categories(self, limit: int = 15) -> list[dict]:
+        """Fetch structured campaign pairs (announcement + bahan) grouped by Discord category."""
+        if not self.token or not self.guild_id:
+            return []
+
+        try:
+            url = f"{self.base_url}/guilds/{self.guild_id}/channels"
+            resp = requests.get(url, headers=self._get_headers(), timeout=12)
+            if resp.status_code != 200:
+                return []
+
+            channels_data = resp.json()
+            if not isinstance(channels_data, list):
+                return []
+
+            # Group channels by category (parent_id)
+            categories: dict[str, list[dict]] = {}
+            for ch in channels_data:
+                pid = ch.get("parent_id")
+                if pid:
+                    categories.setdefault(str(pid), []).append(ch)
+
+            campaign_cats = []
+            for pid, sibs in categories.items():
+                ann = next((c for c in sibs if "announcement" in c.get("name", "").lower()), None)
+                bahan = next((c for c in sibs if "bahan" in c.get("name", "").lower()), None)
+                budget_ch = next((c for c in sibs if "budget" in c.get("name", "").lower()), None)
+                if not ann:
+                    continue
+
+                budget_pct = 100.0
+                if budget_ch:
+                    bm = re.search(r'(\d+(?:\.\d+)?)\s*%', budget_ch.get("name", ""))
+                    if bm:
+                        try:
+                            budget_pct = float(bm.group(1))
+                        except ValueError:
+                            pass
+
+                campaign_cats.append({
+                    "parent_id": pid,
+                    "ann_id": str(ann["id"]),
+                    "ann_name": ann.get("name", ""),
+                    "bahan_id": str(bahan["id"]) if bahan else None,
+                    "budget_pct": budget_pct,
+                })
+
+            # Sort newest first
+            campaign_cats.sort(
+                key=lambda x: int(x["ann_id"]) if x["ann_id"].isdigit() else 0,
+                reverse=True,
+            )
+
+            results: list[dict] = []
+            headers = self._get_headers()
+
+            for cat in campaign_cats[:limit]:
+                try:
+                    ann_url = f"{self.base_url}/channels/{cat['ann_id']}/messages?limit=1"
+                    r_ann = requests.get(ann_url, headers=headers, timeout=10)
+                    if not r_ann.ok:
+                        continue
+                    ann_list = r_ann.json()
+                    if not isinstance(ann_list, list) or not ann_list:
+                        continue
+
+                    ann_msg = ann_list[0]
+                    parsed = parse_discord_campaign_message(ann_msg)
+                    parsed["budget_percentage"] = cat["budget_pct"]
+                    parsed["channel_id"] = cat["ann_id"]
+
+                    # If bahan channel exists, merge hashtags, rules, and footage
+                    if cat["bahan_id"]:
+                        self._message_channel_map[str(cat["bahan_id"])] = cat["bahan_id"]
+                        b_url = f"{self.base_url}/channels/{cat['bahan_id']}/messages?limit=1"
+                        r_b = requests.get(b_url, headers=headers, timeout=10)
+                        if r_b.ok:
+                            b_list = r_b.json()
+                            if isinstance(b_list, list) and b_list:
+                                b_msg = b_list[0]
+                                b_parsed = parse_discord_campaign_message(b_msg)
+                                if b_parsed.get("hashtags"):
+                                    parsed["hashtags"] = b_parsed["hashtags"]
+                                if b_parsed.get("assets"):
+                                    for a in b_parsed["assets"]:
+                                        if a not in parsed["assets"]:
+                                            parsed["assets"].append(a)
+                                if b_parsed.get("dos"):
+                                    for d in b_parsed["dos"]:
+                                        if d not in parsed["dos"]:
+                                            parsed["dos"].append(d)
+                                if b_parsed.get("donts"):
+                                    for d in b_parsed["donts"]:
+                                        if d not in parsed["donts"]:
+                                            parsed["donts"].append(d)
+                                # Map bahan message id as well
+                                b_msg_id = str(b_msg.get("id", ""))
+                                if b_msg_id:
+                                    self._message_channel_map[b_msg_id] = cat["bahan_id"]
+
+                    parsed["materials_count"] = len(parsed.get("assets", []))
+                    results.append(parsed)
+
+                    # Update detail cache
+                    c_id = parsed["id"]
+                    msg_id = str(ann_msg.get("id", ""))
+                    self._detail_cache[c_id] = (parsed, time.time())
+                    if msg_id:
+                        self._message_channel_map[msg_id] = cat["ann_id"]
+
+                except Exception as ex:
+                    logger.warning("Error fetching category %s: %s", cat.get("ann_name"), ex)
+                    continue
+
+            return results
+        except Exception as e:
+            logger.warning("Error during category-based guild fetch: %s", e)
             return []
 
     def get_campaigns(self, limit: int = 15, force_refresh: bool = False) -> list[dict]:
@@ -98,6 +223,11 @@ class MotionklipClient:
 
         target_channels = list(self.channels)
         if not target_channels and self.guild_id:
+            # First attempt category-based grouped fetch (announcement + bahan + budget)
+            cat_campaigns = self._fetch_from_guild_categories(limit=limit)
+            if cat_campaigns:
+                self._campaigns_cache = (cat_campaigns, time.time())
+                return cat_campaigns
             target_channels = self._discover_channels()
 
         if not target_channels:
@@ -183,7 +313,9 @@ class MotionklipClient:
 
         headers = self._get_headers()
         for ch_id in target_channels:
-            url = f"{self.base_url}/channels/{ch_id}/messages/{msg_id}"
+            # Note: Discord restricts /messages/{msg_id} to bot tokens only.
+            # Using /messages?around={msg_id}&limit=1 works seamlessly for both bot and user tokens.
+            url = f"{self.base_url}/channels/{ch_id}/messages?around={msg_id}&limit=1"
             try:
                 resp = requests.get(url, headers=headers, timeout=15)
                 if resp.status_code == 429:
@@ -197,14 +329,60 @@ class MotionklipClient:
                     logger.warning("Discord API returned status %d fetching message %s in channel %s", resp.status_code, msg_id, ch_id)
                     continue
 
-                raw_msg = resp.json()
-                if not isinstance(raw_msg, dict):
+                res_data = resp.json()
+                raw_msg = None
+                if isinstance(res_data, list) and res_data:
+                    # Find exact message by ID if returned in list
+                    for m in res_data:
+                        if str(m.get("id")) == str(msg_id):
+                            raw_msg = m
+                            break
+                    if not raw_msg and res_data:
+                        raw_msg = res_data[0]
+                elif isinstance(res_data, dict):
+                    raw_msg = res_data
+
+                if not raw_msg or not isinstance(raw_msg, dict):
                     continue
 
                 if not raw_msg.get("channel_id"):
                     raw_msg["channel_id"] = str(ch_id)
 
                 detail = parse_discord_campaign_message(raw_msg)
+
+                # If missing assets or hashtags, check sibling bahan channel in guild
+                if (not detail.get("assets") or not detail.get("hashtags")) and self.guild_id and not self.channels:
+                    try:
+                        ch_info = requests.get(f"{self.base_url}/channels/{ch_id}", headers=headers, timeout=8).json()
+                        parent_id = ch_info.get("parent_id")
+                        if parent_id:
+                            g_channels = requests.get(f"{self.base_url}/guilds/{self.guild_id}/channels", headers=headers, timeout=8).json()
+                            if isinstance(g_channels, list):
+                                bahan_ch = next((c for c in g_channels if c.get("parent_id") == parent_id and "bahan" in c.get("name", "").lower()), None)
+                                budget_ch = next((c for c in g_channels if c.get("parent_id") == parent_id and "budget" in c.get("name", "").lower()), None)
+                                if budget_ch and detail.get("budget_percentage", 100.0) == 100.0:
+                                    bm = re.search(r'(\d+(?:\.\d+)?)\s*%', budget_ch.get("name", ""))
+                                    if bm:
+                                        detail["budget_percentage"] = float(bm.group(1))
+
+                                if bahan_ch:
+                                    b_resp = requests.get(f"{self.base_url}/channels/{bahan_ch['id']}/messages?limit=1", headers=headers, timeout=8)
+                                    if b_resp.ok and b_resp.json():
+                                        b_parsed = parse_discord_campaign_message(b_resp.json()[0])
+                                        if b_parsed.get("hashtags") and not detail.get("hashtags"):
+                                            detail["hashtags"] = b_parsed["hashtags"]
+                                        if b_parsed.get("assets"):
+                                            detail.setdefault("assets", [])
+                                            for a in b_parsed["assets"]:
+                                                if a not in detail["assets"]:
+                                                    detail["assets"].append(a)
+                                        if b_parsed.get("dos") and not detail.get("dos"):
+                                            detail["dos"] = b_parsed["dos"]
+                                        if b_parsed.get("donts") and not detail.get("donts"):
+                                            detail["donts"] = b_parsed["donts"]
+                    except Exception as e_sib:
+                        logger.debug("Failed sibling channel lookup: %s", e_sib)
+
                 detail["materials_count"] = len(detail.get("assets", []))
 
                 # Cache detail
