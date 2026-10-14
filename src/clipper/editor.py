@@ -14,6 +14,7 @@ except ImportError:
 
 from src.clipper.framing import determine_framing_mode, CropConfig
 from src.clipper.subtitles import generate_clipper_subtitles, burn_subtitles_to_video
+from src.tiktok.subtitle_detector import has_existing_subtitles
 
 logger = logging.getLogger("clipper.editor")
 
@@ -449,7 +450,17 @@ def _render_clipper_multi_video(
         if res.returncode == 0 and os.path.exists(out_path):
             logger.info("Rendered multi-footage successfully: %s", out_path)
 
-            # Auto speech subtitles burning
+            # Auto speech subtitles burning — skip if source footage already has subs
+            if auto_subtitles:
+                # Check all source clips for existing hardcoded/soft subtitles
+                clips_with_subs = [c for c in video_paths if os.path.exists(c) and has_existing_subtitles(c)]
+                if clips_with_subs:
+                    logger.info(
+                        "Skipping auto-subtitle: %d/%d source clip(s) already have subtitles",
+                        len(clips_with_subs), len(video_paths),
+                    )
+                    auto_subtitles = False
+
             if auto_subtitles:
                 try:
                     ass_path = generate_clipper_subtitles(out_path, margin_v=crop_cfg_global.margin_v)

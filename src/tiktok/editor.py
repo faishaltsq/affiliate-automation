@@ -10,6 +10,7 @@ import textwrap
 from pathlib import Path
 
 from src.tiktok.subtitles import generate_subtitles_ass
+from src.tiktok.subtitle_detector import has_existing_subtitles
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,11 @@ def process_video(
 
     sub_ass = None
     try:
+        # Auto-detect existing subtitles (soft or hardcoded/burned-in)
+        if auto_subtitles and has_existing_subtitles(input_path):
+            logger.info("Existing subtitles detected in %s — skipping auto subtitle generation", input_path)
+            auto_subtitles = False
+
         if in_w >= in_h:
             fg_h = int(crop_width * in_h / in_w)
             top_space = (crop_height - fg_h) // 2
