@@ -17,6 +17,7 @@ from src.tiktok.uploader import TikTokUploader
 from src.tiktok.youtube import search_videos, download_video, get_action_start_time
 from src.tiktok.editor import process_video
 from src.tiktok.youtube_uploader import upload_shorts
+from src.tiktok.source_scraper import collect_multi_source, YOUTUBE_SHORTS_POOL
 
 logger = logging.getLogger("tiktok.pipeline")
 
@@ -144,27 +145,52 @@ def run_pipeline(
     Path(download_dir).mkdir(parents=True, exist_ok=True)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    videos = []
-    seen_ids = set()
-    # Fetch 3x the required count as buffer against download failures
     search_buffer = max((max_results or 1) * 3, 5)
-    for kw in keywords:
-        results = search_videos([kw], max_results=search_buffer, max_duration=max_duration)
-        for v in results:
-            if v["id"] not in seen_ids and not db.is_uploaded(v["id"]):
-                seen_ids.add(v["id"])
-                videos.append(v)
-        if len(videos) >= search_buffer:
-            break
+    source_type = config.get("source_type", "shorts")
 
-    # Keep more candidates than strictly needed, so failed downloads can be retried with the next
-    videos = videos[:search_buffer]
+    if source_type == "multi":
+        # Multi-platform: YouTube Shorts, TikTok hashtag/channel, Instagram Reels, Facebook Reels
+        source_platforms = config.get(
+            "source_platforms",
+            ["youtube", "tiktok_hashtag", "tiktok_channel", "instagram", "facebook"]
+        )
+        platform_labels = {
+            "youtube": "YouTube Shorts",
+            "tiktok_hashtag": "TikTok Hashtag",
+            "tiktok_channel": "TikTok Channel",
+            "instagram": "Instagram Reels",
+            "facebook": "Facebook Reels",
+        }
+        label_str = ", ".join(platform_labels.get(p, p) for p in source_platforms)
+        notify(f"🌐 Multi-source scraper aktif: <b>{label_str}</b>")
+        videos = collect_multi_source(
+            count=search_buffer,
+            db=db,
+            platforms=source_platforms,
+            keywords=keywords if keyword_override else None,
+        )
+    else:
+        # Legacy YouTube-only mode
+        videos = []
+        seen_ids = set()
+        for kw in keywords:
+            results = search_videos([kw], max_results=search_buffer, max_duration=max_duration)
+            for v in results:
+                if v["id"] not in seen_ids and not db.is_uploaded(v["id"]):
+                    seen_ids.add(v["id"])
+                    v.setdefault("source_platform", "youtube")
+                    v.setdefault("raw_id", v["id"])
+                    videos.append(v)
+            if len(videos) >= search_buffer:
+                break
+        videos = videos[:search_buffer]
+
     if not videos:
-        notify("⚠️ Tidak ditemukan kandidat video YouTube baru.")
+        notify("⚠️ Tidak ditemukan kandidat video dari semua platform.")
         db.close()
         return {"success": False, "uploaded": 0, "found": 0, "videos": [], "errors": ["No candidate videos found"]}
 
-    notify(f"🔍 Ditemukan {len(videos)} kandidat video HD. Memulai proses download & edit...")
+    notify(f"🔍 Ditemukan {len(videos)} kandidat video multi-platform. Memulai proses download & edit...")
 
     uploaded_videos = []
     errors = []
@@ -175,11 +201,13 @@ def run_pipeline(
             break
 
         vid = video["id"]
+        raw_vid = video.get("raw_id", vid)
         title = video.get("title", "")
         channel = video.get("channel", "")
         url = video.get("webpage_url", "")
+        platform = video.get("source_platform", "youtube")
 
-        notify(f"📥 Mengunduh: <b>{title[:50]}</b> ({channel})...")
+        notify(f"📥 [{platform.upper()}] Mengunduh: <b>{title[:50]}</b> ({channel})...")
         raw_path = download_video(url, download_dir)
         if not raw_path:
             err = f"Download gagal untuk video {vid}"
@@ -229,7 +257,7 @@ def run_pipeline(
         caption = caption_tpl.format(title=title)
         success = uploader.upload_video(edited_path, caption)
         if success:
-            db.mark_uploaded(vid, title, channel)
+            db.mark_uploaded(raw_vid, title, channel)
             uploaded_videos.append({"id": vid, "title": title, "channel": channel, "path": edited_path})
             notify(f"✅ <b>Sukses terunggah ke TikTok:</b> <i>{title}</i>")
 

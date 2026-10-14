@@ -194,11 +194,11 @@ def process_video(
                 output_path,
             ]
         else:
-            # Portrait (already vertical): Scale and pad directly
+            # Portrait (already vertical): Scale and crop to exact 9:16 vertical fullscreen
             filters = [
-                f"scale={crop_width}:{crop_height}:force_original_aspect_ratio=decrease:flags=lanczos",
+                f"scale={crop_width}:{crop_height}:force_original_aspect_ratio=increase:flags=lanczos",
+                f"crop={crop_width}:{crop_height}:(iw-{crop_width})/2:(ih-{crop_height})/2",
                 "unsharp=5:5:0.8:5:5:0.4",
-                f"pad={crop_width}:{crop_height}:({crop_width}-iw)/2:({crop_height}-ih)/2:black",
             ]
             if overlay_text:
                 safe_text = format_title_overlay(overlay_text)
