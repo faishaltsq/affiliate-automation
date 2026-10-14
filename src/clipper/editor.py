@@ -3,8 +3,14 @@
 import os
 import logging
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional, Union, List
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 from src.clipper.framing import determine_framing_mode, CropConfig
 from src.clipper.subtitles import generate_clipper_subtitles, burn_subtitles_to_video
@@ -64,6 +70,87 @@ def has_audio_stream(video_path: str) -> bool:
         return res.returncode == 0 and "audio" in res.stdout.lower()
     except Exception:
         return False
+
+
+def _get_framing_for_clip(video_path: str, start_sec: float = 0.0, dur_sec: float = None) -> "CropConfig":
+    """
+    Sample frames from a specific time range, detect faces, and return best CropConfig.
+    Falls back to center crop if cv2 unavailable or no faces found in segment.
+    """
+    from src.clipper.framing import determine_framing_mode, detect_faces_in_image
+
+    in_w, in_h = get_video_dimensions(video_path)
+
+    if cv2 is None or not os.path.exists(video_path):
+        return determine_framing_mode(in_w, in_h, face_boxes=None)
+
+    file_dur = get_video_duration(video_path)
+    end_sec = min(start_sec + dur_sec, file_dur) if dur_sec else file_dur
+    span = end_sec - start_sec
+    if span <= 0:
+        return determine_framing_mode(in_w, in_h, face_boxes=None)
+
+    # Sample 3 frames from within the actual segment window
+    num_samples = 3
+    sample_times = [start_sec + span * (i + 1) / (num_samples + 1) for i in range(num_samples)]
+    all_faces = []
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        for i, t in enumerate(sample_times):
+            frame_path = os.path.join(tmp_dir, f"seg_frame_{i}.jpg")
+            cmd = [
+                "ffmpeg", "-y", "-ss", f"{t:.2f}",
+                "-i", video_path,
+                "-vframes", "1", "-q:v", "3", frame_path,
+            ]
+            try:
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=10)
+                if os.path.exists(frame_path):
+                    img = cv2.imread(frame_path)
+                    if img is not None:
+                        boxes = detect_faces_in_image(img)
+                        all_faces.extend(boxes)
+            except Exception:
+                continue
+
+    cfg = determine_framing_mode(in_w, in_h, face_boxes=all_faces if all_faces else None)
+    logger.debug(
+        "Framing for %s [%.1f-%.1f]: mode=%s faces=%d reason=%s",
+        os.path.basename(video_path), start_sec, end_sec, cfg.mode, len(all_faces), cfg.reason
+    )
+    return cfg
+
+
+def _build_vf_segment(idx: int, path: str, dur_sec: float, crop_cfg, fill_mode: bool) -> str:
+    """Build ffmpeg filter_complex fragment for one video segment with per-segment framing."""
+    audio_filter = (
+        f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
+        if has_audio_stream(path)
+        else f"anullsrc=r=48000:cl=stereo,atrim=end={dur_sec:.2f}[a{idx}]"
+    )
+    if fill_mode:
+        return (
+            f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
+            f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
+            f"{audio_filter}"
+        )
+    elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
+        x_off = crop_cfg.x_offset
+        return (
+            f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+            f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+            f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+            f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
+            f"{audio_filter}"
+        )
+    else:
+        return (
+            f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
+            f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
+            f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
+            f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
+            f"{audio_filter}"
+        )
 
 
 def get_video_dimensions(video_path: str) -> tuple[int, int]:
@@ -231,10 +318,10 @@ def _render_clipper_multi_video(
     out_name = f"clip_multi_{n_clips}_{int(target_duration)}s.mp4"
     out_path = os.path.join(output_dir, out_name)
 
-    # Determine framing geometry from first footage
+    # Determine global framing (used for hook banner y position logic only)
     in_w, in_h = get_video_dimensions(video_paths[0])
-    crop_cfg = determine_framing_mode(in_w, in_h)
-    logger.info("Framing mode selected: %s (reason: %s)", crop_cfg.mode, crop_cfg.reason)
+    crop_cfg_global = determine_framing_mode(in_w, in_h)
+    logger.info("Global framing reference: %s (reason: %s)", crop_cfg_global.mode, crop_cfg_global.reason)
 
     inputs = []
     filter_parts = []
@@ -250,36 +337,12 @@ def _render_clipper_multi_video(
         if climax_info.get("punchline_hook"):
             effective_hook = climax_info["punchline_hook"]
 
+        # Per-segment face-aware framing for cold open
+        teaser_cfg = _get_framing_for_clip(teaser_file, teaser_start, teaser_dur)
+        logger.info("Teaser framing: %s (reason: %s)", teaser_cfg.mode, teaser_cfg.reason)
+
         inputs.extend(["-ss", f"{teaser_start:.2f}", "-t", f"{teaser_dur:.2f}", "-i", teaser_file])
-        a_filt = (
-            f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
-            if has_audio_stream(teaser_file)
-            else f"anullsrc=r=48000:cl=stereo,atrim=end={teaser_dur:.2f}[a{idx}]"
-        )
-        if fill_mode:
-            vf = (
-                f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
-                f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
-                f"{a_filt}"
-            )
-        elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
-            x_off = crop_cfg.x_offset
-            vf = (
-                f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
-                f"{a_filt}"
-            )
-        else:
-            vf = (
-                f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
-                f"{a_filt}"
-            )
-        filter_parts.append(vf)
+        filter_parts.append(_build_vf_segment(idx, teaser_file, teaser_dur, teaser_cfg, fill_mode))
         concat_inputs.append(f"[v{idx}][a{idx}]")
         idx += 1
 
@@ -293,36 +356,9 @@ def _render_clipper_multi_video(
                 continue
             inputs.extend(["-ss", f"{b_start:.2f}", "-t", f"{b_dur:.2f}", "-i", b_path])
 
-            audio_filter = (
-                f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
-                if has_audio_stream(b_path)
-                else f"anullsrc=r=48000:cl=stereo,atrim=end={b_dur:.2f}[a{idx}]"
-            )
-
-            if fill_mode:
-                vf = (
-                    f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
-                    f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
-                    f"{audio_filter}"
-                )
-            elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
-                x_off = crop_cfg.x_offset
-                vf = (
-                    f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                    f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
-                    f"{audio_filter}"
-                )
-            else:
-                vf = (
-                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                    f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                    f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
-                    f"{audio_filter}"
-                )
-            filter_parts.append(vf)
+            # Per-beat face-aware framing
+            beat_cfg = _get_framing_for_clip(b_path, b_start, b_dur)
+            filter_parts.append(_build_vf_segment(idx, b_path, b_dur, beat_cfg, fill_mode))
             concat_inputs.append(f"[v{idx}][a{idx}]")
             idx += 1
     else:
@@ -340,36 +376,9 @@ def _render_clipper_multi_video(
 
             inputs.extend(["-ss", f"{start_offset:.2f}", "-t", f"{actual_seg:.2f}", "-i", path])
 
-            audio_filter = (
-                f"[{idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{idx}]"
-                if has_audio_stream(path)
-                else f"anullsrc=r=48000:cl=stereo,atrim=end={actual_seg:.2f}[a{idx}]"
-            )
-
-            if fill_mode:
-                vf = (
-                    f"[{idx}:v]scale=-2:1920:flags=lanczos,crop=1080:1920:(iw-1080)/2:0,"
-                    f"unsharp=5:5:1.0:5:5:0.5,setsar=1[v{idx}];"
-                    f"{audio_filter}"
-                )
-            elif crop_cfg.mode == "crop_4_3" and crop_cfg.crop_filter:
-                x_off = crop_cfg.x_offset
-                vf = (
-                    f"[{idx}:v]crop=1440:1080:{x_off}:0,scale=1080:810:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                    f"[bg{idx}][fg{idx}]overlay=0:555,setsar=1[v{idx}];"
-                    f"{audio_filter}"
-                )
-            else:
-                vf = (
-                    f"[{idx}:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,"
-                    f"scale=270:480,boxblur=20:1,scale=1080:1920[bg{idx}];"
-                    f"[{idx}:v]scale=1080:-2:force_original_aspect_ratio=decrease:flags=lanczos,unsharp=5:5:1.0:5:5:0.5[fg{idx}];"
-                    f"[bg{idx}][fg{idx}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{idx}];"
-                    f"{audio_filter}"
-                )
-            filter_parts.append(vf)
+            # Per-clip face-aware framing
+            clip_cfg = _get_framing_for_clip(path, start_offset, actual_seg)
+            filter_parts.append(_build_vf_segment(idx, path, actual_seg, clip_cfg, fill_mode))
             concat_inputs.append(f"[v{idx}][a{idx}]")
             idx += 1
 
@@ -380,7 +389,7 @@ def _render_clipper_multi_video(
     last_v = "basev"
     if effective_hook:
         esc_hook = effective_hook.replace("'", "'\\''").replace(":", "\\:").upper()
-        banner_y = 440 if crop_cfg.mode == "crop_4_3" else 520
+        banner_y = 440 if crop_cfg_global.mode == "crop_4_3" else 520
         filter_parts.append(
             f"[{last_v}]drawtext=fontfile='{FONT_PATH}':text='{esc_hook}':"
             f"fontcolor=white:fontsize=46:x=(w-text_w)/2:y={banner_y}:box=1:boxcolor=black@0.65:boxborderw=18:"
@@ -425,7 +434,7 @@ def _render_clipper_multi_video(
             # Auto speech subtitles burning
             if auto_subtitles:
                 try:
-                    ass_path = generate_clipper_subtitles(out_path, margin_v=crop_cfg.margin_v)
+                    ass_path = generate_clipper_subtitles(out_path, margin_v=crop_cfg_global.margin_v)
                     if ass_path and os.path.exists(ass_path):
                         burned_out = out_path.replace(".mp4", "_subbed.mp4")
                         if burn_subtitles_to_video(out_path, ass_path, burned_out):

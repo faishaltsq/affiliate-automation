@@ -144,17 +144,30 @@ def determine_framing_mode(
         )
 
     # Compute bounding span of all detected faces
-    min_x = min(b["x"] for b in face_boxes)
-    max_x = max(b["x"] + b["w"] for b in face_boxes)
+    min_x = min(b.get("x", 0) for b in face_boxes)
+    max_x = max(b.get("x", 0) + b.get("w", 0) for b in face_boxes)
     span = max_x - min_x
 
-    # Check edge cut-off risk
+    # Safe Y extraction (backward compatible if test fixtures lack 'y')
+    has_y = any("y" in b for b in face_boxes)
+    min_y = min((b.get("y", 0) for b in face_boxes), default=0) if has_y else int(in_h * 0.25)
+    max_y_bottom = max((b.get("y", 0) + b.get("h", 0) for b in face_boxes), default=int(in_h * 0.75)) if has_y else int(in_h * 0.75)
+
+    # Check edge cut-off risk (horizontal)
     # If any face is located at the far margins (e.g. < 12% or > 88% of width)
     # or span of multiple faces exceeds 4:3 crop width with safe padding
     safe_left_bound = int(in_w * 0.12)
     safe_right_bound = int(in_w * 0.88)
     at_extreme_left = any(b["x"] < safe_left_bound for b in face_boxes)
     at_extreme_right = any((b["x"] + b["w"]) > safe_right_bound for b in face_boxes)
+
+    # Check vertical cut-off risk: if face top is too close to frame top
+    # or face occupies a very large vertical portion, cropping will cut the head
+    safe_top_bound = int(in_h * 0.08)  # top 8% danger zone
+    safe_bottom_bound = int(in_h * 0.92)
+    face_near_top = min_y < safe_top_bound
+    face_near_bottom = max_y_bottom > safe_bottom_bound
+    face_very_tall = (max_y_bottom - min_y) > (in_h * 0.75)
 
     # If subjects are spread across both edges, cropping will cut someone off!
     if (at_extreme_left and at_extreme_right) or (span > (crop_w_4_3 - 100)):
@@ -167,6 +180,19 @@ def determine_framing_mode(
             target_h=int(in_h * 1080.0 / in_w),  # 608 for 16:9
             margin_v=580,
             reason="Multiple subjects at frame edges; fallback to ambient 16:9 to avoid cutoff.",
+        )
+
+    # If faces are too close to top/bottom edge or very tall, ambient fallback avoids head crop
+    if face_near_top or face_very_tall or (face_near_top and face_near_bottom):
+        return CropConfig(
+            mode="ambient_16_9",
+            crop_filter=None,
+            x_offset=0,
+            y_offset=0,
+            target_w=1080,
+            target_h=int(in_h * 1080.0 / in_w),
+            margin_v=580,
+            reason=f"Face near frame edge (top_y={min_y}, bottom_y={max_y_bottom}); fallback to ambient 16:9 to avoid head crop.",
         )
 
     # Subject(s) can fit inside 4:3 crop! Calculate optimal pan offset
