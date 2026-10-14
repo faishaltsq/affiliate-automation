@@ -181,6 +181,7 @@ def render_clipper_video(
     climax_info: Optional[dict] = None,
     auto_subtitles: bool = True,
     story_beats: Optional[List[dict]] = None,
+    watermark_path: Optional[str] = None,
 ) -> Optional[str]:
     """
     Render video into 1080x1920 9:16 format with high quality H.264 BT.709.
@@ -202,6 +203,7 @@ def render_clipper_video(
             climax_info=climax_info,
             auto_subtitles=auto_subtitles,
             story_beats=story_beats,
+            watermark_path=watermark_path,
         )
 
     # Single video mode
@@ -237,6 +239,12 @@ def render_clipper_video(
         )
         last_v = "outv"
 
+    extra_inputs = []
+    if watermark_path and os.path.exists(watermark_path):
+        extra_inputs.extend(["-i", watermark_path])
+        filter_complex.append(f"[{last_v}][1:v]overlay=0:0[wmv]")
+        last_v = "wmv"
+
     fc_str = ";".join(filter_complex)
 
     cmd = [
@@ -245,6 +253,7 @@ def render_clipper_video(
         "-ss", str(start_sec),
         "-t", str(actual_dur),
         "-i", single_path,
+        *extra_inputs,
         "-filter_complex", fc_str,
         "-map", f"[{last_v}]",
         "-map", "0:a?",
@@ -287,6 +296,7 @@ def _render_clipper_multi_video(
     climax_info: Optional[dict] = None,
     auto_subtitles: bool = True,
     story_beats: Optional[List[dict]] = None,
+    watermark_path: Optional[str] = None,
 ) -> Optional[str]:
     """
     Stitch slices from provided footages into a single cohesive 9:16 vertical video.
@@ -311,6 +321,7 @@ def _render_clipper_multi_video(
             fill_mode=fill_mode,
             climax_info=climax_info,
             auto_subtitles=auto_subtitles,
+            watermark_path=watermark_path,
         )
 
     video_paths = valid_paths
@@ -396,6 +407,13 @@ def _render_clipper_multi_video(
             f"enable='between(t,0,3.5)'[outv]"
         )
         last_v = "outv"
+
+    if watermark_path and os.path.exists(watermark_path):
+        wm_idx = idx
+        inputs.extend(["-i", watermark_path])
+        filter_parts.append(f"[{last_v}][{wm_idx}:v]overlay=0:0[wmv]")
+        last_v = "wmv"
+        idx += 1
 
     fc_str = ";".join(filter_parts)
 

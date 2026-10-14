@@ -144,6 +144,21 @@ def run_clipper_pipeline(
 
     notify(f"📋 <b>Campaign Ditemukan:</b> {title} (CPM: Rp {cpm:,})")
 
+    # Resolve watermark for campaign (Motionklip requires mandatory template watermark)
+    is_motionklip = str(campaign_id).startswith("mk-") or detail.get("source") == "motionklip"
+    watermark_path = None
+    if is_motionklip:
+        candidate_wms = [
+            os.path.abspath("assets/watermarks/motionklip.png"),
+            os.path.expanduser(r"~\OneDrive\Gambar\Watermark New MotionKlip.png"),
+        ]
+        for c_wm in candidate_wms:
+            if os.path.exists(c_wm):
+                watermark_path = c_wm
+                break
+        if watermark_path:
+            notify("🏷️ <b>Watermark MotionKlip:</b> Template resmi wajib aktif & akan ditempel otomatis.")
+
     # 2. Resolve target accounts
     if target_accounts:
         accounts = [a for name in target_accounts if (a := get_account(name)) and a["has_cookies"]]
@@ -185,14 +200,24 @@ def run_clipper_pipeline(
         # Separate video footage assets from non-footage guidelines
         footage_assets = []
         for a in assets:
-            u = a.get("url", "")
-            dname = a.get("display_name", "").lower()
+            if isinstance(a, dict):
+                u = a.get("url", "")
+                dname = a.get("display_name", "").lower()
+            elif isinstance(a, str):
+                u = a
+                dname = a.lower()
+            else:
+                continue
+
             if not u:
                 continue
-            if any(w in dname for w in ["guideline", "panduan", "brief", "aturan", "syarat", "doc"]):
+            # Filter out non-footage documents and standalone watermark images
+            if any(w in dname for w in ["guideline", "panduan", "brief", "aturan", "syarat", "doc", "watermark"]):
                 continue
             footage_assets.append(u)
-        target_urls = footage_assets if footage_assets else [a.get("url") for a in assets if a.get("url")]
+        target_urls = footage_assets if footage_assets else [
+            (a.get("url") if isinstance(a, dict) else a) for a in assets if (a.get("url") if isinstance(a, dict) else a)
+        ]
 
     if not target_urls:
         err = "Tidak ada bahan video yang dapat diunduh dari campaign ini."
@@ -306,6 +331,7 @@ def run_clipper_pipeline(
                 climax_info=pkg["punchline_info"],
                 auto_subtitles=True,
                 story_beats=v_beats,
+                watermark_path=watermark_path,
             )
             v_sec = _time.time() - v_t0
             if v_path and os.path.exists(v_path):
@@ -369,6 +395,7 @@ def run_clipper_pipeline(
             climax_info=climax_info,
             auto_subtitles=True,
             story_beats=story_beats,
+            watermark_path=watermark_path,
         )
         render_sec = _time.time() - t1
         if edited_path and os.path.exists(edited_path):
@@ -393,6 +420,7 @@ def run_clipper_pipeline(
             climax_info=None,
             auto_subtitles=True,
             story_beats=None,
+            watermark_path=watermark_path,
         )
         render_sec = _time.time() - t1
         if edited_path and os.path.exists(edited_path):
