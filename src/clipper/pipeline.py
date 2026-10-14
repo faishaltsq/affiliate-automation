@@ -90,6 +90,29 @@ def get_campaign_provider(campaign_id: str):
     return cls()
 
 
+def _is_valid_footage_source(url: str, label: str) -> bool:
+    """Check if a URL is an actual downloadable footage asset, not a guideline, watermark, or creator profile."""
+    u = url.lower().strip()
+    lbl = label.lower().strip()
+
+    # Explicit non-footage documents, rules, tutorials, and watermark templates
+    non_footage_words = ["guideline", "panduan", "brief", "aturan", "syarat", "doc", "watermark", "template", "penempatan", "contoh"]
+    if any(w in lbl for w in non_footage_words):
+        return False
+    if any(w in u for w in ["watermark", "fgqxqwoxgjm", "thbidhbt0m0"]):
+        return False
+
+    # Social media profile links (creator account profiles, not individual videos)
+    if "instagram.com" in u and not any(p in u for p in ["/p/", "/reel/", "/tv/"]):
+        return False
+    if "tiktok.com" in u and not any(p in u for p in ["/video/", "vt.tiktok.com"]):
+        return False
+    if "youtube.com" in u and any(p in u for p in ["/@", "/channel/", "/c/", "/user/"]):
+        return False
+
+    return True
+
+
 def run_clipper_pipeline(
     campaign_id: str,
     source_url: Optional[str] = None,
@@ -197,30 +220,41 @@ def run_clipper_pipeline(
         target_urls = [source_url]
     else:
         assets = detail.get("assets", [])
-        # Separate video footage assets from non-footage guidelines
         footage_assets = []
         for a in assets:
             if isinstance(a, dict):
                 u = a.get("url", "")
-                dname = a.get("display_name", "").lower()
+                dname = a.get("display_name", "")
             elif isinstance(a, str):
                 u = a
-                dname = a.lower()
+                dname = ""
             else:
                 continue
 
             if not u:
                 continue
-            # Filter out non-footage documents and standalone watermark images
-            if any(w in dname for w in ["guideline", "panduan", "brief", "aturan", "syarat", "doc", "watermark"]):
-                continue
-            footage_assets.append(u)
-        target_urls = footage_assets if footage_assets else [
-            (a.get("url") if isinstance(a, dict) else a) for a in assets if (a.get("url") if isinstance(a, dict) else a)
-        ]
+            if _is_valid_footage_source(u, dname):
+                footage_assets.append(u)
+
+        target_urls = footage_assets
 
     if not target_urls:
-        err = "Tidak ada bahan video yang dapat diunduh dari campaign ini."
+        # Check if campaign provided talent profiles instead of footage files
+        assets = detail.get("assets", [])
+        social_profiles = [
+            (a.get("url") if isinstance(a, dict) else a) for a in assets
+            if any(p in (a.get("url") if isinstance(a, dict) else a).lower() for p in ["youtube.com/@", "tiktok.com/@", "instagram.com"])
+        ]
+        if social_profiles:
+            sp_str = ", ".join(f"<code>{sp}</code>" for sp in social_profiles[:3])
+            err = (
+                f"Campaign ini tidak menyediakan link video/Google Drive rekaman langsung di brief (hanya profil channel: {sp_str}). "
+                f"Video panduan penempatan watermark tidak akan diklip.\n\n"
+                f"👉 <b>Silakan kirim ulang dengan menyertakan URL video YouTube yang ingin diklip:</b>\n"
+                f"<code>/clip {campaign_id} {count} https://www.youtube.com/watch?v=VIDEO_ID</code>"
+            )
+        else:
+            err = "Tidak ada bahan footage video yang dapat diunduh dari campaign ini."
         notify(f"⚠️ {err}")
         return {"success": False, "error": err, "brief": brief}
 
@@ -406,20 +440,49 @@ def run_clipper_pipeline(
                 "climax_info": climax_info,
             })
     else:
-        # Single footage single video
-        target_dur = min(max_dur, 60.0)
-        notify(f"🎬 Merender klip 9:16 HD (hook: <i>\"{hook[:45]}...\"</i>)...")
-        input_for_render = unique_footages[0]
+        # Single footage — run full punchline + story beat pipeline (same as multi-footage)
+        target_dur = max(min_dur, min(max_dur, 65.0))
+        solo_file = unique_footages[0]
+        notify("🎙️ Mentranskripsi footage untuk mencari momen punchline/klimaks terbaik...")
+        climax_info = None
+        story_beats = None
+        try:
+            transcripts = transcribe_footage_clips([solo_file])
+            if transcripts:
+                notify(f"🔍 Ditemukan {len(transcripts)} penggalan dialog; menganalisis punchline terbaik...")
+                climax_info = select_climax_punchline(title, transcripts, brief=brief)
+                if climax_info and climax_info.get("punchline_hook"):
+                    notify(
+                        f"🎯 <b>Punchline Hook:</b> <i>\"{climax_info.get('punchline_hook')}\"</i> "
+                        f"(@ {climax_info.get('climax_start')}s)"
+                    )
+        except Exception as p_err:
+            logger.warning("Punchline detection failed on single footage, proceeding with normal hook: %s", p_err)
+
+        # Build story beats to avoid cold intro
+        try:
+            story_beats = build_story_narrative_beats(solo_file, outro_file=None, target_duration=target_dur)
+            if story_beats:
+                beats_sum = sum(b.get("duration", b.get("end", 0.0) - b.get("start", 0.0)) for b in story_beats)
+                teaser_pad = float(climax_info.get("climax_duration", 3.5)) if climax_info else 0.0
+                target_dur = max(min_dur, min(max_dur, beats_sum + teaser_pad))
+        except Exception as b_err:
+            logger.warning("Story beats build failed for single footage: %s", b_err)
+
+        hook_to_use = climax_info.get("punchline_hook") if (climax_info and climax_info.get("punchline_hook")) else hook
+        notify(f"🎬 Merender klip 9:16 HD ({target_dur:.0f}s, hook: <i>\"{hook_to_use[:50]}\"</i>)...")
+
+        input_for_render = [b["file"] for b in story_beats] if story_beats else [solo_file]
         t1 = _time.time()
         edited_path = render_clipper_video(
             input_path=input_for_render,
             duration_sec=target_dur,
-            hook_text=hook,
+            hook_text=hook_to_use,
             cta_text=cta,
             fill_mode=fill_mode,
-            climax_info=None,
+            climax_info=climax_info,
             auto_subtitles=True,
-            story_beats=None,
+            story_beats=story_beats,
             watermark_path=watermark_path,
         )
         render_sec = _time.time() - t1
