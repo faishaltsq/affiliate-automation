@@ -10,8 +10,9 @@ import requests
 from dotenv import dotenv_values
 
 from src.clipper.client import ClippoClient
+from src.clipper.motionklip_client import MotionklipClient
 from src.clipper.brief_analyzer import analyze_campaign_brief
-from src.clipper.pipeline import run_clipper_pipeline
+from src.clipper.pipeline import run_clipper_pipeline, get_campaign_provider
 from src.clipper.account_manager import list_accounts, get_account, set_account_active, register_account, get_next_account_name
 
 logger = logging.getLogger("bot.clipper_agent")
@@ -96,40 +97,119 @@ def _send_video_file(video_path: str, caption: str, thread_id: Optional[int] = N
         logger.error("Error sending Telegram video: %s", e)
 
 
-def _cmd_campaigns(msg_id: int, thread_id: int):
-    """List active Clippo campaigns sorted by CPM and budget."""
-    _send_reply("🔍 Mengambil daftar campaign aktif dari Clippo...", reply_to_msg_id=msg_id, thread_id=thread_id)
-    try:
-        client = ClippoClient()
-        campaigns = client.get_campaigns(limit=10)
-        if not campaigns:
+def _cmd_campaigns(msg_id: int, thread_id: int, source: str = "all"):
+    """List active campaigns from Clippo and/or Motionklip Discord."""
+    src = (source or "all").strip().lower()
+
+    if src in ("motionklip", "mk"):
+        _send_reply("🔍 Mengambil daftar campaign aktif dari MotionKlip...", reply_to_msg_id=msg_id, thread_id=thread_id)
+        try:
+            client = MotionklipClient()
+            campaigns = client.get_campaigns(limit=10) or []
+            if not campaigns:
+                if not getattr(client, "token", None):
+                    _send_reply("⚠️ Token Discord (DISCORD_TOKEN) belum diset untuk MotionKlip.", reply_to_msg_id=msg_id, thread_id=thread_id)
+                else:
+                    _send_reply("⚠️ Tidak ada campaign aktif yang ditemukan di MotionKlip.", reply_to_msg_id=msg_id, thread_id=thread_id)
+                return
+
+            lines = ["🔥 <b>Daftar Campaign MotionKlip Aktif:</b>\n"]
+            for idx, c in enumerate(campaigns[:8], 1):
+                cpm_str = f"Rp {c['cpm']:,}" if c.get("cpm") else "N/A"
+                b_pct = c.get("budget_percentage")
+                budget_str = f"{b_pct:.1f}%" if b_pct is not None else "N/A"
+                cid = c.get("id")
+                lines.append(
+                    f"{idx}. [MotionKlip] <b>{c.get('title', 'Tanpa Judul')}</b>\n"
+                    f"   💰 CPM: <code>{cpm_str} / 1k views</code> | Sisa Budget: <b>{budget_str}</b>\n"
+                    f"   🏷 ID: <code>{cid}</code>\n"
+                    f"   👉 <i>Ketik /brief {cid} untuk lihat syarat & bahan</i>\n"
+                )
+            lines.append("💡 <i>Ketik /clip &lt;ID&gt; untuk langsung download, render & upload video.</i>")
+            _send_reply("\n".join(lines), reply_to_msg_id=msg_id, thread_id=thread_id)
+        except Exception as e:
+            logger.exception("Error in _cmd_campaigns (motionklip): %s", e)
+            _send_reply(f"❌ Gagal mengambil campaign MotionKlip: {e}", reply_to_msg_id=msg_id, thread_id=thread_id)
+
+    elif src == "clippo":
+        _send_reply("🔍 Mengambil daftar campaign aktif dari Clippo...", reply_to_msg_id=msg_id, thread_id=thread_id)
+        try:
+            client = ClippoClient()
+            campaigns = client.get_campaigns(limit=10) or []
+            if not campaigns:
+                _send_reply("⚠️ Tidak ada campaign aktif yang ditemukan di Clippo.", reply_to_msg_id=msg_id, thread_id=thread_id)
+                return
+
+            lines = ["🔥 <b>Daftar Campaign Clippo Aktif:</b>\n"]
+            for idx, c in enumerate(campaigns[:8], 1):
+                cpm_str = f"Rp {c['cpm']:,}" if c.get("cpm") else "N/A"
+                b_pct = c.get("budget_percentage")
+                budget_str = f"{b_pct:.1f}%" if b_pct is not None else "N/A"
+                cid = c.get("id")
+                lines.append(
+                    f"{idx}. [Clippo] <b>{c.get('title', 'Tanpa Judul')}</b>\n"
+                    f"   💰 CPM: <code>{cpm_str} / 1k views</code> | Sisa Budget: <b>{budget_str}</b>\n"
+                    f"   🏷 ID: <code>{cid}</code>\n"
+                    f"   👉 <i>Ketik /brief {cid} untuk lihat syarat & bahan</i>\n"
+                )
+            lines.append("💡 <i>Ketik /clip &lt;ID&gt; untuk langsung download, render & upload video.</i>")
+            _send_reply("\n".join(lines), reply_to_msg_id=msg_id, thread_id=thread_id)
+        except Exception as e:
+            logger.exception("Error in _cmd_campaigns (clippo): %s", e)
+            _send_reply(f"❌ Gagal mengambil campaign: {e}", reply_to_msg_id=msg_id, thread_id=thread_id)
+
+    else:
+        # Default: Fetch both Clippo and Motionklip
+        _send_reply("🔍 Mengambil daftar campaign aktif dari Clippo & MotionKlip...", reply_to_msg_id=msg_id, thread_id=thread_id)
+        clippo_campaigns = []
+        mk_campaigns = []
+
+        try:
+            clippo_campaigns = ClippoClient().get_campaigns(limit=10) or []
+        except Exception as e:
+            logger.warning("Error fetching Clippo campaigns: %s", e)
+
+        try:
+            mk_campaigns = MotionklipClient().get_campaigns(limit=10) or []
+        except Exception as e:
+            logger.warning("Error fetching Motionklip campaigns: %s", e)
+
+        all_campaigns: list[dict] = []
+        for c in clippo_campaigns:
+            item = dict(c)
+            item["_badge"] = "[Clippo]"
+            all_campaigns.append(item)
+        for c in mk_campaigns:
+            item = dict(c)
+            item["_badge"] = "[MotionKlip]"
+            all_campaigns.append(item)
+
+        if not all_campaigns:
             _send_reply("⚠️ Tidak ada campaign aktif yang ditemukan.", reply_to_msg_id=msg_id, thread_id=thread_id)
             return
 
-        lines = ["🔥 <b>Daftar Campaign Clippo Aktif:</b>\n"]
-        for idx, c in enumerate(campaigns[:8], 1):
+        lines = ["🔥 <b>Daftar Campaign Aktif (Clippo & MotionKlip):</b>\n"]
+        for idx, c in enumerate(all_campaigns[:10], 1):
+            badge = c.get("_badge") or ("[MotionKlip]" if str(c.get("id", "")).startswith("mk-") else "[Clippo]")
             cpm_str = f"Rp {c['cpm']:,}" if c.get("cpm") else "N/A"
-            budget_str = f"{c['budget_percentage']:.1f}%"
+            b_pct = c.get("budget_percentage")
+            budget_str = f"{b_pct:.1f}%" if b_pct is not None else "N/A"
             cid = c.get("id")
             lines.append(
-                f"{idx}. <b>{c.get('title', 'Tanpa Judul')}</b>\n"
+                f"{idx}. {badge} <b>{c.get('title', 'Tanpa Judul')}</b>\n"
                 f"   💰 CPM: <code>{cpm_str} / 1k views</code> | Sisa Budget: <b>{budget_str}</b>\n"
                 f"   🏷 ID: <code>{cid}</code>\n"
                 f"   👉 <i>Ketik /brief {cid} untuk lihat syarat & bahan</i>\n"
             )
-
         lines.append("💡 <i>Ketik /clip &lt;ID&gt; untuk langsung download, render & upload video.</i>")
         _send_reply("\n".join(lines), reply_to_msg_id=msg_id, thread_id=thread_id)
-    except Exception as e:
-        logger.exception("Error in _cmd_campaigns: %s", e)
-        _send_reply(f"❌ Gagal mengambil campaign: {e}", reply_to_msg_id=msg_id, thread_id=thread_id)
 
 
 def _cmd_brief(campaign_id: str, msg_id: int, thread_id: int):
     """Show detailed AI analysis of a specific campaign."""
     _send_reply(f"🤖 Menganalisis brief campaign <code>{campaign_id}</code>...", reply_to_msg_id=msg_id, thread_id=thread_id)
     try:
-        client = ClippoClient()
+        client = get_campaign_provider(campaign_id)
         detail = client.get_campaign_detail(campaign_id)
         if not detail or not detail.get("title"):
             _send_reply(f"⚠️ Campaign <code>{campaign_id}</code> tidak ditemukan.", reply_to_msg_id=msg_id, thread_id=thread_id)
@@ -142,9 +222,13 @@ def _cmd_brief(campaign_id: str, msg_id: int, thread_id: int):
         donts_text = "\n".join(f"  ❌ {d}" for d in analysis.get("forbidden_items", [])[:4])
         assets_text = "\n".join(f"  📹 <a href='{a['url']}'>{a.get('display_name') or 'Bahan Video'}</a>" for a in detail.get("assets", [])[:4])
 
+        platform_badge = "[MotionKlip]" if campaign_id.startswith("mk-") else "[Clippo]"
+        b_val = detail.get("budget_percentage")
+        budget_str = f"{b_val:.1f}%" if b_val is not None else "100.0%"
+
         msg = (
-            f"📋 <b>Brief & Aturan: {detail.get('title')}</b>\n\n"
-            f"💰 <b>CPM:</b> Rp {detail.get('cpm', 0):,} / 1k views (Sisa: {detail.get('budget_percentage', 100):.1f}%)\n"
+            f"📋 <b>{platform_badge} Brief & Aturan: {detail.get('title')}</b>\n\n"
+            f"💰 <b>CPM:</b> Rp {detail.get('cpm', 0):,} / 1k views (Sisa: {budget_str})\n"
             f"⏱ <b>Durasi Klip:</b> {detail.get('min_duration', 15)}-{detail.get('max_duration', 180)} detik\n"
             f"🏷 <b>Hashtags:</b> {' '.join(detail.get('hashtags', []))}\n\n"
             f"💡 <b>Ide Winning Hook (0-3s):</b>\n{hooks_text or '  • Langsung ke produk'}\n\n"
@@ -275,6 +359,10 @@ def _cmd_clip_async(
                     upload_lines.append(f"{icon} <b>{u.get('account')}:</b>{hook_info}\n   <i>\"{u.get('caption', '')[:70]}...\"</i>")
 
                 upload_summary = "\n".join(upload_lines)
+                if campaign_id.startswith("mk-"):
+                    submit_hint = "submit link di Discord MotionKlip!"
+                else:
+                    submit_hint = f"submit di app.clippo.id/campaigns/{campaign_id}!"
                 final_msg = (
                     f"🎉 <b>{len(videos)} Klip Sukses Dibuat &amp; Terunggah!</b>\n\n"
                     f"📌 <b>Campaign:</b> {res.get('title')}\n"
@@ -282,7 +370,7 @@ def _cmd_clip_async(
                     f"👥 <b>Hasil Upload ({res.get('success_count')}/{len(res.get('upload_results', []))} unggahan):</b>\n"
                     f"{upload_summary}\n\n"
                     f"📝 <b>Hashtags:</b> {' '.join(res.get('hashtags', []))}\n"
-                    f"👉 <i>Salin link video dari akun di atas dan submit di app.clippo.id/campaigns/{campaign_id}!</i>"
+                    f"👉 <i>Salin link video dari akun di atas dan {submit_hint}</i>"
                 )
                 # Edit final status message, then send dedicated success card
                 status_lines.clear()
@@ -301,30 +389,36 @@ def _cmd_clip_async(
     t.start()
 
 
+def _cmd_help(msg_id: int, thread_id: int):
+    """Show help documentation for clipper agent commands."""
+    help_msg = (
+        "✂️ <b>Clipper Automate Agent (Clippo.id & MotionKlip)</b>\n\n"
+        "Bot ini otomatis mengambil campaign berbayar dari <b>Clippo.id</b> & <b>MotionKlip Discord</b>, menganalisis brief & aturan do's/don'ts, merender 9:16 vertical clip, dan mengunggahnya ke semua akun TikTok aktif dengan <b>caption unik per akun!</b>\n\n"
+        "<b>Campaign:</b>\n"
+        "• <code>/campaigns [mk|clippo]</code> — Lihat daftar campaign aktif (semua, atau filter MotionKlip/Clippo)\n"
+        "• <code>/brief mk-&lt;id&gt;</code> — Analisis AI syarat, do's & don'ts, serta ide hook (contoh: <code>/brief mk-123</code>)\n"
+        "• <code>/clip mk-&lt;id&gt; [count]</code> — Download, render & upload video (contoh: <code>/clip mk-123 2</code>)\n"
+        "• <code>/clip [id]</code> — Upload 1 klip ke semua akun aktif\n"
+        "• <code>/clip [id] 2</code> — Buat 2 klip dengan hook berbeda & bagi per akun\n"
+        "• <code>/clip [id] 3</code> — Buat 3 klip dengan hook berbeda & bagi per akun\n"
+        "• <code>/clip [id] --account nama1,nama2</code> — Upload ke akun tertentu\n\n"
+        "<b>Akun TikTok:</b>\n"
+        "• <code>/accounts</code> — Lihat semua akun & statusnya\n"
+        "• <code>/activate [nama]</code> — Aktifkan akun\n"
+        "• <code>/deactivate [nama]</code> — Nonaktifkan akun\n"
+        "• <code>/addaccount [nama]</code> — Daftarkan akun baru\n\n"
+        "Kamu juga bisa ngobrol santai seputar strategi clipping!"
+    )
+    _send_reply(help_msg, reply_to_msg_id=msg_id, thread_id=thread_id)
+
+
 def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
     """Main message handler for Clipper Topic (246)."""
     t_clean = text.strip()
     t_lower = t_clean.lower()
 
-    if t_lower.startswith("/start") or t_lower == "/help":
-        help_msg = (
-            "✂️ <b>Clipper Automate Agent (Clippo.id & Creators)</b>\n\n"
-            "Bot ini otomatis mengambil campaign berbayar dari <b>Clippo.id</b>, menganalisis brief & aturan do's/don'ts, merender 9:16 vertical clip, dan mengunggahnya ke semua akun TikTok aktif dengan <b>caption unik per akun!</b>\n\n"
-            "<b>Campaign:</b>\n"
-            "• <code>/campaigns</code> — Lihat daftar campaign aktif (CPM & sisa budget)\n"
-            "• <code>/brief [id]</code> — Analisis AI syarat, do's & don'ts, serta ide hook\n"
-            "• <code>/clip [id]</code> — Upload 1 klip ke semua akun aktif\n"
-            "• <code>/clip [id] 2</code> — Buat 2 klip dengan hook berbeda & bagi per akun\n"
-            "• <code>/clip [id] 3</code> — Buat 3 klip dengan hook berbeda & bagi per akun\n"
-            "• <code>/clip [id] --account nama1,nama2</code> — Upload ke akun tertentu\n\n"
-            "<b>Akun TikTok:</b>\n"
-            "• <code>/accounts</code> — Lihat semua akun & statusnya\n"
-            "• <code>/activate [nama]</code> — Aktifkan akun\n"
-            "• <code>/deactivate [nama]</code> — Nonaktifkan akun\n"
-            "• <code>/addaccount [nama]</code> — Daftarkan akun baru\n\n"
-            "Kamu juga bisa ngobrol santai seputar strategi clipping!"
-        )
-        _send_reply(help_msg, reply_to_msg_id=msg_id, thread_id=thread_id)
+    if t_lower.startswith("/start") or t_lower.startswith("/help") or t_lower == "help":
+        _cmd_help(msg_id, thread_id)
 
     elif t_lower.startswith("/accounts") or "daftar akun" in t_lower:
         _cmd_accounts(msg_id, thread_id)
@@ -358,14 +452,22 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
         )
 
     elif t_lower.startswith("/campaigns") or "daftar campaign" in t_lower or "list campaign" in t_lower:
-        _cmd_campaigns(msg_id, thread_id)
+        parts = t_clean.split()
+        source = "all"
+        if len(parts) > 1 and parts[0].lower().startswith("/campaigns"):
+            source = parts[1].lower()
+        elif "mk" in t_lower or "motionklip" in t_lower:
+            source = "mk"
+        elif "clippo" in t_lower:
+            source = "clippo"
+        _cmd_campaigns(msg_id, thread_id, source=source)
 
     elif t_lower.startswith("/brief"):
         parts = t_clean.split()
         if len(parts) > 1:
             _cmd_brief(parts[1], msg_id, thread_id)
         else:
-            _send_reply("Ketik <code>/brief [campaign_id]</code>. Contoh: <code>/brief cmv0h59il0kfbcv26ffgw79ut</code>", reply_to_msg_id=msg_id, thread_id=thread_id)
+            _send_reply("Ketik <code>/brief [campaign_id]</code>. Contoh: <code>/brief cmv0h59il0kfbcv26ffgw79ut</code> atau <code>/brief mk-123</code>", reply_to_msg_id=msg_id, thread_id=thread_id)
 
     elif t_lower.startswith("/clip"):
         parts = t_clean.split()
