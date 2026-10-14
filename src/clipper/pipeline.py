@@ -6,6 +6,7 @@ import logging
 import requests
 from typing import Optional, Callable
 from src.clipper.client import ClippoClient
+from src.clipper.motionklip_client import MotionklipClient
 from src.clipper.brief_analyzer import analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL
 from src.clipper.downloader import download_asset_videos, download_asset_video
 from src.clipper.editor import render_clipper_video
@@ -78,6 +79,17 @@ def _ensure_hashtags(caption: str, hashtags: list[str], tags: list[str] = None) 
     return clean
 
 
+def get_campaign_provider(campaign_id: str):
+    """Return campaign client provider based on campaign ID prefix."""
+    if campaign_id.startswith("mk-"):
+        from src.clipper.motionklip_client import MotionklipClient as _MK
+        cls = globals().get("MotionklipClient", _MK)
+        return cls()
+    from src.clipper.client import ClippoClient as _CC
+    cls = globals().get("ClippoClient", _CC)
+    return cls()
+
+
 def run_clipper_pipeline(
     campaign_id: str,
     source_url: Optional[str] = None,
@@ -89,7 +101,7 @@ def run_clipper_pipeline(
     distribution: str = "distribute",
 ) -> dict:
     """
-    Execute full clipper pipeline for a Clippo campaign.
+    Execute full clipper pipeline for a Clippo or Motionklip campaign.
     Uploads to all active TikTok accounts with unique caption per account.
     target_accounts: list of account folder names; None = all active accounts.
     """
@@ -101,13 +113,14 @@ def run_clipper_pipeline(
             except Exception:
                 pass
 
-    notify(f"✂️ <b>Memulai Clipper Pipeline</b> untuk Campaign <code>{campaign_id}</code>...")
+    platform_name = "Motionklip" if campaign_id.startswith("mk-") else "Clippo"
+    notify(f"✂️ <b>Memulai Clipper Pipeline</b> untuk Campaign <code>{campaign_id}</code> ({platform_name})...")
 
     # 1. Fetch Campaign Details
-    client = ClippoClient()
+    client = get_campaign_provider(campaign_id)
     detail = client.get_campaign_detail(campaign_id)
     if not detail or not detail.get("title"):
-        err = f"Campaign {campaign_id} tidak ditemukan di Clippo."
+        err = f"Campaign {campaign_id} tidak ditemukan di {platform_name}."
         notify(f"⚠️ {err}")
         return {"success": False, "error": err}
 
@@ -194,6 +207,7 @@ def run_clipper_pipeline(
             "success": True,
             "dry_run": True,
             "campaign_id": campaign_id,
+            "platform": platform_name,
             "title": title,
             "cpm": cpm,
             "count": count,
@@ -460,6 +474,7 @@ def run_clipper_pipeline(
     return {
         "success": success_count > 0,
         "campaign_id": campaign_id,
+        "platform": platform_name,
         "title": title,
         "cpm": cpm,
         "count": len(rendered_videos),

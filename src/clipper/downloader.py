@@ -67,10 +67,16 @@ def _download_cloud_or_archive(url: str, output_dir: str) -> List[str]:
     clean_url = url.strip()
     download_url = clean_url
 
-    # Skip non-downloadable cloud folder links
+    # Google Drive folder links require yt-dlp extraction rather than single HTTP get
     if "drive.google.com/drive/folders" in clean_url:
-        logger.warning("Google Drive folder links cannot be downloaded directly via HTTP: %s", clean_url)
+        logger.info("Google Drive folder link detected, deferring to yt-dlp extraction: %s", clean_url)
         return []
+
+    # Support Google Drive file direct download
+    if "drive.google.com/file/d/" in clean_url:
+        m = re.search(r'drive\.google\.com/file/d/([a-zA-Z0-9_-]+)', clean_url)
+        if m:
+            download_url = f"https://drive.google.com/uc?export=download&id={m.group(1)}"
 
     # Nextcloud public share format: .../index.php/s/<token> -> .../index.php/s/<token>/download
     if "/index.php/s/" in clean_url and not clean_url.rstrip("/").endswith("/download"):
@@ -201,7 +207,7 @@ def download_asset_videos(url: str, output_dir: str = "data/clippo/downloads") -
             return cached_videos
 
     # 2. Cloud shares, Nextcloud, direct zip or binary links
-    if any(k in clean_url for k in ["index.php/s/", ".zip", "/download", "mybati.co.id"]):
+    if "drive.google.com" not in clean_url and any(k in clean_url for k in ["index.php/s/", ".zip", "/download", "mybati.co.id"]):
         cloud_videos = _download_cloud_or_archive(clean_url, output_dir)
         if cloud_videos:
             return cloud_videos
@@ -212,21 +218,30 @@ def download_asset_videos(url: str, output_dir: str = "data/clippo/downloads") -
         if twm_result:
             return [twm_result]
 
-    # 4. Use yt-dlp for YouTube, Instagram, etc.
+    # 4. Use yt-dlp for YouTube, Instagram, Google Drive, etc.
     import sys
     node_path = _find_node()
+    is_gdrive = "drive.google.com" in clean_url
+    is_gdrive_folder = is_gdrive and ("drive/folders" in clean_url or "/folders/" in clean_url)
+
+    out_tmpl = os.path.join(output_dir, "%(title)s.%(ext)s") if is_gdrive else os.path.join(output_dir, "%(id)s.%(ext)s")
+
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "--force-ipv4",
         "--js-runtimes", f"node:{node_path}",
         "--remote-components", "ejs:github",
-        "--no-playlist",
+    ]
+    if not is_gdrive_folder:
+        cmd.append("--no-playlist")
+
+    cmd.extend([
         "-f", "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best[ext=mp4]/best",
         "--merge-output-format", "mp4",
-        "-o", os.path.join(output_dir, "%(id)s.%(ext)s"),
+        "-o", out_tmpl,
         "--no-warnings",
         "--quiet",
-    ]
+    ])
 
     if any(k in clean_url for k in ["youtube.com", "youtu.be"]) and os.path.exists(YTDLP_COOKIES):
         cmd.extend([
@@ -244,18 +259,36 @@ def download_asset_videos(url: str, output_dir: str = "data/clippo/downloads") -
                 if f.is_file() and f.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov")
             ]
             if all_files:
-                newest = max(all_files, key=lambda f: f.stat().st_mtime)
-                if newest.suffix.lower() != ".mp4":
-                    mp4_path = newest.with_suffix(".mp4")
-                    remux = subprocess.run(
-                        ["ffmpeg", "-y", "-i", str(newest), "-c", "copy", str(mp4_path)],
-                        capture_output=True, timeout=120
-                    )
-                    if remux.returncode == 0:
-                        newest.unlink(missing_ok=True)
-                        newest = mp4_path
-                logger.info("Successfully downloaded: %s", newest)
-                return [str(newest)]
+                if is_gdrive_folder:
+                    video_paths = []
+                    for f in all_files:
+                        cur = f
+                        if cur.suffix.lower() != ".mp4":
+                            mp4_path = cur.with_suffix(".mp4")
+                            remux = subprocess.run(
+                                ["ffmpeg", "-y", "-i", str(cur), "-c", "copy", str(mp4_path)],
+                                capture_output=True, timeout=120
+                            )
+                            if remux.returncode == 0:
+                                cur.unlink(missing_ok=True)
+                                cur = mp4_path
+                        video_paths.append(str(cur))
+                    video_paths.sort(key=_natural_sort_key)
+                    logger.info("Successfully downloaded %d video(s) from Google Drive folder: %s", len(video_paths), video_paths)
+                    return video_paths
+                else:
+                    newest = max(all_files, key=lambda f: f.stat().st_mtime)
+                    if newest.suffix.lower() != ".mp4":
+                        mp4_path = newest.with_suffix(".mp4")
+                        remux = subprocess.run(
+                            ["ffmpeg", "-y", "-i", str(newest), "-c", "copy", str(mp4_path)],
+                            capture_output=True, timeout=120
+                        )
+                        if remux.returncode == 0:
+                            newest.unlink(missing_ok=True)
+                            newest = mp4_path
+                    logger.info("Successfully downloaded: %s", newest)
+                    return [str(newest)]
         else:
             logger.warning("yt-dlp failed (code %d): %s", res.returncode, res.stderr[:300])
     except Exception as e:
