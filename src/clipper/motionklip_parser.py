@@ -97,19 +97,72 @@ def _extract_hashtags(text: str) -> list[str]:
     return tags
 
 
-def _extract_urls(text: str) -> list[str]:
-    """Extract all valid HTTP/HTTPS media/footage links from text, ignoring form/chat links."""
-    urls = []
+def _extract_labeled_urls(text: str) -> list[dict]:
+    """
+    Extract all valid media/footage links from text, preserving markdown anchor names
+    (e.g. '[Panduan Penempatan Watermark](https://...)') and context prefixes (e.g. 'Youtube: https://...').
+    Guideline/tutorial/watermark links are excluded — they are rules, not footage.
+    """
+    results: list[dict] = []
     seen = set()
     ignored_domains = ["forms.gle", "discord.com/channels", "docs.google.com/forms"]
-    for raw in re.findall(r'https?://[^\s<>"\')]+', text):
-        cleaned = re.sub(r'[*.,;!?)>\]]+$', '', raw)
-        if any(ign in cleaned for ign in ignored_domains):
+
+    # Labels that indicate a guideline/tutorial link — not footage
+    GUIDELINE_LABELS = [
+        "panduan", "petunjuk", "tutorial", "cara", "ketentuan", "aturan",
+        "watermark", "penempatan", "template", "contoh", "referensi",
+        "rules", "guideline", "guide", "instruction", "how to",
+        "tata cara", "syarat", "peraturan",
+    ]
+
+    def _is_guideline_label(label: str) -> bool:
+        lower = label.lower()
+        return any(kw in lower for kw in GUIDELINE_LABELS)
+
+    # 1. First extract markdown labeled links: [Label](url)
+    md_links = re.findall(r'\[([^\]]+)\]\((https?://[^\s)]+)\)', text)
+    for label, raw_url in md_links:
+        cleaned = re.sub(r'[*.,;!?)>\]]+$', '', raw_url).strip()
+        if any(ign in cleaned for ign in ignored_domains) or cleaned in seen:
             continue
-        if cleaned and cleaned not in seen:
+        # Skip if the label indicates this is a guideline/tutorial, not footage
+        if _is_guideline_label(label):
+            continue
+        seen.add(cleaned)
+        results.append({
+            "url": cleaned,
+            "display_name": label.strip(),
+            "is_required": False,
+        })
+
+    # 2. Extract remaining raw URLs and inspect prefix/surrounding line
+    for line in text.splitlines():
+        line_str = line.strip()
+        for raw in re.findall(r'https?://[^\s<>"\')]+', line_str):
+            cleaned = re.sub(r'[*.,;!?)>\]]+$', '', raw).strip()
+            if any(ign in cleaned for ign in ignored_domains) or cleaned in seen:
+                continue
             seen.add(cleaned)
-            urls.append(cleaned)
-    return urls
+
+            prefix_match = re.search(r'([A-Za-z0-9\s_-]+)[:*]+\s*https?://', line_str)
+            label = prefix_match.group(1).strip() if prefix_match else ""
+
+            # Skip if the prefix/line indicates this is a guideline/watermark tutorial
+            if _is_guideline_label(label) or _is_guideline_label(line_str):
+                continue
+
+            results.append({
+                "url": cleaned,
+                "display_name": label,
+                "is_required": False,
+            })
+
+    return results
+
+
+def _extract_urls(text: str) -> list[str]:
+    """Extract all valid HTTP/HTTPS media/footage links from text (legacy compat)."""
+    return [item["url"] for item in _extract_labeled_urls(text)]
 
 
 def _clean_bullet(line: str) -> str:
@@ -278,15 +331,12 @@ def parse_discord_campaign_message(raw_msg: dict) -> dict:
     seen_urls = set()
     assets = []
 
-    # Extract from full text
-    for url in _extract_urls(full_text):
+    # Extract from full text with labels
+    for item in _extract_labeled_urls(full_text):
+        url = item["url"]
         if url not in seen_urls:
             seen_urls.add(url)
-            assets.append({
-                "url": url,
-                "display_name": "",
-                "is_required": False,
-            })
+            assets.append(item)
 
     # Extract from attachments
     for att in attachments:
