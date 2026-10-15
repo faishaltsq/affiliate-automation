@@ -79,3 +79,21 @@ class TestProcessVideo:
         out = str(tmp_path / "fail.mp4")
         with pytest.raises(RuntimeError):
             process_video("nonexistent.mp4", out)
+
+
+class TestHookTitleWindow:
+    def test_hook_title_only_first_10_seconds(self, dummy_video, tmp_path):
+        from unittest.mock import patch as _patch
+        out = str(tmp_path / "hook.mp4")
+        with _patch("src.tiktok.editor.subprocess.run", wraps=subprocess.run) as mock_run:
+            process_video(
+                dummy_video, out,
+                max_duration=4,
+                overlay_text="OUTDOOR BOYS TEST HOOK",
+                hook_duration=10.0,
+                fill_mode=True,
+            )
+        calls = [c for c in mock_run.call_args_list if c[0][0] and c[0][0][0] == "ffmpeg"]
+        assert calls, "no ffmpeg invocation captured"
+        fc = " ".join(calls[-1][0][0])
+        assert "enable='between(t,0,10" in fc, fc

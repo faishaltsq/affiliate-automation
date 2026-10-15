@@ -8,6 +8,7 @@ import os
 import subprocess
 import textwrap
 from pathlib import Path
+from typing import Optional
 
 from src.tiktok.subtitles import generate_subtitles_ass
 from src.tiktok.subtitle_detector import has_existing_subtitles
@@ -78,6 +79,10 @@ def process_video(
     start_time: float = 0.0,
     fill_mode: bool = False,
     auto_subtitles: bool = True,
+    hook_duration: float = 10.0,
+    subtitle_language: Optional[str] = None,
+    subtitle_model_size: str = "base",
+    subtitle_segments: Optional[list] = None,
 ) -> str:
     """Format video to 9:16 portrait for mobile screens without chopping content.
 
@@ -122,7 +127,8 @@ def process_video(
                         f":text='{safe_text}'"
                         ":fontcolor=white:fontsize=46:line_spacing=14"
                         f":x=(w-text_w)/2:y=280"
-                        ":box=1:boxcolor=black@0.7:boxborderw=18[v_title]"
+                        ":box=1:boxcolor=black@0.7:boxborderw=18"
+                        f":enable='between(t,0,{hook_duration})'[v_title]"
                     )
                     fc_parts.append(drawtext)
                     map_label = "[v_title]"
@@ -135,6 +141,9 @@ def process_video(
                         start_time=start_time,
                         duration=trim_duration,
                         margin_v=360,
+                        language=subtitle_language,
+                        model_size=subtitle_model_size,
+                        segments=subtitle_segments,
                     )
                     if sub_ass and os.path.exists(sub_ass):
                         escaped_sub = Path(sub_ass).resolve().as_posix().replace(":", r"\:")
@@ -160,7 +169,8 @@ def process_video(
                         f":text='{safe_text}'"
                         ":fontcolor=white:fontsize=46:line_spacing=14"
                         f":x=(w-text_w)/2:y={title_y}"
-                        ":box=1:boxcolor=black@0.7:boxborderw=18[v_title]"
+                        ":box=1:boxcolor=black@0.7:boxborderw=18"
+                        f":enable='between(t,0,{hook_duration})'[v_title]"
                     )
                     fc_parts.append(drawtext)
                     map_label = "[v_title]"
@@ -176,6 +186,9 @@ def process_video(
                         start_time=start_time,
                         duration=trim_duration,
                         margin_v=sub_margin_v,
+                        language=subtitle_language,
+                        model_size=subtitle_model_size,
+                        segments=subtitle_segments,
                     )
                     if sub_ass and os.path.exists(sub_ass):
                         escaped_sub = Path(sub_ass).resolve().as_posix().replace(":", r"\:")
@@ -215,6 +228,7 @@ def process_video(
                     ":fontcolor=white:fontsize=46:line_spacing=14"
                     f":x=(w-text_w)/2:y=280"
                     ":box=1:boxcolor=black@0.7:boxborderw=18"
+                    f":enable='between(t,0,{hook_duration})'"
                 )
                 filters.append(drawtext)
 
@@ -224,6 +238,9 @@ def process_video(
                     start_time=start_time,
                     duration=trim_duration,
                     margin_v=360,
+                    language=subtitle_language,
+                    model_size=subtitle_model_size,
+                    segments=subtitle_segments,
                 )
                 if sub_ass and os.path.exists(sub_ass):
                     escaped_sub = Path(sub_ass).resolve().as_posix().replace(":", r"\:")

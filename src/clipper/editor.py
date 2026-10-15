@@ -183,6 +183,7 @@ def render_clipper_video(
     auto_subtitles: bool = True,
     story_beats: Optional[List[dict]] = None,
     watermark_path: Optional[str] = None,
+    hook_duration: float = 10.0,
 ) -> Optional[str]:
     """
     Render video into 1080x1920 9:16 format with high quality H.264 BT.709.
@@ -205,6 +206,7 @@ def render_clipper_video(
             auto_subtitles=auto_subtitles,
             story_beats=story_beats,
             watermark_path=watermark_path,
+            hook_duration=hook_duration,
         )
 
     # Single video mode
@@ -236,7 +238,7 @@ def render_clipper_video(
         filter_complex.append(
             f"[{last_v}]drawtext=fontfile='{FONT_PATH}':text='{esc_hook}':"
             f"fontcolor=white:fontsize=46:x=(w-text_w)/2:y=280:box=1:boxcolor=black@0.65:boxborderw=18:"
-            f"enable='between(t,0,3.5)'[outv]"
+            f"enable='between(t,0,{hook_duration})'[outv]"
         )
         last_v = "outv"
 
@@ -300,6 +302,7 @@ def _render_clipper_multi_video(
     auto_subtitles: bool = True,
     story_beats: Optional[List[dict]] = None,
     watermark_path: Optional[str] = None,
+    hook_duration: float = 10.0,
 ) -> Optional[str]:
     """
     Stitch slices from provided footages into a single cohesive 9:16 vertical video.
@@ -325,6 +328,7 @@ def _render_clipper_multi_video(
             climax_info=climax_info,
             auto_subtitles=auto_subtitles,
             watermark_path=watermark_path,
+            hook_duration=hook_duration,
         )
 
     video_paths = valid_paths
@@ -407,7 +411,7 @@ def _render_clipper_multi_video(
         filter_parts.append(
             f"[{last_v}]drawtext=fontfile='{FONT_PATH}':text='{esc_hook}':"
             f"fontcolor=white:fontsize=46:x=(w-text_w)/2:y={banner_y}:box=1:boxcolor=black@0.65:boxborderw=18:"
-            f"enable='between(t,0,3.5)'[outv]"
+            f"enable='between(t,0,{hook_duration})'[outv]"
         )
         last_v = "outv"
 
