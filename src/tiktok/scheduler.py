@@ -150,6 +150,21 @@ def _notify_telegram(msg: str, thread_id: str | None = None):
         logger.error("Failed to send Telegram notification: %s", e)
 
 
+def _get_pending_clip_count() -> int:
+    """Pending clips in the queue; 0 on any failure (a reminder must never crash)."""
+    try:
+        from src.tiktok.config import load_config
+        from src.tiktok.state import VideoStateDB
+        cfg = load_config()
+        db = VideoStateDB(cfg.get("db_path", "data/tiktok/state.db"))
+        n = db.get_queued_count()
+        db.close()
+        return n
+    except Exception as e:
+        logger.warning("Could not read queue count: %s", e)
+        return 0
+
+
 def _run_scheduled_pipeline(slot_name: str | None = None):
     """Execute one pipeline run as scheduled job (anti-spam, only start + finish notifications)."""
     from src.tiktok.pipeline import run_pipeline
@@ -158,6 +173,22 @@ def _run_scheduled_pipeline(slot_name: str | None = None):
     time_str = now.strftime("%H:%M")
     slot_label = f" (Slot {slot_name} WIB)" if slot_name else ""
     logger.info("Scheduled pipeline run at %s%s", time_str, slot_label)
+
+    if _current_mode == "reminder":
+        pending = _get_pending_clip_count()
+        tail = (
+            f"📦 Klip siap upload: <b>{pending}</b>\n"
+            "👉 Kirim <code>/upload</code> kalau mau posting sekarang."
+            if pending
+            else "📦 Belum ada klip di antrean.\n"
+                 "👉 Kirim <code>/source &lt;url&gt;</code> untuk memotong video baru."
+        )
+        _notify_telegram(
+            f"⏰ <b>Pengingat Slot FYP</b> — {time_str}{slot_label}\n"
+            f"🎯 Jam prime time: <b>{time_str} WIB</b>\n"
+            f"{tail}"
+        )
+        return
 
     _notify_telegram(
         f"⏰ <b>Jadwal FYP Otomatis Aktif</b> — {time_str}{slot_label}\n"
