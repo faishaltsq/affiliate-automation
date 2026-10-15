@@ -205,12 +205,18 @@ def _cmd_status(msg_id: int, thread_id: int):
     from src.tiktok.scheduler import get_status_str as sched_status_str
     sched_status = sched_status_str()
 
+    q_count = db.get_queued_count()
+    source_mode = cfg.get("source_mode", "shorts")
+    mode_desc = "🌲 Outdoor Boys Multi-Part Highlight" if source_mode == "outdoorboys" else "🎬 YouTube Shorts FYP"
+
     msg = (
         "📊 <b>Status TikTok Automation Agent</b>\n\n"
+        f"🎯 <b>Mode Sumber:</b> {mode_desc}\n"
+        f"📦 <b>Antrean Cuplikan Part:</b> {q_count} klip siap upload\n"
         f"🎬 <b>Total Video Terunggah:</b> {total_uploaded}\n"
         f"⏰ <b>Scheduler:</b> {sched_status}\n"
-        f"⏱ <b>Durasi Klip Aktif:</b> {cfg.get('clip_duration_seconds', 360)} detik (6 Menit)\n"
-        f"📐 <b>Format Render:</b> 1080x1920 (9:16 Lanczos + Unsharp CRF 18)\n"
+        f"⏱ <b>Durasi Klip Aktif:</b> {cfg.get('clip_duration_seconds', 75)} detik\n"
+        f"📐 <b>Format Render:</b> 1080x1920 (9:16 Lanczos + Header Part + Unsharp)\n"
         f"📺 <b>Dual Upload:</b> TikTok + YouTube Shorts\n"
         f"🔄 <b>Terakhir Dijalankan:</b> {last_run_str}\n\n"
         f"<b>4 Video Terakhir:</b>\n{recent_list_str or '• Belum ada video'}\n\n"
