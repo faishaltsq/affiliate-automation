@@ -29,6 +29,9 @@ API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 # Lock to ensure only one video render/upload pipeline runs at a time
 _PIPELINE_LOCK = threading.Lock()
 
+# Any URL token in a '/source <url> [count]' message
+_SOURCE_URL_RE = re.compile(r"https?://\S+")
+
 
 def _clean_text_for_telegram(text: str) -> str:
     """Strip internal reasoning/think tags and clean text."""
@@ -85,6 +88,9 @@ def handle_tiktok_message(msg: dict, text: str, msg_id: int, thread_id: int):
             return
         elif cmd in ("/dryrun", "/test"):
             _trigger_pipeline_async(dry_run=True, msg_id=msg_id, thread_id=thread_id, keyword=args or None)
+            return
+        elif cmd in ("/source", "/src", "/potong"):
+            _trigger_source_pipeline_async(args, msg_id, thread_id)
             return
         elif cmd in ("/keywords", "/keyword"):
             _cmd_keywords(args, msg_id, thread_id)
@@ -183,6 +189,96 @@ def _detect_intent(text_lower: str, original_text: str) -> tuple[Optional[str], 
             return "upload", kw, fill_mode
 
     return None, None, False
+
+
+def _trigger_source_pipeline_async(args: str, msg_id: int, thread_id: int):
+    """Handle '/source <url> [count]' — one long source video into N hook clips, uploaded directly."""
+    m = _SOURCE_URL_RE.search(args or "")
+    if not m:
+        _send_reply(
+            "Format: <code>/source &lt;url_video&gt; [jumlah_klip]</code>\n"
+            "Contoh: <code>/source https://youtu.be/ZRIBNLUXbZo 3</code>",
+            reply_to_message_id=msg_id,
+            thread_id=thread_id,
+        )
+        return
+
+    url = m.group(0).rstrip(".,)")
+    count = 3
+    for tok in (args or "").replace(url, " ").split():
+        if tok.isdigit():
+            count = max(1, min(8, int(tok)))
+            break
+
+    if _PIPELINE_LOCK.locked():
+        _send_reply(
+            "⏳ <b>Pipeline sedang berjalan.</b> Tunggu proses saat ini selesai dulu.",
+            reply_to_message_id=msg_id,
+            thread_id=thread_id,
+        )
+        return
+
+    _send_reply(
+        f"✂️ <b>Mode Sumber Panjang Aktif</b>\n\n"
+        f"🔗 <b>Sumber:</b> <code>{url[:70]}</code>\n"
+        f"🎯 <b>Target klip:</b> {count}\n\n"
+        f"<i>Transkripsi → cari hook → render 9:16 + subtitle → upload TikTok &amp; YouTube Shorts.</i>",
+        reply_to_message_id=msg_id,
+        thread_id=thread_id,
+    )
+
+    def worker():
+        with _PIPELINE_LOCK:
+            try:
+                from src.tiktok.config import load_config as _load_cfg
+                from src.tiktok.source_clipper import run_source_pipeline
+
+                cfg = _load_cfg()
+                sc_cfg = cfg.get("source_clip", {})
+                db = VideoStateDB(cfg["db_path"])
+
+                res = run_source_pipeline(
+                    url=url,
+                    count=count,
+                    db=db,
+                    config=cfg,
+                    fill_mode=sc_cfg.get("fill_mode", True),
+                    hook_duration=float(sc_cfg.get("hook_title_seconds", 10)),
+                    language=sc_cfg.get("source_language"),
+                    notify_fn=lambda text: _send_reply(text, thread_id=thread_id),
+                )
+                db.close()
+
+                if not res.get("success") and not res.get("clips"):
+                    _send_reply(
+                        f"⚠️ <b>Gagal memproses sumber:</b>\n{res.get('error', 'unknown')}",
+                        thread_id=thread_id,
+                    )
+                    return
+
+                lines = [
+                    "✅ <b>Selesai!</b>\n",
+                    f"📹 <b>Klip dibuat:</b> {res['clips_enqueued']}",
+                    f"⬆️ <b>Berhasil terupload:</b> {res['clips_uploaded']}",
+                    f"🌐 <b>Bahasa video:</b> {res.get('language') or 'auto'}",
+                    f"📝 <b>Segmen transkrip:</b> {res.get('transcript_segments', 0)}\n",
+                ]
+                for c in res["clips"]:
+                    tt = "✅" if c["tiktok_ok"] else "❌"
+                    yt = "✅" if c["youtube_ok"] else "❌"
+                    lines.append(
+                        f"• <b>Part {c['part_num']}/{c['total_parts']}</b> {c['hook_title']} "
+                        f"({c['duration']:.0f}s, {c['subtitle_lines']} baris subtitle) "
+                        f"— TikTok {tt} / Shorts {yt}"
+                    )
+                if res.get("errors"):
+                    lines.append("\n⚠️ <b>Catatan:</b> " + "; ".join(res["errors"][:4]))
+                _send_reply("\n".join(lines), thread_id=thread_id)
+            except Exception as e:
+                logger.exception("Source pipeline failed: %s", e)
+                _send_reply(f"❌ <b>Error:</b> <code>{e}</code>", thread_id=thread_id)
+
+    threading.Thread(target=worker, daemon=True, name="source-pipeline").start()
 
 
 def _cmd_status(msg_id: int, thread_id: int):

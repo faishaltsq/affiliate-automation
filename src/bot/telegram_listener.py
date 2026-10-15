@@ -97,6 +97,7 @@ def _sync_telegram_commands():
         {"command": "status", "description": "Cek status & jadwal pipeline"},
         {"command": "upload", "description": "Download, render & upload TikTok + Shorts"},
         {"command": "dryrun", "description": "Tes render video tanpa upload"},
+        {"command": "source", "description": "Potong 1 video panjang jadi beberapa klip hook"},
         {"command": "keywords", "description": "Daftar keyword TikTok satisfying"},
         {"command": "campaigns", "description": "Daftar campaign aktif Clippo.id"},
         {"command": "accounts", "description": "Daftar akun TikTok & status cookies"},
