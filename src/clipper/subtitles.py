@@ -188,7 +188,8 @@ def burn_subtitles_to_video(in_video: str, ass_path: str, out_video: str) -> boo
         "ffmpeg", "-y",
         "-i", in_video,
         "-vf", f"subtitles='{safe_ass_path}'",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+        "-maxrate", "20M", "-bufsize", "25M",
         "-c:a", "copy",
         out_video
     ]

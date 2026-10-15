@@ -317,8 +317,9 @@ def extract_climax_teaser(video_path: str, start_sec: float, duration_sec: float
         "-ss", f"{start_sec:.2f}",
         "-i", video_path,
         "-t", f"{duration_sec:.2f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-        "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+        "-maxrate", "20M", "-bufsize", "25M",
+        "-c:a", "aac", "-b:a", "320k",
         out_path
     ]
     try:
