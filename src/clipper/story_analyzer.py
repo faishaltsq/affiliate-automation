@@ -20,6 +20,7 @@ def build_story_narrative_beats(
     hero_file: str,
     outro_file: Optional[str] = None,
     target_duration: float = 65.0,
+    language: Optional[str] = None,
 ) -> List[Dict]:
     """
     Extract natural, continuous dialogue beats from the hero story video
@@ -53,7 +54,7 @@ def build_story_narrative_beats(
 
         segs, _ = model.transcribe(
             tmp_wav,
-            language="id",
+            language=language,
             initial_prompt=DEFAULT_INITIAL_PROMPT,
             beam_size=1,
         )

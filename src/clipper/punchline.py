@@ -25,14 +25,19 @@ LLM_API_KEY = (
 LLM_MODEL = os.environ.get("OPENROUTER_MODEL") or _ALL.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
 
 
-def transcribe_footage_clips(video_paths: List[str], max_sample_sec: float = 25.0) -> List[Dict]:
+def transcribe_footage_clips(
+    video_paths: List[str],
+    max_sample_sec: float = 25.0,
+    language: Optional[str] = None,
+    model_size: str = "tiny",
+) -> List[Dict]:
     """
     Transcribe the first `max_sample_sec` seconds of candidate footage clips using Whisper.
     Returns list of dicts: [{"file": path, "start": float, "end": float, "text": str}]
     """
     try:
         from src.tiktok.subtitles import _get_whisper_model
-        model = _get_whisper_model()
+        model = _get_whisper_model(model_size)
     except Exception as e:
         logger.warning(f"Could not load whisper model for footage transcription: {e}")
         return []
@@ -56,7 +61,7 @@ def transcribe_footage_clips(video_paths: List[str], max_sample_sec: float = 25.
                 if not os.path.exists(audio_path) or os.path.getsize(audio_path) < 1000:
                     continue
 
-                segments, _ = model.transcribe(audio_path, language="id", beam_size=1)
+                segments, _ = model.transcribe(audio_path, language=language, beam_size=1)
                 for seg in segments:
                     txt = seg.text.strip()
                     if txt:

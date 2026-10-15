@@ -10,21 +10,26 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_WHISPER_MODEL = None
+_WHISPER_MODELS: dict = {}
 
 
-def _get_whisper_model():
-    """Lazy load faster-whisper model (tiny model on CPU with int8)."""
-    global _WHISPER_MODEL
-    if _WHISPER_MODEL is None:
-        try:
-            import faster_whisper
-            logger.info("Loading faster-whisper 'tiny' model on CPU...")
-            _WHISPER_MODEL = faster_whisper.WhisperModel("tiny", device="cpu", compute_type="int8")
-        except Exception as e:
-            logger.error("Failed to load faster-whisper: %s", e)
-            return None
-    return _WHISPER_MODEL
+def _get_whisper_model(size: str = "tiny"):
+    """Lazy load faster-whisper on CPU with int8. Cached per model size.
+
+    `size` matters: 'tiny' is fast but mangles non-English speech; 'base' is
+    the practical minimum for an accurate transcript of an English source.
+    """
+    if size in _WHISPER_MODELS:
+        return _WHISPER_MODELS[size]
+    try:
+        import faster_whisper
+        logger.info("Loading faster-whisper '%s' model on CPU...", size)
+        model = faster_whisper.WhisperModel(size, device="cpu", compute_type="int8")
+        _WHISPER_MODELS[size] = model
+        return model
+    except Exception as e:
+        logger.error("Failed to load faster-whisper '%s': %s", size, e)
+        return None
 
 
 def format_ass_timestamp(seconds: float) -> str:
@@ -38,6 +43,58 @@ def format_ass_timestamp(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
+def _write_ass(
+    raw_segments,
+    output_ass_path: str,
+    font_size: int = 36,
+    margin_v: int = 580,
+) -> Optional[str]:
+    """Render segments to an ASS file. Shared by both the injected and Whisper paths."""
+    dialogues = []
+    for seg in raw_segments:
+        text = (seg["text"] if isinstance(seg, dict) else seg.text).strip()
+        if not text or len(text) < 2:
+            continue
+        clean_text = re.sub(r"\[.*?\]|\(.*?\)", "", text).strip()
+        if not clean_text:
+            continue
+
+        words = clean_text.split()
+        if len(words) > 7:
+            mid = len(words) // 2
+            clean_text = " ".join(words[:mid]) + "\\N" + " ".join(words[mid:])
+
+        start_val = seg["start"] if isinstance(seg, dict) else seg.start
+        end_val = seg["end"] if isinstance(seg, dict) else seg.end
+        dialogues.append(
+            f"Dialogue: 0,{format_ass_timestamp(start_val)},"
+            f"{format_ass_timestamp(end_val)},Default,,0,0,0,,{clean_text}"
+        )
+
+    if not dialogues:
+        logger.info("No speech segments to write, skipping subtitles.")
+        return None
+
+    ass_header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3.0,1.2,2,40,40,{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    with open(output_ass_path, "w", encoding="utf-8") as f:
+        f.write(ass_header)
+        f.write("\n".join(dialogues) + "\n")
+
+    logger.info("Generated %d subtitle dialogue lines: %s", len(dialogues), output_ass_path)
+    return output_ass_path
+
+
 def generate_subtitles_ass(
     video_path: str,
     start_time: float = 0.0,
@@ -45,21 +102,36 @@ def generate_subtitles_ass(
     output_ass_path: Optional[str] = None,
     margin_v: int = 580,
     font_size: int = 36,
+    language: Optional[str] = None,
+    model_size: str = "tiny",
+    segments: Optional[list] = None,
 ) -> Optional[str]:
     """
-    Transcribe speech in the video segment and output an ASS subtitle file.
-    Returns path to the generated ASS file, or None if no speech is detected.
+    Build an ASS subtitle file for the video segment.
+
+    If `segments` is supplied (list of {"start","end","text"} already rebased to
+    clip-relative time), it is used verbatim and Whisper is NOT called. This is
+    how the hook text and the subtitles are guaranteed to come from one
+    transcription.
+
+    Otherwise the audio is transcribed here (legacy path).
     """
     if not os.path.exists(video_path):
         return None
 
-    model = _get_whisper_model()
-    if model is None:
-        return None
-
-    # Extract temporary WAV audio slice for transcription
     temp_wav = None
     try:
+        if segments is not None:
+            raw_segments = list(segments)
+            # Subtitle lines are already clip-relative; the audio slice is not needed.
+            if not output_ass_path:
+                output_ass_path = str(Path(video_path).with_suffix("")) + "_injected.ass"
+            return _write_ass(raw_segments, output_ass_path, font_size, margin_v)
+
+        model = _get_whisper_model(model_size)
+        if model is None:
+            return None
+
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
             temp_wav = tf.name
 
@@ -79,65 +151,23 @@ def generate_subtitles_ass(
             logger.debug("Failed to extract audio or video is silent: %s", res.stderr)
             return None
 
-        # Transcribe with faster-whisper
-        segments, info = model.transcribe(
+        raw_segments, info = model.transcribe(
             temp_wav,
+            language=language,
             beam_size=1,
             word_timestamps=False,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
         )
-
-        dialogues = []
-        for seg in segments:
-            text = seg.text.strip()
-            # Skip empty or garbage hallucinations
-            if not text or len(text) < 2:
-                continue
-            # Clean unwanted brackets/emojis
-            clean_text = re.sub(r"\[.*?\]|\(.*?\)", "", text).strip()
-            if not clean_text:
-                continue
-
-            # Break long lines if necessary
-            words = clean_text.split()
-            if len(words) > 7:
-                mid = len(words) // 2
-                clean_text = " ".join(words[:mid]) + "\\N" + " ".join(words[mid:])
-
-            # ASS formatting
-            start_ts = format_ass_timestamp(seg.start)
-            end_ts = format_ass_timestamp(seg.end)
-            dialogues.append(
-                f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{clean_text}"
-            )
-
-        if not dialogues:
-            logger.info("No speech detected in clip, skipping subtitles.")
-            return None
+        raw_segments = [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in raw_segments
+        ]
 
         if not output_ass_path:
             output_ass_path = temp_wav.replace(".wav", ".ass")
 
-        ass_header = f"""[Script Info]
-ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3.0,1.2,2,40,40,{margin_v},1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
-        with open(output_ass_path, "w", encoding="utf-8") as f:
-            f.write(ass_header)
-            f.write("\n".join(dialogues) + "\n")
-
-        logger.info("Generated %d subtitle dialogue lines: %s", len(dialogues), output_ass_path)
-        return output_ass_path
-
+        return _write_ass(raw_segments, output_ass_path, font_size, margin_v)
     except Exception as e:
         logger.warning("Subtitle generation failed (continuing without subs): %s", e)
         return None
