@@ -73,17 +73,40 @@ def run_pipeline(
 
     if keyword_override:
         kw_clean = keyword_override.strip()
+        # Strip low-value buzzwords that degrade YouTube search quality into WhatsApp status / low-effort reuploads
+        for noise in ["fullscreen", "full screen", "status", "whatsapp", "wa", "hd", "4k", "aesthetic", "shorts", "#shorts"]:
+            import re
+            kw_clean = re.sub(rf"\b{re.escape(noise)}\b", "", kw_clean, flags=re.IGNORECASE).strip()
+        kw_clean = re.sub(r"\s+", " ", kw_clean).strip()
+
         kw_lower = kw_clean.lower()
         search_candidates = []
 
-        if any(w in kw_lower for w in ["mobil", "car", "otomotif", "auto", "vehicle"]):
+        if any(w in kw_lower for w in ["katana", "samurai", "sword", "wakizashi", "pedang"]):
+            # Specific disambiguation: prevent Indonesian "Suzuki Katana" car queries!
+            search_candidates.extend([
+                "Japanese Katana samurai sword restoration ASMR #shorts",
+                "rusty Katana sword restoration satisfying #shorts",
+                "TysyTube antique Katana sword restoration #shorts",
+                "blacksmith forging Japanese samurai Katana sword #shorts",
+                "restoration rusty samurai sword blade #shorts",
+            ])
+        elif any(w in kw_lower for w in ["camping", "kemah", "tenda", "bushcraft", "survival", "shelter"]):
+            search_candidates.extend([
+                "Outdoor Boys camping bushcraft shelter fishing #shorts",
+                "solo camping in heavy rain ASMR relaxing #shorts",
+                "Bertram Craft and Wilderness relaxing camping #shorts",
+                "primitive survival building warm shelter #shorts",
+                "bushcraft winter camping campfire cooking #shorts",
+            ])
+        elif any(w in kw_lower for w in ["mobil", "car", "otomotif", "auto", "vehicle"]):
             search_candidates.extend([
                 "WD Detailing abandoned car restoration barn find 4K",
                 "classic car restoration timelapse 4K",
                 f"{kw_clean} car restoration 4K",
                 f"{kw_clean} 4K",
             ])
-        elif any(w in kw_lower for w in ["pisau", "knife", "pedang", "blade", "golok", "cleaver"]):
+        elif any(w in kw_lower for w in ["pisau", "knife", "blade", "golok", "cleaver"]):
             search_candidates.extend([
                 "TysyTube rusty knife restoration satisfying 4K",
                 "rusty knife restoration ASMR 4K",
@@ -116,7 +139,8 @@ def run_pipeline(
                 f"{kw_clean} 4K",
             ])
         else:
-            search_candidates.append(f"{kw_clean} 4K")
+            search_candidates.append(f"{kw_clean} satisfying #shorts")
+            search_candidates.append(f"{kw_clean} ASMR #shorts")
             search_candidates.append(kw_clean)
 
         # Fallback to configured preset channels if needed
