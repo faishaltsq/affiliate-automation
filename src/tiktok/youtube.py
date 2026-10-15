@@ -255,3 +255,47 @@ def _extract_video_id(url: str) -> str | None:
     import re
     match = re.search(r"(?:v=|/)([0-9A-Za-z_-]{11})(?:[&?]|$)", url)
     return match.group(1) if match else None
+
+
+def download_video_720p(url: str, out_dir: str, timeout: int = 900) -> str | None:
+    """Download one 720p mp4 for fast local slicing.
+
+    Capped at 720p on purpose: the clip is re-encoded to 1080x1920 anyway and a
+    full-resolution multi-hour download is needlessly slow.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    outtmpl = os.path.join(out_dir, "%(id)s_720p.%(ext)s")
+    cmd = [
+        *_ytdlp_base(),
+        "--format", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
+        "--merge-output-format", "mp4",
+        "--output", outtmpl,
+        "--no-warnings",
+        "--quiet",
+        url,
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if res.returncode == 0:
+            candidates = sorted(
+                Path(out_dir).glob("*_720p.mp4"), key=lambda p: p.stat().st_mtime, reverse=True
+            )
+            if candidates:
+                return str(candidates[0])
+        logger.error("720p download failed (code %s): %s", res.returncode, res.stderr[-300:])
+    except Exception as exc:
+        logger.error("720p download error for %s: %s", url, exc)
+    return None
+
+
+def fetch_source_metadata(url: str, timeout: int = 60) -> dict:
+    """Fetch id/title/duration/language/chapters for any yt-dlp-supported URL."""
+    cmd = [*_ytdlp_base(), "--dump-json", "--no-warnings", "--quiet", url]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if res.returncode == 0 and res.stdout.strip():
+            return json.loads(res.stdout.strip().splitlines()[0])
+        logger.error("Metadata fetch failed (code %s): %s", res.returncode, res.stderr[-300:])
+    except Exception as exc:
+        logger.error("Metadata fetch error for %s: %s", url, exc)
+    return {}

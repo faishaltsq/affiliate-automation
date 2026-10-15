@@ -161,30 +161,9 @@ def clean_chapter_title(title: str, max_chars: int = 24) -> str:
 
 
 def download_full_720p(url: str, download_dir: str) -> Optional[str]:
-    """Download single 720p copy for fast local slicing."""
-    os.makedirs(download_dir, exist_ok=True)
-    outtmpl = os.path.join(download_dir, "%(id)s_720p.%(ext)s")
-
-    cmd = [
-        *_ytdlp_base(),
-        "--format", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
-        "--merge-output-format", "mp4",
-        "--output", outtmpl,
-        "--no-warnings",
-        "--quiet",
-        url,
-    ]
-
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if res.returncode == 0:
-            # Locate downloaded file
-            for f in Path(download_dir).glob("*_720p.mp4"):
-                return str(f)
-    except Exception as exc:
-        logger.error("Download 720p failed: %s", exc)
-
-    return None
+    """Download single 720p copy for fast local slicing (shared implementation)."""
+    from src.tiktok.youtube import download_video_720p
+    return download_video_720p(url, download_dir)
 
 
 def generate_outdoorboys_clips(
