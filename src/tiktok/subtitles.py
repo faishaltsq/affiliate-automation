@@ -32,6 +32,28 @@ def _get_whisper_model(size: str = "tiny"):
         return None
 
 
+SILENCE_GRACE_SEC = 5.0
+
+
+def _word_ends(seg) -> list:
+    """Word end-times inside a segment, [] when word timestamps are unavailable."""
+    words = getattr(seg, "words", None)
+    if not isinstance(words, list):
+        return []
+    return [float(w.end) for w in words if getattr(w, "end", None) is not None]
+
+
+def cap_end_to_speech(start: float, end: float, word_ends, grace: float = SILENCE_GRACE_SEC) -> float:
+    """A subtitle line may outlive its last spoken word by at most `grace` seconds.
+
+    Whisper stretches a segment's `end` into the silence that follows; burned
+    as-is, the line sits on screen while nobody is talking.
+    """
+    if not word_ends:
+        return float(end)
+    return max(float(start) + 0.3, min(float(end), max(word_ends) + grace))
+
+
 def format_ass_timestamp(seconds: float) -> str:
     """Format seconds into ASS timestamp string: H:MM:SS.cs"""
     h = int(seconds // 3600)
@@ -155,12 +177,16 @@ def generate_subtitles_ass(
             temp_wav,
             language=language,
             beam_size=1,
-            word_timestamps=False,
+            word_timestamps=True,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
         )
         raw_segments = [
-            {"start": s.start, "end": s.end, "text": s.text}
+            {
+                "start": s.start,
+                "end": cap_end_to_speech(s.start, s.end, _word_ends(s)),
+                "text": s.text,
+            }
             for s in raw_segments
         ]
 

@@ -122,3 +122,61 @@ def test_generate_subtitles_uses_injected_segments_without_transcribing(tmp_path
     assert "we found the trail" in content
     assert "and followed it north" in content
     assert "0:00:00.50,0:00:02.00" in content
+
+
+def test_cap_end_to_speech_limits_silence_overshoot():
+    """Whisper's segment end may run 7s past the last word; the cap must cut it."""
+    from src.tiktok.subtitles import cap_end_to_speech
+
+    # Real case: seg 4.05-11.84 "Yes." whose only word ends at 4.29
+    assert cap_end_to_speech(4.05, 11.84, [4.29]) == 9.29
+
+
+def test_cap_end_to_speech_leaves_normal_segments_untouched():
+    """A segment already tight to its last word must not be shortened."""
+    from src.tiktok.subtitles import cap_end_to_speech
+
+    assert cap_end_to_speech(0.0, 2.74, [2.74]) == 2.74
+    assert cap_end_to_speech(0.0, 3.00, [2.74]) == 3.00
+    # No word timestamps available -> never guess, keep the original end.
+    assert cap_end_to_speech(0.0, 12.0, []) == 12.0
+
+
+def test_cap_end_to_speech_never_collapses_to_zero_length():
+    from src.tiktok.subtitles import cap_end_to_speech
+
+    # Pathological: word ends before the segment even starts.
+    assert cap_end_to_speech(10.0, 11.0, [1.0]) == 10.3
+
+
+def test_legacy_whisper_path_caps_line_at_last_word_plus_grace(tmp_path):
+    """End-to-end: the burned line must die 5s after the last spoken word."""
+    from unittest.mock import MagicMock
+    from unittest.mock import patch as _patch
+
+    video_dummy = tmp_path / "vid.mp4"
+    video_dummy.write_text("dummy")
+    out_ass = str(tmp_path / "subs.ass")
+
+    word = MagicMock()
+    word.end = 4.29
+
+    seg = MagicMock()
+    seg.start = 4.05
+    seg.end = 11.84          # Whisper stretched this into the silence
+    seg.text = " Yes. "
+    seg.words = [word]
+
+    mock_model = MagicMock()
+    mock_model.transcribe.return_value = ([seg], MagicMock())
+
+    with _patch("src.tiktok.subtitles._get_whisper_model", return_value=mock_model), \
+         _patch("subprocess.run") as mock_run, \
+         _patch("os.path.exists", return_value=True), \
+         _patch("os.path.getsize", return_value=5000):
+        mock_run.return_value = MagicMock(returncode=0)
+        generate_subtitles_ass(str(video_dummy), duration=10.0, output_ass_path=out_ass)
+
+    content = (tmp_path / "subs.ass").read_text(encoding="utf-8")
+    assert "Dialogue: 0,0:00:04.05,0:00:09.29" in content, content
+    assert "0:00:11.84" not in content

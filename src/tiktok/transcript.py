@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from typing import Dict, List, Optional
 
-from src.tiktok.subtitles import _get_whisper_model
+from src.tiktok.subtitles import _get_whisper_model, _word_ends, cap_end_to_speech
 
 logger = logging.getLogger("tiktok.transcript")
 
@@ -63,6 +63,7 @@ def transcribe_source(
                 audio_path,
                 language=language,
                 beam_size=1,
+                word_timestamps=True,
                 vad_filter=True,
                 vad_parameters=dict(min_silence_duration_ms=500),
             )
@@ -77,7 +78,9 @@ def transcribe_source(
                 continue
             segments.append({
                 "start": round(float(s.start), 2),
-                "end": round(float(s.end), 2),
+                # Whisper stretches `end` into the following silence; cap the line
+                # so it dies SILENCE_GRACE_SEC after the last word actually spoken.
+                "end": round(cap_end_to_speech(s.start, s.end, _word_ends(s)), 2),
                 "text": text,
             })
 

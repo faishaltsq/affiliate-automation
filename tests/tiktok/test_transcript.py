@@ -65,6 +65,56 @@ def test_transcribe_source_has_no_duration_cap(tmp_path):
     assert "-t" not in seen["cmd"], "no sample cap for a long source"
 
 
+def test_transcribe_source_caps_segment_end_to_speech(tmp_path):
+    """The transcript that becomes subtitles must not trail into silence."""
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x" * 2000)
+
+    word = MagicMock()
+    word.end = 4.29
+    seg = _seg(4.05, 11.84, "Yes.")
+    seg.words = [word]
+
+    def fake_run(cmd, **kwargs):
+        with open(cmd[-1], "wb") as fh:
+            fh.write(b"0" * 5000)
+
+        class R:
+            returncode = 0
+            stderr = ""
+
+        return R()
+
+    with patch("src.tiktok.transcript._get_whisper_model", return_value=_fake_model([seg])), \
+         patch("src.tiktok.transcript.subprocess.run", side_effect=fake_run):
+        res = transcribe_source(str(video))
+
+    assert res["segments"][0]["end"] == 9.29, res["segments"][0]
+
+
+def test_transcribe_source_requests_word_timestamps(tmp_path):
+    """Without word timestamps the silence cap has nothing to measure against."""
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x" * 2000)
+    model = _fake_model([_seg(1.0, 2.0, "hello")])
+
+    def fake_run(cmd, **kwargs):
+        with open(cmd[-1], "wb") as fh:
+            fh.write(b"0" * 5000)
+
+        class R:
+            returncode = 0
+            stderr = ""
+
+        return R()
+
+    with patch("src.tiktok.transcript._get_whisper_model", return_value=model), \
+         patch("src.tiktok.transcript.subprocess.run", side_effect=fake_run):
+        transcribe_source(str(video))
+
+    assert model.transcribe.call_args.kwargs.get("word_timestamps") is True
+
+
 def test_transcribe_source_missing_file(tmp_path):
     res = transcribe_source(str(tmp_path / "nope.mp4"))
     assert res["segments"] == []
