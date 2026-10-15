@@ -9,6 +9,7 @@ venv/
 .venv/
 data/tiktok/downloads/
 data/tiktok/output/
+data/tiktok/queue/
 cookies*.txt
 data/tiktok/cookies.txt
 *.db

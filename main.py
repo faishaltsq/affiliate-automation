@@ -63,6 +63,7 @@ def main():
             print("=== TikTok Video Automation Status ===")
             print(f"Total uploaded videos: {stats['total_uploaded']}")
             print(f"Total runs logged: {stats['total_runs']}")
+            print(f"Pending clips in queue: {db.get_queued_count()}")
             if stats["last_run"]:
                 print(f"Last run: {stats['last_run']['run_at']} (uploaded: {stats['last_run']['videos_uploaded']})")
             if recent:
