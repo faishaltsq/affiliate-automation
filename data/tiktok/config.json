@@ -7,6 +7,14 @@
     "clip_duration_seconds": 75,
     "fill_mode": true
   },
+  "source_clip": {
+    "clips_per_source": 3,
+    "clip_duration_seconds": 75,
+    "hook_title_seconds": 10,
+    "fill_mode": true,
+    "whisper_model": "base",
+    "source_language": null
+  },
   "queue_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\queue",
   "keywords": [
     "satisfying car restoration #shorts",
