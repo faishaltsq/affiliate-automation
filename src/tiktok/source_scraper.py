@@ -168,6 +168,48 @@ def _run_ytdlp_flat(url: str, max_items: int = 20, extra_args: Optional[List[str
         return []
 
 
+def _extract_topic_tokens(keywords: List[str]) -> set[str]:
+    """Extract clean, meaningful topic tokens from a list of keywords."""
+    tokens = set()
+    noise = {
+        "satisfying", "asmr", "4k", "hd", "shorts", "#shorts", "vertical",
+        "fullscreen", "full", "screen", "relaxing", "compilation", "diy",
+        "video", "videos", "cinematic", "status", "whatsapp", "wa", "reel",
+        "reels", "tiktok", "fyp", "and", "in", "of", "the", "for", "with"
+    }
+    for kw in keywords:
+        clean = re.sub(r"[#,\-_/]", " ", kw.lower())
+        for word in clean.split():
+            if len(word) >= 3 and word not in noise:
+                tokens.add(word)
+    return tokens
+
+
+def calculate_relevance(title: str, channel: str, keywords: List[str]) -> float:
+    """Calculate relevance score (0.0 to 1.0) of a video against keywords.
+
+    Requires at least 2 distinct topical token matches when the query contains 3+ tokens,
+    or at least 1 match when the query has 1-2 tokens.
+    Returns 0.0 if the threshold is not met (hard drop).
+    """
+    if not keywords:
+        return 1.0  # No filter active (general browsing)
+
+    target_tokens = _extract_topic_tokens(keywords)
+    if not target_tokens:
+        return 1.0
+
+    text = f"{title.lower()} {channel.lower()}"
+    matched = [t for t in target_tokens if t in text]
+
+    # Required matches: at least 2 if query has 3+ tokens, else 1
+    min_required = 2 if len(target_tokens) >= 3 else 1
+    if len(matched) < min_required:
+        return 0.0
+
+    return len(matched) / len(target_tokens)
+
+
 def _normalize_entry(entry: dict, platform: str) -> Optional[dict]:
     """Normalize a yt-dlp entry to standard video dict."""
     vid_id = entry.get("id") or entry.get("display_id")
@@ -351,14 +393,30 @@ def collect_multi_source(
     results = []
     seen_ids = set()
 
+    # If specific keywords are requested (targeted search), adapt platforms:
+    # 1. Instagram Reels & Facebook Reels don't support keyword queries via yt-dlp,
+    #    so skip them when a specific user query is active to avoid irrelevant random reels!
+    # 2. Derive TikTok hashtags directly from the query keywords.
+    is_targeted_search = bool(keywords)
+
+    if is_targeted_search:
+        # Focus on platforms that can actually search by query
+        platforms = [p for p in platforms if p in ("youtube", "tiktok_hashtag")]
+        if not platforms:
+            platforms = ["youtube"]
+
+        # Derive hashtags from topic tokens
+        topic_tokens = _extract_topic_tokens(keywords)
+        matched_tags = [t for t in topic_tokens if len(t) >= 4]
+        active_tags = matched_tags[:4] if matched_tags else random.sample(TIKTOK_HASHTAGS, min(4, len(TIKTOK_HASHTAGS)))
+    else:
+        active_tags = random.sample(TIKTOK_HASHTAGS, min(5, len(TIKTOK_HASHTAGS)))
+
     kws = keywords or random.sample(YOUTUBE_SHORTS_POOL, min(6, len(YOUTUBE_SHORTS_POOL)))
 
     platform_scrapers = {
         "youtube": lambda: scrape_youtube_shorts(kws, max_results=per_platform, db=db),
-        "tiktok_hashtag": lambda: scrape_tiktok_hashtag(
-            random.sample(TIKTOK_HASHTAGS, min(5, len(TIKTOK_HASHTAGS))),
-            max_results=per_platform, db=db
-        ),
+        "tiktok_hashtag": lambda: scrape_tiktok_hashtag(active_tags, max_results=per_platform, db=db),
         "tiktok_channel": lambda: scrape_tiktok_channels(
             random.sample(TIKTOK_CHANNELS, min(4, len(TIKTOK_CHANNELS))),
             max_results=per_platform, db=db
@@ -390,5 +448,22 @@ def collect_multi_source(
         except Exception as e:
             logger.warning("source_scraper: %s failed: %s", platform, e)
 
-    random.shuffle(results)
+    # RELEVANCE FILTER: Score every candidate across all platforms against the keywords
+    if is_targeted_search and keywords:
+        filtered = []
+        for v in results:
+            score = calculate_relevance(v.get("title", ""), v.get("channel", ""), keywords)
+            v["_relevance"] = score
+            if score > 0.0:  # Must share at least one topical keyword
+                filtered.append(v)
+            else:
+                logger.warning(
+                    "source_scraper: DROPPING IRRELEVANT VIDEO [%s]: '%s' (channel: %s)",
+                    v.get("source_platform"), v.get("title"), v.get("channel")
+                )
+        # Sort by relevance descending
+        filtered.sort(key=lambda v: -(v.get("_relevance", 0)))
+        results = filtered
+
+    random.shuffle(results) if not is_targeted_search else None
     return results[:count * 3]  # return buffer; pipeline picks count
