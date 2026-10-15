@@ -172,7 +172,37 @@ def run_pipeline(
     search_buffer = max((max_results or 1) * 3, 5)
     source_type = config.get("source_type", "shorts")
 
-    if source_type == "multi":
+    # Direct URL mode: if direct URLs provided (e.g. from Facebook, Instagram, YouTube),
+    # use them directly instead of searching
+    direct_urls = config.get("direct_urls", [])
+    if direct_urls:
+        notify(f"🔗 Menggunakan {len(direct_urls)} direct video URL yang dikonfigurasi...")
+        videos = []
+        for u in direct_urls:
+            # derive platform and id
+            platform = "unknown"
+            if "youtube.com" in u or "youtu.be" in u:
+                platform = "youtube"
+            elif "instagram.com" in u:
+                platform = "instagram"
+            elif "facebook.com" in u or "fb.watch" in u:
+                platform = "facebook"
+            elif "tiktok.com" in u:
+                platform = "tiktok"
+
+            import re
+            vid_id = re.sub(r"[^a-zA-Z0-9_-]", "_", u.split("?")[0].rstrip("/").split("/")[-1])
+            if not db.is_uploaded(vid_id):
+                videos.append({
+                    "id": f"{platform}_{vid_id}",
+                    "raw_id": vid_id,
+                    "title": f"Video {platform.capitalize()}",
+                    "channel": platform,
+                    "duration": 60,
+                    "webpage_url": u,
+                    "source_platform": platform,
+                })
+    elif source_type == "multi":
         # Multi-platform: YouTube Shorts, TikTok hashtag/channel, Instagram Reels, Facebook Reels
         source_platforms = config.get(
             "source_platforms",
