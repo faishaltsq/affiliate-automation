@@ -17,6 +17,7 @@ from src.tiktok.uploader import TikTokUploader
 from src.tiktok.youtube import search_videos, download_video, get_action_start_time
 from src.tiktok.editor import process_video
 from src.tiktok.youtube_uploader import upload_shorts
+from src.tiktok.outdoorboys import replenish_outdoorboys_queue
 
 logger = logging.getLogger("tiktok.pipeline")
 
@@ -69,6 +70,85 @@ def run_pipeline(
 
     db = VideoStateDB(config.get("db_path", "data/tiktok/state.db"))
     uploader = TikTokUploader(config.get("tiktok_cookies_path", "data/tiktok/cookies.txt"))
+
+    # Outdoor Boys Multi-Part Queue Mode
+    source_mode = config.get("source_mode", "shorts")
+    is_outdoorboys = (source_mode == "outdoorboys") or (
+        keyword_override and any(w in keyword_override.lower() for w in ["outdoorboys", "outdoor boys", "luke nichols"])
+    )
+
+    if is_outdoorboys:
+        notify("🌲 <b>Mode Outdoor Boys Aktif:</b> Mengambil cuplikan dari antrean...")
+        replenish_outdoorboys_queue(db, config, notify_fn=notify)
+
+        uploaded_videos = []
+        errors = []
+        max_uploads = count if count is not None else 1
+
+        for _ in range(max_uploads):
+            clip = db.get_next_queued_clip()
+            if not clip:
+                notify("⚠️ Tidak ada cuplikan Outdoor Boys yang tersedia di antrean.")
+                break
+
+            clip_id = clip["clip_id"]
+            title = clip["title"]
+            file_path = clip["file_path"]
+            part_num = clip["part_num"]
+            total_parts = clip["total_parts"]
+
+            if not os.path.exists(file_path):
+                notify(f"⚠️ File cuplikan {file_path} tidak ditemukan di disk, melewati...")
+                db.mark_clip_uploaded(clip_id)
+                continue
+
+            if dry_run:
+                notify(f"🧪 [DRY RUN] Cuplikan siap di: <code>{file_path}</code> (Upload dilewati).")
+                uploaded_videos.append({"id": clip_id, "title": title, "channel": "Outdoor Boys", "path": file_path})
+                continue
+
+            notify(f"🚀 Mengunggah ke TikTok: <b>{title}</b>...")
+            caption = f"{title} #outdoorboys #bushcraft #survival #camping #alaska #fyp"
+            success = uploader.upload_video(file_path, caption)
+            if success:
+                db.mark_clip_uploaded(clip_id)
+                db.mark_uploaded(clip_id, title, "Outdoor Boys")
+                uploaded_videos.append({"id": clip_id, "title": title, "channel": "Outdoor Boys", "path": file_path})
+
+                remaining = db.get_queued_count()
+                notify(
+                    f"✅ <b>Sukses terunggah ke TikTok:</b> <i>{title}</i>\n"
+                    f"📦 <i>Sisa antrean: {remaining} part cuplikan.</i>"
+                )
+
+                if upload_youtube:
+                    notify("📺 Mengunggah ke YouTube Shorts...")
+                    yt_desc = f"{title}\n\nOriginal by Outdoor Boys\n\n#Shorts #OutdoorBoys #Bushcraft #Survival"
+                    yt_result = upload_shorts(
+                        video_path=file_path,
+                        title=title,
+                        description=yt_desc,
+                        tags=["Shorts", "OutdoorBoys", "Bushcraft", "Survival", "Alaska"],
+                    )
+                    if yt_result.get("success"):
+                        yt_url = yt_result.get("url", "")
+                        notify(f"✅ <b>Sukses terunggah ke YouTube Shorts:</b> <a href='{yt_url}'>{yt_result.get('title', title)}</a>")
+                        uploaded_videos[-1]["youtube_url"] = yt_url
+                    else:
+                        yt_err = yt_result.get("error", "Unknown error")
+                        notify(f"⚠️ YouTube Shorts upload gagal: {yt_err}")
+            else:
+                err = f"Upload TikTok gagal untuk {clip_id}"
+                errors.append(err)
+
+        db.close()
+        return {
+            "success": len(uploaded_videos) > 0,
+            "uploaded": len(uploaded_videos),
+            "found": len(uploaded_videos) + len(errors),
+            "videos": uploaded_videos,
+            "errors": errors,
+        }
 
     if keyword_override:
         kw_clean = keyword_override.strip()

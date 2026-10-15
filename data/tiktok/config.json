@@ -1,5 +1,13 @@
 {
   "source_type": "shorts",
+  "source_mode": "outdoorboys",
+  "outdoorboys": {
+    "channel_url": "https://www.youtube.com/@OutdoorBoys/videos",
+    "clips_per_video": 4,
+    "clip_duration_seconds": 75,
+    "fill_mode": true
+  },
+  "queue_dir": "C:\\Users\\cubeb\\OneDrive\\Documents\\coding\\projects\\affiliate-automation\\data\\tiktok\\queue",
   "keywords": [
     "satisfying car restoration #shorts",
     "rusty knife restoration satisfying #shorts",

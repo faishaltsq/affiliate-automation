@@ -28,7 +28,83 @@ class VideoStateDB:
                 errors TEXT
             )
         """)
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS clip_queue (
+                clip_id TEXT PRIMARY KEY,
+                video_id TEXT NOT NULL,
+                part_num INTEGER NOT NULL,
+                total_parts INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                chapter_title TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                uploaded_at TEXT
+            )
+        """)
         self._conn.commit()
+
+    def enqueue_clip(
+        self,
+        clip_id: str,
+        video_id: str,
+        part_num: int,
+        total_parts: int,
+        title: str,
+        chapter_title: str,
+        file_path: str,
+    ):
+        """Add a generated multi-part clip to the scheduled upload queue."""
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO clip_queue
+            (clip_id, video_id, part_num, total_parts, title, chapter_title, file_path, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))
+            """,
+            (clip_id, video_id, part_num, total_parts, title, chapter_title, file_path),
+        )
+        self._conn.commit()
+
+    def get_next_queued_clip(self) -> dict | None:
+        """Fetch the next pending clip in order (first by video batch created_at, then part_num)."""
+        row = self._conn.execute(
+            """
+            SELECT clip_id, video_id, part_num, total_parts, title, chapter_title, file_path, status, created_at
+            FROM clip_queue
+            WHERE status = 'pending'
+            ORDER BY created_at ASC, part_num ASC
+            LIMIT 1
+            """
+        ).fetchone()
+        return dict(row) if row else None
+
+    def mark_clip_uploaded(self, clip_id: str):
+        """Mark a queued clip as uploaded."""
+        self._conn.execute(
+            "UPDATE clip_queue SET status = 'uploaded', uploaded_at = datetime('now') WHERE clip_id = ?",
+            (clip_id,),
+        )
+        self._conn.commit()
+
+    def get_queued_count(self, video_id: str | None = None) -> int:
+        """Return count of pending clips in queue."""
+        if video_id:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM clip_queue WHERE status = 'pending' AND video_id = ?",
+                (video_id,),
+            ).fetchone()
+        else:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM clip_queue WHERE status = 'pending'"
+            ).fetchone()
+        return row[0] if row else 0
+
+    def is_video_processed(self, video_id: str) -> bool:
+        """Check if any clips have already been generated for this video."""
+        row = self._conn.execute(
+            "SELECT 1 FROM clip_queue WHERE video_id = ? LIMIT 1", (video_id,)
+        ).fetchone()
+        return row is not None
 
     def is_uploaded(self, video_id: str) -> bool:
         row = self._conn.execute(

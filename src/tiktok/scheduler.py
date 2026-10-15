@@ -98,7 +98,17 @@ def get_status_str() -> str:
         slots_str = ", ".join(info.get("slots", []))
         next_s = info.get("next_slot", "-")
         wait_s = info.get("wait_str", "-")
-        return f"🟢 Aktif — Mode FYP ({slots_str} WIB) | Slot Terdekat: {next_s} WIB ({wait_s})"
+        try:
+            from src.tiktok.state import VideoStateDB
+            from src.tiktok.config import load_config
+            cfg = load_config()
+            sdb = VideoStateDB(cfg.get("db_path", "data/tiktok/state.db"))
+            q_cnt = sdb.get_queued_count()
+            sdb.close()
+            q_str = f" | 🌲 Queue: {q_cnt} part" if q_cnt > 0 else ""
+        except Exception:
+            q_str = ""
+        return f"🟢 Aktif — Mode FYP ({slots_str} WIB) | Slot Terdekat: {next_s} WIB ({wait_s}){q_str}"
     return f"🟢 Aktif (Interval {info.get('interval_hours', 2)} jam)"
 
 
