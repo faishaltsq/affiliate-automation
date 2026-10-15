@@ -17,7 +17,6 @@ from src.tiktok.uploader import TikTokUploader
 from src.tiktok.youtube import search_videos, download_video, get_action_start_time
 from src.tiktok.editor import process_video
 from src.tiktok.youtube_uploader import upload_shorts
-from src.tiktok.source_scraper import collect_multi_source, YOUTUBE_SHORTS_POOL
 
 logger = logging.getLogger("tiktok.pipeline")
 
@@ -73,32 +72,20 @@ def run_pipeline(
 
     if keyword_override:
         kw_clean = keyword_override.strip()
-        # Strip low-value buzzwords that degrade YouTube search quality into WhatsApp status / low-effort reuploads
-        for noise in ["fullscreen", "full screen", "status", "whatsapp", "wa", "hd", "4k", "aesthetic", "shorts", "#shorts"]:
-            import re
+        # Clean formatting/noise words so they don't pollute YouTube search
+        import re
+        for noise in ["fullscreen", "full screen", "status", "whatsapp", "wa", "hd", "4k", "shorts", "#shorts"]:
             kw_clean = re.sub(rf"\b{re.escape(noise)}\b", "", kw_clean, flags=re.IGNORECASE).strip()
         kw_clean = re.sub(r"\s+", " ", kw_clean).strip()
 
         kw_lower = kw_clean.lower()
         search_candidates = []
 
-        if any(w in kw_lower for w in ["katana", "samurai", "sword", "wakizashi", "pedang"]):
-            # Specific disambiguation: prevent Indonesian "Suzuki Katana" car queries!
-            search_candidates.extend([
-                "Japanese Katana samurai sword restoration ASMR #shorts",
-                "rusty Katana sword restoration satisfying #shorts",
-                "TysyTube antique Katana sword restoration #shorts",
-                "blacksmith forging Japanese samurai Katana sword #shorts",
-                "restoration rusty samurai sword blade #shorts",
-            ])
-        elif any(w in kw_lower for w in ["camping", "kemah", "tenda", "bushcraft", "survival", "shelter"]):
-            search_candidates.extend([
-                "Outdoor Boys camping bushcraft shelter fishing #shorts",
-                "solo camping in heavy rain ASMR relaxing #shorts",
-                "Bertram Craft and Wilderness relaxing camping #shorts",
-                "primitive survival building warm shelter #shorts",
-                "bushcraft winter camping campfire cooking #shorts",
-            ])
+        # Disambiguation & targeted search
+        if "katana" in kw_lower and "sword" not in kw_lower and "pedang" not in kw_lower:
+            search_candidates.append(f"{kw_clean} sword #shorts")
+            search_candidates.append(f"{kw_clean} samurai #shorts")
+            search_candidates.append(f"{kw_clean} sword")
         elif any(w in kw_lower for w in ["mobil", "car", "otomotif", "auto", "vehicle"]):
             search_candidates.extend([
                 "WD Detailing abandoned car restoration barn find 4K",
@@ -106,7 +93,7 @@ def run_pipeline(
                 f"{kw_clean} car restoration 4K",
                 f"{kw_clean} 4K",
             ])
-        elif any(w in kw_lower for w in ["pisau", "knife", "blade", "golok", "cleaver"]):
+        elif any(w in kw_lower for w in ["pisau", "knife", "pedang", "blade", "golok", "cleaver"]):
             search_candidates.extend([
                 "TysyTube rusty knife restoration satisfying 4K",
                 "rusty knife restoration ASMR 4K",
@@ -139,14 +126,9 @@ def run_pipeline(
                 f"{kw_clean} 4K",
             ])
         else:
-            search_candidates.append(f"{kw_clean} satisfying #shorts")
-            search_candidates.append(f"{kw_clean} ASMR #shorts")
+            search_candidates.append(f"{kw_clean} #shorts")
             search_candidates.append(kw_clean)
 
-        # Fallback to configured preset channels if needed
-        for pk in config.get("keywords", []):
-            if pk not in search_candidates:
-                search_candidates.append(pk)
         keywords = search_candidates
     else:
         import random
@@ -169,82 +151,27 @@ def run_pipeline(
     Path(download_dir).mkdir(parents=True, exist_ok=True)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    videos = []
+    seen_ids = set()
+    # Fetch 3x the required count as buffer against download failures
     search_buffer = max((max_results or 1) * 3, 5)
-    source_type = config.get("source_type", "shorts")
+    for kw in keywords:
+        results = search_videos([kw], max_results=search_buffer, max_duration=max_duration)
+        for v in results:
+            if v["id"] not in seen_ids and not db.is_uploaded(v["id"]):
+                seen_ids.add(v["id"])
+                videos.append(v)
+        if len(videos) >= search_buffer:
+            break
 
-    # Direct URL mode: if direct URLs provided (e.g. from Facebook, Instagram, YouTube),
-    # use them directly instead of searching
-    direct_urls = config.get("direct_urls", [])
-    if direct_urls:
-        notify(f"🔗 Menggunakan {len(direct_urls)} direct video URL yang dikonfigurasi...")
-        videos = []
-        for u in direct_urls:
-            # derive platform and id
-            platform = "unknown"
-            if "youtube.com" in u or "youtu.be" in u:
-                platform = "youtube"
-            elif "instagram.com" in u:
-                platform = "instagram"
-            elif "facebook.com" in u or "fb.watch" in u:
-                platform = "facebook"
-            elif "tiktok.com" in u:
-                platform = "tiktok"
-
-            import re
-            vid_id = re.sub(r"[^a-zA-Z0-9_-]", "_", u.split("?")[0].rstrip("/").split("/")[-1])
-            if not db.is_uploaded(vid_id):
-                videos.append({
-                    "id": f"{platform}_{vid_id}",
-                    "raw_id": vid_id,
-                    "title": f"Video {platform.capitalize()}",
-                    "channel": platform,
-                    "duration": 60,
-                    "webpage_url": u,
-                    "source_platform": platform,
-                })
-    elif source_type == "multi":
-        # Multi-platform: YouTube Shorts, TikTok hashtag/channel, Instagram Reels, Facebook Reels
-        source_platforms = config.get(
-            "source_platforms",
-            ["youtube", "tiktok_hashtag", "tiktok_channel", "instagram", "facebook"]
-        )
-        platform_labels = {
-            "youtube": "YouTube Shorts",
-            "tiktok_hashtag": "TikTok Hashtag",
-            "tiktok_channel": "TikTok Channel",
-            "instagram": "Instagram Reels",
-            "facebook": "Facebook Reels",
-        }
-        label_str = ", ".join(platform_labels.get(p, p) for p in source_platforms)
-        notify(f"🌐 Multi-source scraper aktif: <b>{label_str}</b>")
-        videos = collect_multi_source(
-            count=search_buffer,
-            db=db,
-            platforms=source_platforms,
-            keywords=keywords if keyword_override else None,
-        )
-    else:
-        # Legacy YouTube-only mode
-        videos = []
-        seen_ids = set()
-        for kw in keywords:
-            results = search_videos([kw], max_results=search_buffer, max_duration=max_duration)
-            for v in results:
-                if v["id"] not in seen_ids and not db.is_uploaded(v["id"]):
-                    seen_ids.add(v["id"])
-                    v.setdefault("source_platform", "youtube")
-                    v.setdefault("raw_id", v["id"])
-                    videos.append(v)
-            if len(videos) >= search_buffer:
-                break
-        videos = videos[:search_buffer]
-
+    # Keep more candidates than strictly needed, so failed downloads can be retried with the next
+    videos = videos[:search_buffer]
     if not videos:
-        notify("⚠️ Tidak ditemukan kandidat video dari semua platform.")
+        notify("⚠️ Tidak ditemukan kandidat video YouTube baru.")
         db.close()
         return {"success": False, "uploaded": 0, "found": 0, "videos": [], "errors": ["No candidate videos found"]}
 
-    notify(f"🔍 Ditemukan {len(videos)} kandidat video multi-platform. Memulai proses download & edit...")
+    notify(f"🔍 Ditemukan {len(videos)} kandidat video HD. Memulai proses download & edit...")
 
     uploaded_videos = []
     errors = []
@@ -255,13 +182,11 @@ def run_pipeline(
             break
 
         vid = video["id"]
-        raw_vid = video.get("raw_id", vid)
         title = video.get("title", "")
         channel = video.get("channel", "")
         url = video.get("webpage_url", "")
-        platform = video.get("source_platform", "youtube")
 
-        notify(f"📥 [{platform.upper()}] Mengunduh: <b>{title[:50]}</b> ({channel})...")
+        notify(f"📥 Mengunduh: <b>{title[:50]}</b> ({channel})...")
         raw_path = download_video(url, download_dir)
         if not raw_path:
             err = f"Download gagal untuk video {vid}"
@@ -311,7 +236,7 @@ def run_pipeline(
         caption = caption_tpl.format(title=title)
         success = uploader.upload_video(edited_path, caption)
         if success:
-            db.mark_uploaded(raw_vid, title, channel)
+            db.mark_uploaded(vid, title, channel)
             uploaded_videos.append({"id": vid, "title": title, "channel": channel, "path": edited_path})
             notify(f"✅ <b>Sukses terunggah ke TikTok:</b> <i>{title}</i>")
 

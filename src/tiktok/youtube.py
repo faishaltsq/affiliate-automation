@@ -177,27 +177,6 @@ def search_videos(
     if prefer_vertical:
         videos.sort(key=lambda v: (not v.get("is_vertical", False),))
 
-    # Relevance filter: score each result by keyword overlap in title/channel
-    # and demote/remove results that share zero keywords with the query
-    query_tokens = set(query.lower().replace("#shorts", "").replace("#", "").split())
-    # Remove noise words that don't carry topical signal
-    noise = {"satisfying", "asmr", "4k", "hd", "shorts", "vertical", "fullscreen", "full", "screen"}
-    query_tokens -= noise
-
-    if query_tokens:
-        for v in videos:
-            title_lower = v.get("title", "").lower()
-            channel_lower = v.get("channel", "").lower()
-            combined = f"{title_lower} {channel_lower}"
-            hits = sum(1 for t in query_tokens if t in combined)
-            v["_relevance"] = hits / len(query_tokens)
-
-        # Sort: vertical first, then by relevance score descending
-        videos.sort(key=lambda v: (not v.get("is_vertical", False), -(v.get("_relevance", 0))))
-
-        # Drop videos with zero keyword relevance (completely off-topic)
-        videos = [v for v in videos if v.get("_relevance", 0) > 0] or videos[:max_results]
-
     return videos
 
 
