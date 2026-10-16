@@ -42,6 +42,15 @@ class VideoStateDB:
                 uploaded_at TEXT
             )
         """)
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS clipper_uploads (
+                fingerprint TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL DEFAULT '',
+                account TEXT NOT NULL,
+                video_path TEXT NOT NULL DEFAULT '',
+                uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
         self._conn.commit()
 
     def enqueue_clip(
@@ -54,12 +63,22 @@ class VideoStateDB:
         chapter_title: str,
         file_path: str,
     ):
-        """Add a generated multi-part clip to the scheduled upload queue."""
+        """Add a generated multi-part clip to the scheduled upload queue.
+
+        Re-enqueueing an already-uploaded clip must NOT flip it back to
+        'pending' (that re-uploads it). Existing 'uploaded' rows are left
+        untouched; only 'pending' rows get their metadata refreshed.
+        """
         self._conn.execute(
             """
-            INSERT OR REPLACE INTO clip_queue
+            INSERT INTO clip_queue
             (clip_id, video_id, part_num, total_parts, title, chapter_title, file_path, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))
+            ON CONFLICT(clip_id) DO UPDATE SET
+                title = excluded.title,
+                chapter_title = excluded.chapter_title,
+                file_path = excluded.file_path
+            WHERE clip_queue.status = 'pending'
             """,
             (clip_id, video_id, part_num, total_parts, title, chapter_title, file_path),
         )
@@ -118,6 +137,37 @@ class VideoStateDB:
             (video_id, title, channel),
         )
         self._conn.commit()
+
+    # --- Clipper upload fingerprint ledger (duplicate-post guard) ---
+
+    def is_clipper_uploaded(self, fingerprint: str) -> bool:
+        """True if this exact content+account combination was already posted."""
+        row = self._conn.execute(
+            "SELECT 1 FROM clipper_uploads WHERE fingerprint = ? LIMIT 1", (fingerprint,)
+        ).fetchone()
+        return row is not None
+
+    def mark_clipper_uploaded(
+        self, fingerprint: str, campaign_id: str, account: str, video_path: str = ""
+    ):
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO clipper_uploads (fingerprint, campaign_id, account, video_path)
+            VALUES (?, ?, ?, ?)
+            """,
+            (fingerprint, campaign_id, account, video_path),
+        )
+        self._conn.commit()
+
+    def recent_clipper_uploads(self, limit: int = 10) -> list[dict]:
+        cursor = self._conn.execute(
+            """
+            SELECT fingerprint, campaign_id, account, video_path, uploaded_at
+            FROM clipper_uploads ORDER BY uploaded_at DESC LIMIT ?
+            """,
+            (limit,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
 
     def log_run(self, found: int, uploaded: int, skipped: int, errors: str = ""):
         self._conn.execute(

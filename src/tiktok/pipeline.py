@@ -33,6 +33,17 @@ def setup_logging(log_dir: str) -> None:
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
+    # Drop file handlers for previous days: a stale handler keeps writing the
+    # same events into yesterday's file, which makes duplicate uploads look
+    # real in the logs (same timestamp in two files).
+    for h in list(root.handlers):
+        if isinstance(h, logging.FileHandler) and h.baseFilename != str(log_file.resolve()):
+            root.removeHandler(h)
+            try:
+                h.close()
+            except Exception:
+                pass
+
     if not any(
         isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
         for h in root.handlers

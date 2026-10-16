@@ -28,6 +28,9 @@ CLIPPER_THREAD_ID = int(os.environ.get("TG_CLIPPER_THREAD_ID", "246"))
 
 _active_tasks: dict[str, bool] = {}
 
+# Only one clipper pipeline at a time — concurrent runs post the same clip twice.
+_CLIPPER_LOCK = threading.Lock()
+
 
 def _send_reply(text: str, reply_to_msg_id: Optional[int] = None, thread_id: Optional[int] = None):
     """Send HTML reply to Telegram Clipper Topic."""
@@ -275,8 +278,18 @@ def _cmd_clip_async(
     thread_id: int,
     count: int = 1,
     distribution: str = "distribute",
+    force: bool = False,
 ):
     """Run clipper pipeline in background thread with live status message editing."""
+    # One clipper pipeline at a time: two concurrent /clip runs race past each
+    # other's duplicate checks and post the same clip twice.
+    if _CLIPPER_LOCK.locked():
+        _send_reply(
+            "⏳ <b>Clipper pipeline sedang berjalan.</b> Tunggu proses saat ini selesai dulu.",
+            reply_to_msg_id=msg_id,
+            thread_id=thread_id,
+        )
+        return
     _send_reply(f"⏳ <b>Memulai pipeline ({count} klip)...</b>", reply_to_msg_id=msg_id, thread_id=thread_id)
 
     def worker():
@@ -338,6 +351,7 @@ def _cmd_clip_async(
                 progress_callback=progress_cb,
                 count=count,
                 distribution=distribution,
+                force=force,
             )
             if res.get("success"):
                 # Send each generated video file to Telegram Topic 246
@@ -385,7 +399,13 @@ def _cmd_clip_async(
             logger.exception("Worker error: %s", e)
             _send_reply(f"❌ <b>Error:</b> <code>{e}</code>", thread_id=thread_id)
 
-    t = threading.Thread(target=worker, daemon=True, name=f"clipper-{campaign_id}")
+    def _locked_worker():
+        # Serialize whole pipeline: concurrent /clip runs pass each other's
+        # duplicate check before either marks the ledger.
+        with _CLIPPER_LOCK:
+            worker()
+
+    t = threading.Thread(target=_locked_worker, daemon=True, name=f"clipper-{campaign_id}")
     t.start()
 
 
@@ -401,7 +421,8 @@ def _cmd_help(msg_id: int, thread_id: int):
         "• <code>/clip [id]</code> — Upload 1 klip ke semua akun aktif\n"
         "• <code>/clip [id] 2</code> — Buat 2 klip dengan hook berbeda & bagi per akun\n"
         "• <code>/clip [id] 3</code> — Buat 3 klip dengan hook berbeda & bagi per akun\n"
-        "• <code>/clip [id] --account nama1,nama2</code> — Upload ke akun tertentu\n\n"
+        "• <code>/clip [id] --account nama1,nama2</code> — Upload ke akun tertentu\n"
+        "• <code>/clip [id] --force</code> — Paksa upload ulang klip yang sudah pernah dipost (anti-duplikat aktif by default)\n\n"
         "<b>Akun TikTok:</b>\n"
         "• <code>/accounts</code> — Lihat semua akun & statusnya\n"
         "• <code>/activate [nama]</code> — Aktifkan akun\n"
@@ -506,6 +527,12 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
                 distribution = "all"
                 remaining = [x for x in remaining if x != "--all-accounts"]
 
+            # Parse force flag (re-upload clips already posted to these accounts)
+            force = False
+            if "--force" in remaining:
+                force = True
+                remaining = [x for x in remaining if x != "--force"]
+
             # Remaining non-flag arg = source URL
             url_args = [x for x in remaining if not x.startswith("--")]
             if url_args:
@@ -519,6 +546,7 @@ def handle_clipper_message(msg: dict, text: str, msg_id: int, thread_id: int):
                 thread_id,
                 count=count,
                 distribution=distribution,
+                force=force,
             )
         else:
             _send_reply(

@@ -43,6 +43,45 @@ def test_clean_chapter_title():
     assert "[" not in clean
 
 
+def test_replenish_outdoorboys_queue_all_processed(monkeypatch):
+    """All channel videos processed → replenish must return 0, never re-clip one.
+
+    The old fallback ('choosing oldest candidate') re-sliced an already-processed
+    video, whose clip rows flipped back to pending → duplicate uploads.
+    """
+    import tempfile
+    import os
+    from unittest.mock import patch
+    from src.tiktok.state import VideoStateDB
+    from src.tiktok.outdoorboys import replenish_outdoorboys_queue
+
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_path = f.name
+    db = None
+    try:
+        db = VideoStateDB(db_path)
+        # v1 is already sliced AND already uploaded → queue empty, video known.
+        db.enqueue_clip("v1_part1", "v1", 1, 1, "T1", "Ch1", "/tmp/p.mp4")
+        db.mark_clip_uploaded("v1_part1")
+        assert db.get_queued_count() == 0
+
+        notices = []
+        with patch(
+            "src.tiktok.outdoorboys.fetch_channel_videos",
+            return_value=[{"id": "v1", "title": "Already Done", "url": "https://youtu.be/v1"}],
+        ), patch("src.tiktok.outdoorboys.generate_outdoorboys_clips") as mock_gen:
+            cnt = replenish_outdoorboys_queue(db, config={}, notify_fn=notices.append)
+
+        assert cnt == 0
+        assert not mock_gen.called, "video yang sudah diproses tidak boleh dipotong ulang"
+        assert db.get_queued_count() == 0, "klip lama tidak boleh kembali ke antrean"
+        assert any("sudah pernah dipotong" in n for n in notices)
+    finally:
+        if db is not None:
+            db.close()
+        os.unlink(db_path)
+
+
 def test_replenish_outdoorboys_queue_existing_queue(monkeypatch):
     import tempfile
     import os

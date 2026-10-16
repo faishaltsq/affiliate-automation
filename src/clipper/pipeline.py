@@ -79,6 +79,28 @@ def _ensure_hashtags(caption: str, hashtags: list[str], tags: list[str] = None) 
     return clean
 
 
+def _upload_fingerprint(account: str, video_path: str, source_paths: Optional[list] = None) -> str:
+    """Stable identity of one (account, source footage, rendered clip) upload.
+
+    Keyed on content, NOT campaign_id: two different campaigns that resolve to
+    the same footage render the same video, and posting it twice to the same
+    account is exactly the duplicate this guards against. Render is
+    byte-deterministic for identical inputs, and the output stem derives from
+    the footage filename, so (account, source names, stem) is a stable key
+    across re-runs while staying distinct for genuinely different footage.
+    """
+    import hashlib
+    srcs = ",".join(
+        sorted(
+            os.path.splitext(os.path.basename(p))[0]
+            for p in (source_paths or [])
+        )
+    )
+    stem = os.path.splitext(os.path.basename(video_path or ""))[0]
+    raw = f"{account}|{srcs}|{stem}".lower()
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
 def get_campaign_provider(campaign_id: str):
     """Return campaign client provider based on campaign ID prefix."""
     if campaign_id.startswith("mk-"):
@@ -122,11 +144,13 @@ def run_clipper_pipeline(
     progress_callback: Optional[Callable[[str], None]] = None,
     count: int = 1,
     distribution: str = "distribute",
+    force: bool = False,
 ) -> dict:
     """
     Execute full clipper pipeline for a Clippo or Motionklip campaign.
     Uploads to all active TikTok accounts with unique caption per account.
     target_accounts: list of account folder names; None = all active accounts.
+    force: re-upload clips that were already posted to these accounts.
     """
     def notify(msg: str):
         logger.info(msg)
@@ -500,6 +524,17 @@ def run_clipper_pipeline(
         return {"success": False, "error": err, "brief": brief}
 
     # 7. Upload ke masing-masing akun
+    # Upload ledger (same SQLite state file as the TikTok queue) = anti-duplikat:
+    # re-running a campaign must not re-post identical clips to the same account.
+    from src.tiktok.config import load_config as _load_cfg
+    from src.tiktok.state import VideoStateDB as _StateDB
+    try:
+        _cfg = _load_cfg()
+        upload_db = _StateDB(_cfg.get("db_path", "data/tiktok/state.db"))
+    except Exception as _db_err:
+        logger.warning("Upload ledger unavailable, duplicate guard disabled: %s", _db_err)
+        upload_db = None
+
     results = []
     if distribution == "distribute" and len(rendered_videos) > 1:
         # Distribute distinct video per account
@@ -516,9 +551,24 @@ def run_clipper_pipeline(
             caption = _generate_variant_caption(brief, acc_style, idx, custom_hook=v_hook)
             caption = _ensure_hashtags(caption, hashtags, tags=campaign_tags)
 
+            fp = _upload_fingerprint(acc_username, v_path, unique_footages)
+            if upload_db and not force and upload_db.is_clipper_uploaded(fp):
+                notify(f"⏭️ {acc_username}: klip ini sudah pernah diupload, dilewati (anti-duplikat).")
+                results.append({
+                    "account": acc_username,
+                    "video_path": v_path,
+                    "hook": v_hook,
+                    "success": True,
+                    "skipped_duplicate": True,
+                    "caption": caption,
+                })
+                continue
+
             try:
                 uploader = TikTokUploader(cookies)
                 ok = uploader.upload_video(v_path, caption)
+                if ok and upload_db:
+                    upload_db.mark_clipper_uploaded(fp, campaign_id, acc_username, v_path)
                 results.append({
                     "account": acc_username,
                     "video_path": v_path,
@@ -550,7 +600,21 @@ def run_clipper_pipeline(
 
                 try:
                     uploader = TikTokUploader(cookies)
+                    fp = _upload_fingerprint(acc_username, v_path, unique_footages)
+                    if upload_db and not force and upload_db.is_clipper_uploaded(fp):
+                        notify(f"⏭️ {acc_username}: klip ini sudah pernah diupload, dilewati (anti-duplikat).")
+                        results.append({
+                            "account": acc_username,
+                            "video_path": v_path,
+                            "hook": v_hook,
+                            "success": True,
+                            "skipped_duplicate": True,
+                            "caption": caption,
+                        })
+                        continue
                     ok = uploader.upload_video(v_path, caption)
+                    if ok and upload_db:
+                        upload_db.mark_clipper_uploaded(fp, campaign_id, acc_username, v_path)
                     results.append({"account": acc_username, "video_path": v_path, "hook": v_hook, "success": ok, "caption": caption})
                     notify(f"{'✅' if ok else '❌'} {acc_username}: {'berhasil' if ok else 'gagal'}")
                 except Exception as e:
@@ -559,6 +623,11 @@ def run_clipper_pipeline(
                     notify(f"❌ {acc_username}: error — <code>{e}</code>")
 
     success_count = sum(1 for r in results if r["success"])
+    skipped_dupes = sum(1 for r in results if r.get("skipped_duplicate"))
+    if upload_db:
+        upload_db.close()
+    if skipped_dupes:
+        notify(f"⏭️ <b>{skipped_dupes} unggahan dilewati</b> karena sudah pernah diupload sebelumnya.")
     notify(f"✅ <b>Selesai!</b> {success_count}/{len(results)} unggahan berhasil.")
 
     primary_path = rendered_videos[0]["video_path"] if rendered_videos else None

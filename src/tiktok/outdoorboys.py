@@ -305,8 +305,15 @@ def replenish_outdoorboys_queue(
             break
 
     if not target_video:
-        logger.info("All latest Outdoor Boys videos already processed, choosing oldest candidate.")
-        target_video = videos[0]
+        # Never fall back to an already-processed video: re-slicing it produces
+        # clips whose IDs already exist, and re-uploading them means duplicates.
+        logger.info("All latest Outdoor Boys videos already processed, nothing to do.")
+        if notify_fn:
+            notify_fn(
+                "ℹ️ Semua video terbaru Outdoor Boys sudah pernah dipotong. "
+                "Tidak ada yang diproses ulang (mencegah duplikat)."
+            )
+        return 0
 
     generated = generate_outdoorboys_clips(
         video_dict=target_video,

@@ -57,6 +57,20 @@ def test_enqueue_and_get_next_queued_clip():
         assert db.get_queued_count() == 0
         assert db.get_next_queued_clip() is None
 
+        # Re-enqueueing a clip that already went out must NOT resurrect it.
+        # (Old INSERT OR REPLACE reset status to 'pending' → duplicate upload.)
+        db.enqueue_clip(
+            clip_id="vid1_part1",
+            video_id="vid1",
+            part_num=1,
+            total_parts=2,
+            title="Outdoor Boys Survival Part 1",
+            chapter_title="Building snow shelter",
+            file_path="/tmp/vid1_part1.mp4",
+        )
+        assert db.get_queued_count() == 0, "klip yang sudah diupload tidak boleh kembali ke antrean"
+        assert db.get_next_queued_clip() is None
+
         db.close()
     finally:
         os.unlink(db_path)
