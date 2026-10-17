@@ -150,14 +150,14 @@ def test_get_action_start_time_fallback_skips_intro():
     assert title is None
 
 
-def test_download_video_720p_caps_height(tmp_path, monkeypatch):
+def test_download_video_hd_prefers_best_height(tmp_path, monkeypatch):
     import src.tiktok.youtube as yt
 
     captured = {}
 
     def fake_run(cmd, **kwargs):
         captured["cmd"] = cmd
-        (tmp_path / "abc123_720p.mp4").write_bytes(b"0" * 2000)
+        (tmp_path / "abc123_hd.mp4").write_bytes(b"0" * 2000)
 
         class R:
             returncode = 0
@@ -169,9 +169,9 @@ def test_download_video_720p_caps_height(tmp_path, monkeypatch):
     monkeypatch.setattr(yt.subprocess, "run", fake_run)
     monkeypatch.setattr(yt, "_ytdlp_base", lambda with_cookies=True: ["yt-dlp"])
 
-    res = yt.download_video_720p("https://youtu.be/abc123", str(tmp_path))
-    assert res is not None and res.endswith("_720p.mp4")
-    assert "height<=720" in " ".join(captured["cmd"])
+    res = yt.download_video_hd("https://youtu.be/abc123", str(tmp_path))
+    assert res is not None and res.endswith("_hd.mp4")
+    assert "height<=2160" in " ".join(captured["cmd"])
 
 
 def test_fetch_source_metadata_returns_empty_on_failure(monkeypatch):

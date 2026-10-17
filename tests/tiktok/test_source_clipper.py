@@ -43,7 +43,7 @@ def test_pipeline_uploads_every_clip_and_uses_shared_transcript(tmp_path):
                    return_value={"id": "abc123", "title": "Long Source", "duration": 3600}), \
              patch("src.tiktok.source_clipper.transcribe_source",
                    return_value={"segments": SEGMENTS, "language": "en", "duration": 3600}), \
-             patch("src.tiktok.source_clipper.download_video_720p", return_value=str(source)), \
+             patch("src.tiktok.source_clipper.download_video_hd", return_value=str(source)), \
              patch("src.tiktok.source_clipper.find_hook_windows", return_value=hooks), \
              patch("src.tiktok.source_clipper.process_video", side_effect=fake_render):
             res = run_source_pipeline(
@@ -87,7 +87,7 @@ def test_pipeline_reports_partial_upload_failure(tmp_path):
                    return_value={"id": "x1", "title": "T", "duration": 3600}), \
              patch("src.tiktok.source_clipper.transcribe_source",
                    return_value={"segments": SEGMENTS, "language": "en", "duration": 3600}), \
-             patch("src.tiktok.source_clipper.download_video_720p", return_value=str(source)), \
+             patch("src.tiktok.source_clipper.download_video_hd", return_value=str(source)), \
              patch("src.tiktok.source_clipper.find_hook_windows", return_value=hooks), \
              patch("src.tiktok.source_clipper.process_video",
                    side_effect=lambda **kw: (open(kw["output_path"], "wb").write(b"0" * 3000), kw["output_path"])[1]):
@@ -142,7 +142,7 @@ def test_pipeline_fails_when_transcription_empty(tmp_path):
                    return_value={"id": "n1", "title": "T", "duration": 3600}), \
              patch("src.tiktok.source_clipper.transcribe_source",
                    return_value={"segments": [], "language": None, "duration": 0}), \
-             patch("src.tiktok.source_clipper.download_video_720p", return_value=str(source)):
+             patch("src.tiktok.source_clipper.download_video_hd", return_value=str(source)):
             res = run_source_pipeline(url="https://youtu.be/n1", db=db,
                                       config={"queue_dir": str(tmp_path / "q"),
                                               "download_dir": str(tmp_path / "d")})
@@ -163,7 +163,7 @@ def test_pipeline_reports_language_from_transcript(tmp_path):
                    return_value={"id": "z9", "title": "T", "duration": 3600}), \
              patch("src.tiktok.source_clipper.transcribe_source",
                    return_value={"segments": SEGMENTS, "language": "ja", "duration": 3600}), \
-             patch("src.tiktok.source_clipper.download_video_720p", return_value=str(source)), \
+             patch("src.tiktok.source_clipper.download_video_hd", return_value=str(source)), \
              patch("src.tiktok.source_clipper.find_hook_windows", return_value=hooks), \
              patch("src.tiktok.source_clipper.process_video",
                    side_effect=lambda **kw: (open(kw["output_path"], "wb").write(b"0" * 3000), kw["output_path"])[1]):

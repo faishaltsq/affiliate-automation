@@ -257,18 +257,20 @@ def _extract_video_id(url: str) -> str | None:
     return match.group(1) if match else None
 
 
-def download_video_720p(url: str, out_dir: str, timeout: int = 900) -> str | None:
-    """Download one 720p mp4 for fast local slicing.
+def download_video_hd(url: str, out_dir: str, timeout: int = 2400) -> str | None:
+    """Download best available video (up to 2160p) for local slicing.
 
-    Capped at 720p on purpose: the clip is re-encoded to 1080x1920 anyway and a
-    full-resolution multi-hour download is needlessly slow.
+    Kept high-res on purpose: the clip render upscales source to 1080x1920,
+    so a 720p source makes the final short visibly soft.
     """
     os.makedirs(out_dir, exist_ok=True)
-    outtmpl = os.path.join(out_dir, "%(id)s_720p.%(ext)s")
+    outtmpl = os.path.join(out_dir, "%(id)s_hd.%(ext)s")
     cmd = [
         *_ytdlp_base(),
-        "--format", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
+        "--format", "bestvideo[height<=2160]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best",
         "--merge-output-format", "mp4",
+        "--concurrent-fragments", "4",
+        "--no-playlist",
         "--output", outtmpl,
         "--no-warnings",
         "--quiet",
@@ -278,13 +280,13 @@ def download_video_720p(url: str, out_dir: str, timeout: int = 900) -> str | Non
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         if res.returncode == 0:
             candidates = sorted(
-                Path(out_dir).glob("*_720p.mp4"), key=lambda p: p.stat().st_mtime, reverse=True
+                Path(out_dir).glob("*_hd.mp4"), key=lambda p: p.stat().st_mtime, reverse=True
             )
             if candidates:
                 return str(candidates[0])
-        logger.error("720p download failed (code %s): %s", res.returncode, res.stderr[-300:])
+        logger.error("HD download failed (code %s): %s", res.returncode, res.stderr[-300:])
     except Exception as exc:
-        logger.error("720p download error for %s: %s", url, exc)
+        logger.error("HD download error for %s: %s", url, exc)
     return None
 
 

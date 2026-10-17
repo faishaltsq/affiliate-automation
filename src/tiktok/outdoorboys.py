@@ -160,10 +160,10 @@ def clean_chapter_title(title: str, max_chars: int = 24) -> str:
     return clean.title()
 
 
-def download_full_720p(url: str, download_dir: str) -> Optional[str]:
-    """Download single 720p copy for fast local slicing (shared implementation)."""
-    from src.tiktok.youtube import download_video_720p
-    return download_video_720p(url, download_dir)
+def download_full_hd(url: str, download_dir: str) -> Optional[str]:
+    """Download single HD copy for local slicing (shared implementation)."""
+    from src.tiktok.youtube import download_video_hd
+    return download_video_hd(url, download_dir)
 
 
 def generate_outdoorboys_clips(
@@ -201,7 +201,7 @@ def generate_outdoorboys_clips(
         return []
 
     notify(f"📥 Mengunduh video master 720p (Ditemukan {len(selected_chapters)} babak aksi)...")
-    raw_path = download_full_720p(url, download_dir)
+    raw_path = download_full_hd(url, download_dir)
     if not raw_path or not os.path.exists(raw_path):
         notify("❌ Gagal mengunduh video master Outdoor Boys.")
         return []

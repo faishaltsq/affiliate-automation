@@ -1,6 +1,6 @@
 """source_clipper.py — One long source video -> N vertical hook clips -> direct upload.
 
-Flow: metadata -> 720p download -> ONE Whisper pass -> LLM hook windows ->
+Flow: metadata -> HD download (best quality) -> ONE Whisper pass -> LLM hook windows ->
       per-window render (hook title 10s + subtitles sliced from that same
       transcript) -> immediate upload to TikTok & YouTube Shorts.
 """
@@ -13,7 +13,7 @@ from src.tiktok.editor import process_video
 from src.tiktok.hook_finder import find_hook_windows
 from src.tiktok.state import VideoStateDB
 from src.tiktok.transcript import slice_segments, transcribe_source
-from src.tiktok.youtube import download_video_720p, fetch_source_metadata
+from src.tiktok.youtube import download_video_hd, fetch_source_metadata
 
 logger = logging.getLogger("tiktok.source_clipper")
 
@@ -86,8 +86,8 @@ def run_source_pipeline(
                     "clips_enqueued": 0, "clips_uploaded": 0, "source_id": source_id}
 
         # 3. Download
-        notify("📥 <i>Mengunduh video sumber (720p untuk pemotongan cepat)...</i>")
-        raw_path = download_video_720p(url, download_dir)
+        notify("📥 <i>Mengunduh video sumber (kualitas HD terbaik)...</i>")
+        raw_path = download_video_hd(url, download_dir)
         if not raw_path or not os.path.exists(raw_path):
             return {"success": False, "error": "Download video sumber gagal.",
                     "clips_enqueued": 0, "clips_uploaded": 0}
