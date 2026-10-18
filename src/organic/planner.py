@@ -1,22 +1,44 @@
 """
 Intelligent Pillar & Topic Planner for Organic Posting.
-Balances content pillars, avoids duplicate topics, selects fresh trends.
+Balances 4 core content pillars:
+1. breaking_disaster     (Bencana alam, krisis nasional, BMKG, cuaca ekstrem)
+2. football_sports       (Sepak bola Indonesia & dunia, Timnas, EPL, UCL)
+3. tech_gadget_ai        (Teknologi, inovasi digital, smartphone, AI)
+4. market_finance_stocks (IHSG, saham lokal IDX, Wall Street, dividen, makroekonomi)
 """
 
 import random
 from datetime import datetime, timezone, timedelta
-from src.trends.multi_source import fetch_all_trends, EVERGREEN_ID_TOPICS
-from src.organic.db import is_topic_recent, get_today_post_count
-from src.organic.generator import PILLARS
+from src.trends.multi_source import (
+    fetch_trends_for_pillar,
+    fetch_hot_topics,
+    pillar_for_topic,
+    EVERGREEN_BY_PILLAR,
+)
+from src.organic.db import is_topic_recent, get_today_post_count, get_today_chain_count
+from src.organic.generator import CHAIN_PILLARS
 from src.logger import get_logger
 
 log = get_logger("organic_planner")
 
-# How many consecutive posts can share the same pillar before rotating
-MAX_SAME_PILLAR = 2
+ALL_PILLARS = [
+    "breaking_disaster",
+    "football_sports",
+    "tech_gadget_ai",
+    "market_finance_stocks"
+]
 
-# Topics that can always be fresh even if posted recently (evergreen OK to repeat faster)
-EVERGREEN_THRESHOLD_DAYS = 3  # only 3 days for evergreen vs 7 days for trending
+EVERGREEN_THRESHOLD_DAYS = 3
+
+# A headline this hot outranks the pillar weighting — a live national story
+# (karhutla, IHSG trading halt) beats the usual football-heavy mix.
+HOT_TOPIC_MIN_HEAT = 18
+
+# Chain quota. Four-part threads earn more dwell time and more replies, but a
+# feed made only of them reads like a content farm; the account keeps its
+# spontaneous texture by staying mostly single posts.
+CHAIN_MAX_PER_DAY = 5
+CHAIN_PROBABILITY = 0.75
 
 
 def _get_wib_hour() -> int:
@@ -24,61 +46,91 @@ def _get_wib_hour() -> int:
     return datetime.now(wib).hour
 
 
+def _get_post_format(hour: int, post_count_today: int) -> str:
+    """
+    Data-backed format selection (from Threads Insights):
+    Editorial image cards drive ~50x-100x higher FYP reach than plain text.
+    80% with_image (editorial card), 20% text_only.
+    """
+    return random.choices(["with_image", "text_only"], weights=[80, 20])[0]
+
+
+def _get_post_style(hour: int) -> str:
+    """
+    Selects direct, human netizen style based on time of day (WIB).
+    Heavy bias towards snappy_take (to the point) to avoid boilerplate preamble.
+    """
+    if 5 <= hour < 10:
+        return random.choices(["snappy_take", "morning_greeting"], weights=[7, 3])[0]
+    elif 11 <= hour < 14:
+        return random.choices(["snappy_take", "midday_banter"], weights=[7, 3])[0]
+    elif 15 <= hour < 18:
+        return random.choices(["snappy_take", "afternoon_wrap"], weights=[7, 3])[0]
+    elif 19 <= hour < 24 or 0 <= hour < 2:
+        return random.choices(["snappy_take", "night_scrolling"], weights=[7, 3])[0]
+    else:
+        return "snappy_take"
+
+
+def _get_post_structure(pillar: str) -> str:
+    """Picks single vs 4-part chain for one slot.
+
+    Only the monetisable pillars (tech & market) get chains: those are the
+    threads where a held-back fragment and a binary prediction have something to
+    sell. Bencana and football stay single — urgency wants one post, and a
+    football take lands harder short.
+    """
+    if pillar not in CHAIN_PILLARS:
+        return "single"
+    try:
+        if get_today_chain_count() >= CHAIN_MAX_PER_DAY:
+            return "single"
+    except Exception as e:
+        # Quota lookup failed → do not risk an uncapped chain day.
+        log.warning(f"Chain quota check failed ({e}); defaulting to single post.")
+        return "single"
+    return "chain" if random.random() < CHAIN_PROBABILITY else "single"
+
+
 def _select_pillar(hour: int, post_count_today: int) -> str:
     """
-    Picks content pillar based on time of day.
-    Ensures variety by cycling through categories.
+    Picks content pillar based on real performance analytics:
+    - Football/Sports is the primary traffic & virality driver (~50-60% of volume).
+    - Market/Stocks (Local IDX & Global Bloomberg/Reuters/Wall Street).
+    - Tech/AI (Emerging gadgets, AI tools, chips).
+    - Disaster/BMKG reserved for urgent national events.
     """
-    # Time-of-day weights: higher weight = more likely
-    if 6 <= hour < 10:
-        # Morning rush
+    if 5 <= hour < 10:
+        # Pagi (05:00-10:00 WIB): Hasil bola semalam/EPL/UCL + pasar Wall St + Tech
         weights = {
-            "relatable_struggle": 4,
-            "hot_take_debate": 2,
-            "menfess_qna": 2,
-            "breaking_trend": 1,
-            "pop_culture_meme": 1,
-            "lifestyle_dump": 1,
+            "football_sports": 7,
+            "market_finance_stocks": 3,
+            "tech_gadget_ai": 2,
+            "breaking_disaster": 1,
         }
-    elif 10 <= hour < 14:
-        # Siang kerja
+    elif 10 <= hour < 16:
+        # Siang (10:00-16:00 WIB): Info bola & bursa transfer + IHSG sesi 1 + AI tech
         weights = {
-            "hot_take_debate": 3,
-            "breaking_trend": 3,
-            "relatable_struggle": 2,
-            "menfess_qna": 1,
-            "pop_culture_meme": 1,
-            "lifestyle_dump": 1,
+            "football_sports": 6,
+            "market_finance_stocks": 4,
+            "tech_gadget_ai": 3,
+            "breaking_disaster": 1,
         }
-    elif 14 <= hour < 18:
-        # Sore
+    elif 16 <= hour < 21:
+        # Sore - Prime time malam: Bola/Timnas (peak traffic virality) + Tech + Makro
         weights = {
-            "breaking_trend": 3,
-            "pop_culture_meme": 3,
-            "hot_take_debate": 2,
-            "relatable_struggle": 2,
-            "lifestyle_dump": 1,
-            "menfess_qna": 1,
-        }
-    elif 18 <= hour < 22:
-        # Malam prime time
-        weights = {
-            "pop_culture_meme": 4,
-            "menfess_qna": 3,
-            "lifestyle_dump": 2,
-            "hot_take_debate": 2,
-            "breaking_trend": 2,
-            "relatable_struggle": 1,
+            "football_sports": 8,
+            "tech_gadget_ai": 3,
+            "market_finance_stocks": 2,
+            "breaking_disaster": 1,
         }
     else:
-        # Late night / midnight
+        # Larut malam: Bola Eropa/taktik live + Wall Street opening + Tech
         weights = {
-            "menfess_qna": 4,
-            "lifestyle_dump": 3,
-            "relatable_struggle": 2,
-            "pop_culture_meme": 2,
-            "hot_take_debate": 1,
-            "breaking_trend": 1,
+            "football_sports": 7,
+            "tech_gadget_ai": 3,
+            "market_finance_stocks": 3,
+            "breaking_disaster": 1,
         }
 
     pool = []
@@ -88,36 +140,59 @@ def _select_pillar(hour: int, post_count_today: int) -> str:
     return random.choice(pool)
 
 
-def _select_topic(trends: list[str], used_today: list[str]) -> tuple[str, str]:
+def _select_hot_topic(used_today: list[str]) -> tuple[str, str] | None:
     """
-    Picks a fresh topic not used today and not in recent 7-day SQLite history.
-    Falls back to evergreen topics if all trending topics are stale.
-    Returns (topic, source) where source is 'trending' or 'evergreen'.
+    Returns the hottest *usable* live story, or None.
+
+    A story is usable when it clears HOT_TOPIC_MIN_HEAT, hasn't been posted
+    today, and wasn't covered in the last 7 days. Ranked by heat (impact +
+    cross-source corroboration), so karhutla/IHSG-halt outrank routine coverage.
     """
+    try:
+        ranked = fetch_hot_topics(top_n=12)
+    except Exception as e:
+        log.warning(f"Hot topic fetch failed: {e}")
+        return None
+
+    for r in ranked:
+        topic = r["topic"]
+        if r["heat"] < HOT_TOPIC_MIN_HEAT:
+            break
+        if topic in used_today or is_topic_recent(topic, days=7):
+            continue
+        return topic, pillar_for_topic(topic)
+    return None
+
+
+def _select_topic_for_pillar(pillar: str, used_today: list[str]) -> tuple[str, str]:
+    """
+    Picks a fresh topic from the specific pillar trends.
+    Falls back to pillar evergreen if trending list is exhausted.
+    """
+    trends = fetch_trends_for_pillar(pillar)
     random.shuffle(trends)
 
-    # Try fresh trending topics first
     for t in trends:
         if t not in used_today and not is_topic_recent(t, days=7):
             return t, "trending"
 
-    # Try evergreen (shorter cooldown)
-    evergreen_shuffled = EVERGREEN_ID_TOPICS[:]
-    random.shuffle(evergreen_shuffled)
-    for t in evergreen_shuffled:
+    # Fallback to evergreen for this specific pillar
+    evergreen_list = EVERGREEN_BY_PILLAR.get(pillar, [])[:]
+    random.shuffle(evergreen_list)
+    for t in evergreen_list:
         if t not in used_today and not is_topic_recent(t, days=EVERGREEN_THRESHOLD_DAYS):
             return t, "evergreen"
 
-    # Last resort: pick least-used evergreen
-    log.warning("All topics recently used — picking random evergreen as last resort")
-    fallback = random.choice(EVERGREEN_ID_TOPICS)
-    return fallback, "evergreen_forced"
+    if evergreen_list:
+        return random.choice(evergreen_list), "evergreen_forced"
+
+    return f"Update tren terkini seputar {pillar.replace('_', ' ')}", "fallback"
 
 
 def plan_single_post(used_today: list[str] = None) -> dict:
     """
     Plans a single organic post item.
-    Returns dict: {topic, pillar, source}
+    Returns dict: {topic, pillar, source, post_format, post_style}
     """
     if used_today is None:
         used_today = []
@@ -125,50 +200,65 @@ def plan_single_post(used_today: list[str] = None) -> dict:
     hour = _get_wib_hour()
     today_count = get_today_post_count()
 
-    # Fetch current trends
-    trends = fetch_all_trends()
+    # Hot-topic override: a live national story (karhutla, IHSG trading halt, etc.)
+    # takes the slot instead of the routine pillar mix, so the timeline reacts to
+    # what is actually happening now.
+    hot = _select_hot_topic(used_today)
+    if hot:
+        topic, pillar = hot
+        source = "hot_trending"
+    else:
+        # Select pillar, format (text vs image), and netizen style
+        pillar = _select_pillar(hour, today_count)
+        topic, source = _select_topic_for_pillar(pillar, used_today)
+    post_format = _get_post_format(hour, today_count)
+    post_style = _get_post_style(hour)
+    post_structure = _get_post_structure(pillar)
 
-    # Select pillar and topic
-    pillar = _select_pillar(hour, today_count)
-    topic, source = _select_topic(trends, used_today)
-
-    log.info(f"Planned post: pillar={pillar}, topic='{topic[:40]}', source={source}, wib_hour={hour}")
+    log.info(
+        f"Planned post: pillar={pillar}, topic='{topic[:40]}', source={source}, "
+        f"format={post_format}, style={post_style}, structure={post_structure}, wib_hour={hour}"
+    )
     return {
         "topic": topic,
         "pillar": pillar,
         "source": source,
+        "post_format": post_format,
+        "post_style": post_style,
+        "post_structure": post_structure,
     }
 
 
 def plan_daily_batch(count: int = 10) -> list[dict]:
     """
-    Plans a full day's worth of organic posts with diversity.
-    Returns list of {topic, pillar, source} dicts.
+    Plans a full day's worth of organic posts with diversity across all 4 pillars.
     """
-    trends = fetch_all_trends()
     used_topics = []
     posts = []
 
     for i in range(count):
-        # Simulate hour spread across the day (07:00–23:00)
         simulated_hour = 7 + int((i / count) * 16)
-
         pillar = _select_pillar(simulated_hour, i)
-        topic, source = _select_topic(trends, used_topics)
+        topic, source = _select_topic_for_pillar(pillar, used_topics)
+        post_format = _get_post_format(simulated_hour, i)
+        post_style = _get_post_style(simulated_hour)
         used_topics.append(topic)
 
         posts.append({
             "topic": topic,
             "pillar": pillar,
             "source": source,
+            "post_format": post_format,
+            "post_style": post_style,
+            "post_structure": _get_post_structure(pillar),
             "planned_hour": simulated_hour,
         })
 
-    log.info(f"Planned {len(posts)} posts for today with {len(set(p['pillar'] for p in posts))} distinct pillars")
+    log.info(f"Planned {len(posts)} posts for today across 4 core pillars")
     return posts
 
 
 if __name__ == "__main__":
-    batch = plan_daily_batch(count=10)
+    batch = plan_daily_batch(count=8)
     for i, item in enumerate(batch, 1):
-        print(f"{i:02d}. [{item['pillar']:20s}] [{item['source']:10s}] {item['topic'][:60]}")
+        print(f"{i:02d}. [{item['pillar']:22s}] [{item['source']:10s}] {item['topic'][:60]}")

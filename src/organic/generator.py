@@ -10,133 +10,366 @@ from datetime import datetime, timezone, timedelta
 from src.brief.generator import _llm
 from src.image.vibe_search import search_vibe_image
 from src.logger import get_logger
+from src.organic.personas import get_persona
 
 log = get_logger("organic_generator")
 
 PILLARS = [
-    "breaking_trend",      # Viral news, memes, drama netizen
-    "relatable_struggle",  # Commute KRL Manggarai, WFO drama, AC kantor mati, burnout
-    "hot_take_debate",     # Debat receh makanan, kebiasaan unik, lifestyle
-    "pop_culture_meme",    # K-pop, film lokal/bioskop, konser, viral TikTok sound
-    "menfess_qna",         # Pertanyaan mancing engagement (drop playlist, spill)
-    "lifestyle_dump",      # Foto aesthetic + one-line thought santai
+    "breaking_disaster",      # Bencana alam, cuaca ekstrem BMKG, musibah, krisis darurat
+    "football_sports",        # Sepak bola Timnas, Liga 1, EPL, UCL, bursa transfer
+    "tech_gadget_ai",         # Teknologi, AI, smartphone flagship, inovasi digital, chip
+    "market_finance_stocks",  # IHSG, bursa saham IDX, Wall Street, S&P 500, dividen, makroekonomi
 ]
 
 
-def _get_wib_context() -> tuple[int, str]:
-    """Returns current WIB hour and mood descriptor."""
+def _get_wib_context() -> tuple[int, str, str, int]:
+    """Returns current WIB hour, mood descriptor, formatted date string, and year."""
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
     hour = now.hour
+    date_str = now.strftime("%A, %d %B %Y")
+    year = now.year
 
     if 6 <= hour < 10:
-        mood = "pagi rush hour: lagi commute KRL Manggarai yang chaos, ngantuk parah, butuh kopi, lecek sebelum nyampe kantor"
+        mood = "pagi hari: ringkasan bursa global/Wall Street semalam, kabar gempa/cuaca BMKG pagi, update hasil pertandingan bola dini hari"
     elif 10 <= hour < 14:
-        mood = "siang lemes: mikirin makan siang apa, boncos gofood, meeting ga guna, ac kantor anget, pengen tidur siang"
+        mood = "siang jam kerja: perdagangan IHSG sesi 1, kabar bencana aktual, update industri teknologi dan AI"
     elif 14 <= hour < 18:
-        mood = "sore menjelang pulang: energi udah 1%, ngitung menit jam pulang, siap-siap perang di stasiun transit"
+        mood = "sore penutupan pasar: closing IHSG, kabar breaking news nasional, transfer sepak bola"
     elif 18 <= hour < 21:
-        mood = "malam santai/self reward: baru nyampe kosan, leha-leha, makan batagor/seblak, scrolling timeline"
-    elif 21 <= hour <= 23:
-        mood = "malam overthinking: quarter life crisis, mikirin karir dan gaji numpang lewat, rebahan di kasur kamar kos"
+        mood = "malam prime time: analisis laga sepak bola, diskusi tren teknologi terbaru, kabar mitigasi bencana terkini"
     else:
-        mood = "tengah malam/insomnia: belum bisa tidur, scroll hp sambil mikirin hal-hal random di hidup"
+        mood = "malam bursa AS: pembukaan bursa saham Wall Street (S&P 500/Nasdaq), perkembangan rilis model AI global, jadwal bola larut malam"
 
-    return hour, mood
+    return hour, mood, date_str, year
 
 
-def generate_organic_post(topic: str, pillar: str = "breaking_trend") -> dict:
+CHAIN_PART_COUNT = 4
+
+# Chains are only worth the extra reading for pillars where a longer argument
+# holds attention (money and gadget decisions). Bencana never gets a chain:
+# urgency wants one post, not a four-part essay.
+CHAIN_PILLARS = ("tech_gadget_ai", "market_finance_stocks")
+
+# The chain contract. Every clause exists to buy one more scroll: an unresolved
+# opening, a fact that contradicts the obvious reading, a turn onto the reader,
+# and a close precise enough that answering it requires typing.
+CHAIN_RULES = """
+STRUKTUR THREAD CHAIN — WAJIB TEPAT {n} ELEMEN DI `parts`, URUTAN INI:
+
+PART 1 — HOOK (open loop):
+- Buka dengan klaim tajam atau anomali. DILARANG memberi kesimpulan, hasil akhir, atau jawaban.
+- Janji struktur dengan angka ganjil spesifik: "ada 3 alasannya, dan yang ketiga ...".
+- ANGKA HANYA BOLEH DIPAKAI KALAU ADA DI SUMBER BERITA. Kalau tidak ada sumbernya, tulis versi tanpa angka. DILARANG SEKALI-KALI MENGARANG ANGKA, persentase, atau nama lembaga.
+
+PART 2 — KONTRADIKSI / DATA:
+- Satu angka atau fakta dari sumber yang membantah dugaan umum, lalu tunjukkan apa artinya.
+- Tutup dengan celah baru, bukan penjelasan tuntas.
+
+PART 3 — IMPLIKASI KE PEMBACA:
+- Pindah dari topik ke pembaca: "Buat lo yang ..., ini ...".
+- Sebutkan perasaan atau konsekuensi nyata (saldo turun, nunggu gajian, tanggungan), bukan abstraksi.
+
+PART 4 — HOT TAKE + PEMICU KOMENTAR:
+- Opini tajam milik sendiri yang bisa dibantah, lalu SATU pemicu dari dua jenis ini saja:
+  (a) prediksi biner + stakes — "Tahun ini tutup di atas atau bawah 7.000?"
+  (b) minta pengalaman sempit — "Yang udah pake seri ini, awet berapa bulan?"
+- DILARANG pemicu klise: "Menurut kalian?", "Gimana menurut kalian?", "Tim mana?", "Ada yang ngerasain?"
+- Pemicu HARUS spesifik ke isi thread, bukan pertanyaan yang bisa ditempel di post mana pun.
+
+Setiap part: 1-3 kalimat pendek, ada jeda baris, satu ide saja.
+
+bonus_reply (satu kalimat, opsional tapi disarankan):
+- Satu potongan yang sengaja disimpan: angka minor, temuan minor, atau prediksi yang belum divalidasi.
+- Boleh mengundang sanggahan. Boleh spesulatif tapi jujur ("kabar yang beredar", "kalau bener").
+- BUKAN pengulangan part 4, BUKAN ajakan komentar, BUKAN kesimpulan utama.
+- BUKAN promosi, BUKAN link, BUKAN nama produk.
+""".replace("{n}", str(CHAIN_PART_COUNT))
+
+
+def _normalize_chain(raw) -> tuple:
+    """Validates the chain the LLM produced. Returns (parts, error).
+
+    parts is exactly CHAIN_PART_COUNT non-empty strings, or an empty list when
+    the model produced something unusable. A chain that arrives short or as one
+    blob defeats the entire structure, so the caller falls back to a single post
+    instead of publishing a broken thread to a live account.
     """
-    Generates an authentic organic Threads post in Rara Kinanti's voice.
-    No products, no affiliate links, no promotional hashtags.
+    if not isinstance(raw, list):
+        return [], f"expected a list, got {type(raw).__name__}"
+    parts = [str(p).strip() for p in raw if str(p or "").strip()]
+    if len(parts) < CHAIN_PART_COUNT:
+        return [], f"only {len(parts)} usable parts (need {CHAIN_PART_COUNT})"
+    return parts[:CHAIN_PART_COUNT], ""
+
+
+def generate_organic_post(
+    topic: str,
+    pillar: str = "breaking_disaster",
+    post_format: str = "with_image",
+    post_style: str = "snappy_take",
+    persona: str = None,
+    post_structure: str = "single",
+) -> dict:
     """
-    hour, mood = _get_wib_context()
+    Generates an authentic organic Threads post in Netizen 'Warga Threads' voice or custom persona.
+    Focuses exclusively on: Bencana, Sepak Bola, Teknologi/AI, dan Saham/IHSG.
+    Supports both text-only threads and image-backed threads.
 
-    prompt = f"""Kamu adalah akun netizen Indonesia yang suka ngomongin berita dan isu yang lagi terjadi. Bukan jurnalis, bukan portal berita — cuma orang biasa yang mantau timeline dan punya pendapat.
+    post_structure:
+      "single" — one short hot take (default, unchanged behaviour).
+      "chain"  — 4-part thread built to be read to the end: hook with an open
+                 loop, contradicting data, implication for the reader, then a hot
+                 take ending in a specific comment trigger. A `bonus_reply`
+                 carries the withheld fragment into the reply section.
+    """
+    hour, mood, date_str, year = _get_wib_context()
+    persona_cfg = get_persona(persona)
+    is_chain = post_structure == "chain"
 
-CARA NULIS:
-- Bahasa Indonesia santai, kayak ngobrol biasa. Ga formal, ga alay.
-- Kapitalisasi natural — ga harus lowercase semua, ga harus rapi juga.
-- Fokus ke SUBSTANSI topik yang dibahas. Jangan jadiin soal diri sendiri atau kehidupan pribadi.
-- JANGAN pernah sebut KRL, Manggarai, kosan, kantor, commute, kecuali topiknya emang soal itu.
-- JANGAN pakai slang berlebihan (istg, literally, chaos, pov, cape bgt).
-- JANGAN pakai hashtag.
-- JANGAN sebut produk, brand, jualan, atau link.
-- Emoji: boleh 0 atau 1. Ga wajib.
+    style_guide = ""
+    if post_style == "morning_greeting":
+        style_guide = (
+            "GAYA: Sapaan pagi yang singkat & langsung sambung ke inti bahasan.\n"
+            "Contoh pembuka: 'morning wargaa threadss, udah pada ngopi belom? ...'\n"
+            "Setelah 1 sapaan pendek, LANGSUNG masuk ke substansi/opini tanpa kata pengantar 'lagi rame/lagi sliweran'."
+        )
+    elif post_style == "midday_banter":
+        style_guide = (
+            "GAYA: Celetukan siang jam istirahat. Langsung to the point ke sudut pandang kritis atau opini tajam."
+        )
+    elif post_style == "afternoon_wrap":
+        style_guide = (
+            "GAYA: Opini sore hari atau penutupan bursa. Langsung to the point ke evaluasi atau insight."
+        )
+    elif post_style == "night_scrolling":
+        style_guide = (
+            "GAYA: Opini reflektif malam hari. Langsung kupas inti isu atau analisis tanpa kata pengantar klise."
+        )
+    else:  # snappy_take
+        style_guide = (
+            "GAYA: TO THE POINT! Langsung ke substansi opini, argumen, reaksi tajam, atau fakta utama.\n"
+            "Kalimat pertama langsung membedah isu tanpa basa-basi kata pembuka apa pun."
+        )
 
-STRATEGI KONTEN YANG PERFORM BAGUS DI THREADS:
-Pilih SALAH SATU pendekatan ini berdasarkan topiknya, dan VARIASIKAN — jangan selalu pilih pertanyaan:
+    format_guide = ""
+    if post_format == "text_only":
+        format_guide = (
+            "FORMAT: POSTINGAN TEKS POLOS (TANPA GAMBAR).\n"
+            "Tulis postingan yang padat, renyah, berbobot, dan to the point."
+        )
+    else:
+        format_guide = (
+            "FORMAT: POSTINGAN DENGAN GAMBAR EDITORIAL (4:5).\n"
+            "WAJIB sertakan `image_query` berupa deskripsi visual pemandangan / objek nyata di lapangan (3-6 kata bahasa Indonesia).\n"
+            "STANDAR VISUAL TINGGI (KOMPOSISI & ANGLE BERKUALITAS):\n"
+            "- PRIORITASKAN ANGLE DINAMIS & EMOSI KUAT: Cari foto dengan low-angle, medium close-up, aksi puncak peristiwa (climax action), ekspresi emosional tajam (teriak, fokus tegang, selebrasi, haru), dan subjek fokus tajam di tengah frame (shallow depth of field).\n"
+            "- HINDARI FOTO DATAR / STATIS: Jangan cari foto orang duduk berjejer, pidato di podium, konferensi pers formal, plang nama gedung, atau landscape kosong tanpa interaksi manusia/aksi.\n"
+            "- Contoh sepak bola -> image_query: 'selebrasi emosional pemain sepak bola gol lapangan' atau 'aksi duel perebutan bola pemain liga'\n"
+            "- Contoh bencana alam -> image_query: 'evakuasi dramatis warga terjang arus banjir' atau 'kobaran api tebal kebakaran pemukiman warga'\n"
+            "- Contoh pasar saham/IHSG -> image_query: 'ekspresi tegang pialang saham layar indeks merah bursa'\n"
+            "- Contoh teknologi/AI -> image_query: 'close up interaksi tangan robotik chip ai futuristik'\n"
+            "- HINDARI foto pasien di ranjang RS, ruang rawat, atau konferensi pers podium kecuali topiknya spesifik tentang itu."
+        )
 
-1. TAKE TAJAM / OPINI SINGKAT — satu atau dua kalimat yang bikin orang penasaran atau mau debat. TIDAK diakhiri tanda tanya.
-   Contoh: "inflasi bahan pokok naik terus tapi yang paling banyak ngomong soal ini justru yang paling jauh dari dampaknya."
-
-2. REAKSI SINGKAT + INSIGHT — 2 kalimat: reaksi jujur, lanjut dengan insight relevan. TIDAK harus diakhiri tanda tanya.
-   Contoh: "banjir bandang di padang parah banget. drainase kota sama tata ruang emang PR menahun yang ga pernah tuntas tiap musim hujan."
-
-3. ANGLE YANG GA DIBAHAS ORANG — sorotin sudut yang biasanya luput dari diskusi mainstream. Statement, bukan pertanyaan.
-   Contoh: "yang menarik dari kasus ini bukan siapa yang salah, tapi kenapa sistemnya bisa biarin ini terjadi berulang."
-
-4. PERTANYAAN TERBUKA — gunakan HANYA kalau topiknya genuinely debatable dan belum ada jawaban jelas. Jangan terlalu sering.
-   Contoh: "Ezra Walian jarang dapet menit bermain di timnas, padahal potensinya lumayan. sistem permainan kita yang belum cocok, atau emang ada faktor lain?"
-
-5. KONTEN BENCANA / MUSIBAH — WAJIB sebutkan:
-   - Lokasi spesifik (kota, kecamatan, provinsi)
-   - Kondisi terkini yang kamu tau dari konteks topik (korban, pengungsi, kerusakan, status evakuasi)
-   - Sumber info kalau memungkinkan (BNPB, BMKG, Pemda, media tertentu)
-   - Ajakan simpati yang tulus (doa/donasi/spread awareness), bukan sekadar "sedih banget"
-   Contoh: "Banjir bandang di Kota Padang, Sumbar hari ini parah banget. BNPB laporin ratusan rumah terendam dan beberapa warga masih dievakuasi. semoga bantuan cepat sampai dan semua selamat."
-
-PENTING: Mayoritas postingan harus berupa STATEMENT / OPINI, bukan pertanyaan. Pertanyaan boleh muncul maksimal 1 dari 4 postingan.
-
-KONTEKS:
-- Jam: {hour:02d}:00 WIB
-- Topik: "{topic}"
-- Jenis konten: {pillar}
-
-TUGAS:
-Tulis 1 postingan Threads soal topik di atas, pilih pendekatan yang paling cocok. Fokus biar orang yang baca pengen like, reply, atau setuju — bukan sekadar baca dan scroll lanjut.
-
-Sertakan juga `image_query`: kata kunci pencarian foto ASLI / DOKUMENTASI BERITA.
-- Untuk berita Indonesia / kasus kriminal / perundungan / bencana / politik / kasus viral / figur publik: WAJIB GUNAKAN BAHASA INDONESIA yang spesifik sesuai peristiwanya (contoh: 'kasus perundungan pemalang polisi', 'konferensi pers polda jateng', 'banjir bandang padang bnpb', 'sidang mk sengketa'). JANGAN gunakan kata kunci generik bahasa Inggris seperti 'classroom' atau 'people talking'. Kita butuh foto jurnalisme / pers / pelaku / TKP asli.
-- Untuk topik umum/lifestyle/relatable: kata kunci visual yang nyata dan autentik.
-
-Format output JSON:
-{{
-  "content": "postingan threads",
-  "image_query": "kata kunci spesifik foto berita asli / dokumentasi"
-}}
-Hanya output JSON. Tanpa markdown ticks.
+    persona_section = f"""
+KARAKTER & TONE PERSONA KHUSUS:
+Nama Persona: {persona_cfg.name} {persona_cfg.emoji}
+{persona_cfg.prompt_guide}
 """
 
-    log.info(f"Generating organic post for topic: '{topic}' (pillar={pillar})")
-    resp_text = _llm([{"role": "user", "content": prompt}], temperature=0.85, max_tokens=600)
+    # A chain stays scannable because each PART is short, not because the whole
+    # thread is — the single-post ceiling would collapse 4 parts into one blob.
+    if is_chain:
+        length_rule = (
+            "- DILARANG BERBELIT: tiap part maksimal 3 kalimat pendek dan 1 ide saja. "
+            "Total tepat 4 part — JANGAN menggabungkannya jadi satu paragraf panjang!"
+        )
+        structure_rules = CHAIN_RULES
+        output_schema = (
+            'Format output JSON:\n'
+            '{\n'
+            f'  "parts": ["part 1", "part 2", "part 3", "part {CHAIN_PART_COUNT}"],\n'
+            '  "bonus_reply": "satu kalimat bonus untuk kolom balasan (kosongkan jika tidak ada)",\n'
+            '  "image_query": "kata kunci foto berita asli (kosongkan jika text_only)"\n'
+            '}'
+        )
+    else:
+        length_rule = (
+            "- DILARANG PANJANG / BERTELE-TELE: Orang malas membaca tulisan panjang di Threads. Buat SANGAT SINGKAT, cukup 1 sampai 2 kalimat padat (maksimal 20-35 kata)!"
+        )
+        structure_rules = (
+            "STRUKTUR KONTEN TO THE POINT (1-2 KALIMAT PADAT):\n"
+            "- Panjang: Cukup 1-2 kalimat pendek (20-35 kata). Ringkas, tajam, nendang.\n"
+            "- Bentuk: Pernyataan lugas, opini kritis berbobot, atau fakta keras.\n"
+            "- HINDARI BERTANYA: Buat pernyataan atau hot take yang kuat, biarkan isi argumennya yang otomatis memancing orang mendebat atau setuju di kolom komentar!"
+        )
+        output_schema = (
+            'Format output JSON:\n'
+            '{\n'
+            '  "content": "postingan threads",\n'
+            '  "image_query": "kata kunci foto berita asli (kosongkan jika text_only)"\n'
+            '}'
+        )
+
+    prompt = f"""Kamu adalah akun netizen Indonesia yang cerdas, to the point, santai, dan berwawasan luas (Warga Threads).
+{persona_section}
+FOKUS KONTEN HANYA 4 PILAR UTAMA:
+1. Bencana Alam & Krisis Nasional (BMKG, BNPB, gempa, banjir bandang, cuaca ekstrem, mitigasi)
+2. Sepak Bola & Olahraga (Timnas Indonesia, Liga 1, Premier League, Liga Champions, bursa transfer)
+3. Teknologi, Gadget & AI (Generative AI, smartphone baru, chip, ekosistem digital, sains)
+4. Pasar Saham & Ekonomi (IHSG, saham lokal IDX, Wall Street AS, S&P 500, Nasdaq, dividen, makroekonomi)
+
+DILARANG KERAS (STRICT PROHIBITION):
+- DILARANG KERAS SELALU MENUTUP DENGAN PERTANYAAN KLISE: Jangan pakai "Menurut kalian...?", "Gimana menurut kalian?", "Kalian tim mana?", "Ada yang ngerasain hal serupa?". Netizen bosan membaca format yang isinya pertanyaan terus-menerus!
+{length_rule}
+- WAJIB TO THE POINT: Kalimat pertama langsung menusuk ke subjek, opini tajam, celetukan kritis, atau fakta utama tanpa basa-basi!
+- DILARANG KERAS kata pembuka klise: "lagi rame", "lagi sliweran", "dari tadi sliweran", "rame banget ngebahas", "scrolling timeline", "timeline hari ini rame", "nemu bahasan menarik".
+- DILARANG membahas gosip artis, infotainment, drama selebriti, pacaran/cerai/selingkuh artis.
+- DILARANG membawa topik KRL Manggarai, anak kos, atau keluhan pribadi klise.
+- DILARANG menggunakan slang kaku (istg, literally, chaos, pov, cape bgt).
+- DILARANG menggunakan hashtag (#).
+- DILARANG promosi produk atau mencantumkan link afiliasi.
+
+PANDUAN GAYA & FORMAT:
+{style_guide}
+{format_guide}
+
+{structure_rules}
+
+KONTEKS WAKTU REAL-TIME:
+- Tanggal & Waktu: {date_str}, pukul {hour:02d}:00 WIB ({mood})
+- Tahun: {year}
+- PENTING: Seluruh konteks WAJIB berbasis fakta & perkembangan terkini tahun {year}. DILARANG KERAS mengutip data basi/usang dari tahun 2023 atau tahun-tahun sebelumnya seolah-olah terjadi hari ini.
+- Topik: "{topic}"
+- Pilar: {pillar}
+- Style: {post_style}
+- Format: {post_format}
+
+{output_schema}
+Hanya output JSON valid tanpa markdown ticks.
+"""
+
+    log.info(f"Generating organic post for topic: '{topic}' (pillar={pillar}, structure={post_structure})")
+    # A chain is four posts plus a bonus reply — 600 tokens would cut it off
+    # mid-sentence.
+    max_tokens = 900 if is_chain else 600
+    resp_text = _llm([{"role": "user", "content": prompt}], temperature=0.85, max_tokens=max_tokens)
 
     # Clean potential markdown ticks
     clean_json = re.sub(r"^```json\s*", "", resp_text.strip(), flags=re.I)
     clean_json = re.sub(r"^```\s*", "", clean_json.strip())
     clean_json = re.sub(r"\s*```$", "", clean_json.strip())
 
+    parts: list = []
+    bonus_reply = ""
     try:
         data = json.loads(clean_json)
-        content = data.get("content", "").strip()
         vibe_query = data.get("image_query", data.get("vibe_image_query", "")).strip()
-        if not content:
-            raise ValueError("Empty content from LLM")
+        if is_chain:
+            parts, chain_err = _normalize_chain(data.get("parts"))
+            if not parts:
+                raise ValueError(f"unusable chain: {chain_err}")
+            bonus_reply = (data.get("bonus_reply") or "").strip()
+            content = "\n\n".join(parts)
+        else:
+            content = data.get("content", "").strip()
+            if not content:
+                raise ValueError("Empty content from LLM")
     except Exception as e:
+        if is_chain:
+            # Publishing a half-formed chain to a live account costs more than
+            # one wasted LLM call.
+            log.warning(f"Chain generation failed ({e}). Falling back to a single post.")
+            return generate_organic_post(
+                topic=topic,
+                pillar=pillar,
+                post_format=post_format,
+                post_style=post_style,
+                persona=persona,
+                post_structure="single",
+            )
         log.warning(f"Failed to parse LLM JSON for organic post: {e}. Using fallback.")
-        content = f"lagi rame banget ngebahas isu {topic} hari ini di timeline. ada banyak sudut pandang menarik, menurut kalian gimana?"
+        content = f"Isu {topic} ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan."
         vibe_query = f"{topic} berita indonesia"
 
-    if not vibe_query:
-        vibe_query = f"{topic} berita"
-
-    # Search authentic news / real-life image
-    image_url = search_vibe_image(vibe_query, raw_topic=topic)
-
-    return {
+    # The card carries the hook only: part 1 is what sells the scroll, and
+    # printing all four parts onto one image turns the thread into a poster.
+    card_summary = parts[0] if parts else content
+    result_base = {
         "topic": topic,
         "pillar": pillar,
+        "post_format": post_format,
+        "post_style": post_style,
+        "persona": persona_cfg.key,
+        "post_structure": post_structure if parts else "single",
         "content": content,
+        "parts": parts,
+        "bonus_reply": bonus_reply,
+    }
+
+    image_url = None
+    if post_format == "text_only":
+        log.info(f"Generated TEXT-ONLY netizen post (skipping image search)")
+        vibe_query = ""
+    else:
+        # Ground the photo search in the topic's real entities. The LLM's visual
+        # query is atmospheric and can drift off-topic; the entity-derived query
+        # keeps the photo attached to the actual news (karhutla → burning peatland,
+        # IHSG halt → red trading board), so image and headline never disagree.
+        from src.trends.multi_source import fetch_topic_image_query
+
+        # Market stories must show the actual instrument, not a stock photo of a
+        # trading floor shot years ago — the number in the headline (IHSG 5.185)
+        # has to match the number on the card.
+        chart_bytes = None
+        try:
+            from src.image.market_chart import render_market_chart, symbol_for_topic
+
+            if symbol_for_topic(topic):
+                chart_bytes = render_market_chart(topic)
+        except Exception as e:
+            log.warning(f"Market chart render failed, falling back to photo: {e}")
+
+        entity_query = fetch_topic_image_query(topic, pillar)
+        vibe_query = entity_query or vibe_query or f"{topic} berita"
+        log.info(f"Image query grounded to topic entities: '{vibe_query}'")
+
+        if chart_bytes:
+            from src.image.card_generator import generate_editorial_card
+
+            log.info("Using live market chart as card image")
+            image_url = generate_editorial_card(
+                photo_url="",
+                headline=topic,
+                summary=card_summary,
+                pillar=pillar,
+                source_hint="yahoo finance",
+                photo_bytes=chart_bytes,
+            )
+            return {
+                **result_base,
+                "vibe_image_query": f"live chart: {topic}",
+                "image_url": image_url,
+            }
+
+        # Fetch authentic real-life HD photo from news portals / internet
+        raw_photo_url = search_vibe_image(vibe_query, raw_topic=topic)
+
+        if raw_photo_url:
+            from src.image.card_generator import generate_editorial_card
+            # Renders clean editorial news card (Real HD photo on top + Dark template with text on bottom)
+            image_url = generate_editorial_card(
+                photo_url=raw_photo_url,
+                headline=topic,
+                summary=card_summary,
+                pillar=pillar,
+            )
+        else:
+            image_url = ""
+
+    return {
+        **result_base,
         "vibe_image_query": vibe_query,
         "image_url": image_url,
     }

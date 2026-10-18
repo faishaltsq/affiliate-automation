@@ -11,7 +11,7 @@ import time
 from src.organic.planner import plan_single_post
 from src.organic.generator import generate_organic_post
 from src.organic.db import init_organic_db, log_organic_post, get_today_post_count
-from src.publish.threads import post_threads
+from src.publish.threads import post_threads, post_thread_chain
 from src.publish.telegram import send_image_to_telegram
 from src.logger import get_logger
 
@@ -39,13 +39,29 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
     topic = plan["topic"]
     pillar = plan["pillar"]
     source = plan["source"]
+    post_format = plan.get("post_format", "with_image")
+    post_style = plan.get("post_style", "snappy_take")
+    post_structure = plan.get("post_structure", "single")
 
-    # 2. Generate copy + image
-    post_data = generate_organic_post(topic=topic, pillar=pillar)
+    # 2. Generate copy + image (or text-only)
+    post_data = generate_organic_post(
+        topic=topic,
+        pillar=pillar,
+        post_format=post_format,
+        post_style=post_style,
+        post_structure=post_structure,
+    )
     content = post_data["content"]
     image_url = post_data["image_url"]
+    parts = post_data.get("parts") or []
+    bonus_reply = post_data.get("bonus_reply") or ""
+    is_chain = len(parts) > 1
 
-    log.info(f"Generated organic post for '{topic[:40]}' | pillar={pillar}")
+    log.info(
+        f"Generated organic post for '{topic[:40]}' | pillar={pillar} | "
+        f"format={post_format} | style={post_style} | structure="
+        f"{'chain' if is_chain else 'single'}"
+    )
     log.info(f"Content: {content[:100]}...")
     log.info(f"Image: {image_url}")
 
@@ -56,24 +72,36 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
             "topic": topic,
             "pillar": pillar,
             "source": source,
+            "post_format": post_format,
+            "post_style": post_style,
+            "post_structure": "chain" if is_chain else "single",
             "content": content,
+            "parts": parts,
+            "bonus_reply": bonus_reply,
             "image_url": image_url,
         }
 
-    # 3. Post to Threads (single post, no affiliate reply)
+    # 3. Post to Threads (no affiliate reply — the link waits for its own gate)
     threads_result = {}
     threads_id = ""
     try:
-        threads_result = post_threads(
-            hook_text=content,
-            reply_text=None,
-            vibe_image_url=image_url or None,
-            product_image_url=None,
-        )
+        if is_chain:
+            threads_result = post_thread_chain(
+                parts, image_url=image_url or None, bonus_reply=bonus_reply
+            )
+        else:
+            threads_result = post_threads(
+                hook_text=content,
+                reply_text=None,
+                vibe_image_url=image_url or None,
+                product_image_url=None,
+            )
         threads_id = threads_result.get("post_id", "")
-        
-        # If posting failed (e.g. image rejected by Meta), retry without image
-        if not threads_id and image_url:
+
+        # If posting failed (e.g. image rejected by Meta), retry without image.
+        # post_thread_chain already does this for its root, so it only applies
+        # to single posts.
+        if not threads_id and image_url and not is_chain:
             err_msg = threads_result.get("error", "")
             log.warning(f"Threads post failed with image (error: {err_msg[:100]}). Retrying without image...")
             threads_result = post_threads(
@@ -84,7 +112,7 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
             )
             threads_id = threads_result.get("post_id", "")
             image_url = None  # clear so Telegram sends text
-            
+
         if threads_id:
             log.info(f"Threads post published: {threads_id}")
         else:
@@ -96,18 +124,32 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
     # 4. Telegram notification to Topic 9
     try:
         pillar_emoji = {
+            "breaking_disaster": "🚨",
+            "football_sports": "⚽",
+            "tech_gadget_ai": "💻",
+            "market_finance_stocks": "📈",
             "breaking_trend": "🔥",
-            "relatable_struggle": "😭",
-            "hot_take_debate": "🌶️",
-            "pop_culture_meme": "🎵",
-            "menfess_qna": "💬",
-            "lifestyle_dump": "✨",
         }.get(pillar, "📝")
 
-        caption = (
-            f"{pillar_emoji} <b>[ORGANIC — {pillar.replace('_', ' ').upper()}]</b>\n\n"
-            f"<i>{content}</i>"
-        )
+        format_badge = "💬 [TEKS POLOS]" if not image_url else "📸 [FOTO BERITA]"
+        if is_chain:
+            # Numbered, so the ordering — the actual retention mechanic — is
+            # legible from the alert alone.
+            body = "\n\n".join(
+                f"<b>{idx + 1}/{len(parts)}</b>\n<i>{part}</i>"
+                for idx, part in enumerate(parts)
+            )
+            if bonus_reply:
+                body += f"\n\n<b>↳ balasan bonus:</b>\n<i>{bonus_reply}</i>"
+            caption = (
+                f"{pillar_emoji} <b>[CHAIN — {pillar.replace('_', ' ').upper()}]</b> "
+                f"• {format_badge}\n\n{body}"
+            )
+        else:
+            caption = (
+                f"{pillar_emoji} <b>[ORGANIC — {pillar.replace('_', ' ').upper()}]</b> "
+                f"• {format_badge}\n\n<i>{content}</i>"
+            )
 
         if image_url:
             send_image_to_telegram(image_url, caption=caption)
@@ -126,6 +168,7 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
             content=content,
             image_url=image_url,
             threads_id=threads_id,
+            post_structure="chain" if is_chain else "single",
         )
 
     return {
@@ -134,14 +177,27 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
         "content": content,
         "image_url": image_url,
         "threads_id": threads_id,
+        "post_structure": "chain" if is_chain else "single",
+        "parts": parts,
+        "bonus_reply": bonus_reply,
     }
 
 
-def execute_organic_post_custom(custom_topic: str, pillar: str = "breaking_trend") -> dict:
-    """Post an organic post with a user-supplied topic."""
+def execute_organic_post_custom(
+    custom_topic: str,
+    pillar: str = "breaking_trend",
+    post_format: str = "text_only",
+    post_style: str = "timeline_chatter"
+) -> dict:
+    """Post an organic post with a user-supplied topic and choice of text_only or with_image."""
     init_organic_db()
 
-    post_data = generate_organic_post(topic=custom_topic, pillar=pillar)
+    post_data = generate_organic_post(
+        topic=custom_topic,
+        pillar=pillar,
+        post_format=post_format,
+        post_style=post_style
+    )
     content = post_data["content"]
     image_url = post_data["image_url"]
 

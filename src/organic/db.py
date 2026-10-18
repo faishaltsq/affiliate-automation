@@ -38,6 +38,10 @@ def init_organic_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Additive migration: rows written before chain support have no structure.
+    cols = [row[1] for row in c.execute("PRAGMA table_info(organic_posts)")]
+    if "post_structure" not in cols:
+        c.execute("ALTER TABLE organic_posts ADD COLUMN post_structure TEXT DEFAULT 'single'")
     conn.commit()
     conn.close()
     log.info("Organic DB tables verified.")
@@ -90,17 +94,31 @@ def get_last_post_time() -> str:
 
 
 def log_organic_post(source: str, pillar: str, topic: str,
-                     content: str, image_url: str, threads_id: str):
+                     content: str, image_url: str, threads_id: str,
+                     post_structure: str = "single"):
     """Records an organic post into the database."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO organic_posts (source, pillar, topic, content, image_url, threads_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (source, pillar, topic, content, image_url, threads_id))
+        INSERT INTO organic_posts (source, pillar, topic, content, image_url, threads_id, post_structure)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (source, pillar, topic, content, image_url, threads_id, post_structure))
     conn.commit()
     conn.close()
-    log.info(f"Logged organic post #{threads_id} on topic '{topic[:30]}'")
+    log.info(f"Logged organic post #{threads_id} on topic '{topic[:30]}' ({post_structure})")
+
+
+def get_today_chain_count() -> int:
+    """How many chain posts already went out today — the planner's daily quota."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT COUNT(*) FROM organic_posts
+        WHERE date(created_at) = date('now') AND post_structure = 'chain'
+    """)
+    count = c.fetchone()[0]
+    conn.close()
+    return count
 
 
 def get_recent_posts(limit: int = 5) -> list[dict]:
@@ -109,7 +127,7 @@ def get_recent_posts(limit: int = 5) -> list[dict]:
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""
-        SELECT id, pillar, topic, content, threads_id, created_at
+        SELECT id, pillar, topic, content, threads_id, post_structure, created_at
         FROM organic_posts ORDER BY id DESC LIMIT ?
     """, (limit,))
     rows = [dict(r) for r in c.fetchall()]

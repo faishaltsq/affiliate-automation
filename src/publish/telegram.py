@@ -177,7 +177,7 @@ def send_brief_to_telegram(
 
 
 def send_image_to_telegram(image_url: str, caption: str = "") -> dict:
-    """Sends image with optional caption to the affiliate thread."""
+    """Sends image with optional caption to the affiliate thread using direct upload."""
     if not BOT_TOKEN or not CHAT_ID:
         return {"error": "not_configured"}
 
@@ -186,6 +186,50 @@ def send_image_to_telegram(image_url: str, caption: str = "") -> dict:
     # Convert basic markdown *bold* to <b>bold</b> if present
     formatted_caption = re.sub(r"\*([^\*]+)\*", r"<b>\1</b>", caption)
 
+    local_card = DATA_DIR / "editorial_latest.jpg"
+    photo_bytes = None
+    if local_card.exists():
+        try:
+            photo_bytes = local_card.read_bytes()
+        except Exception:
+            photo_bytes = None
+
+    if not photo_bytes and image_url and image_url.startswith("http"):
+        try:
+            resp = requests.get(image_url, timeout=10)
+            if resp.ok and len(resp.content) > 1000:
+                photo_bytes = resp.content
+        except Exception:
+            photo_bytes = None
+
+    data = {
+        "chat_id": int(CHAT_ID),
+        "caption": _truncate(formatted_caption, 1024),
+        "parse_mode": "HTML",
+    }
+    if thread_id:
+        data["message_thread_id"] = thread_id
+
+    # 1. Try multipart direct file upload
+    if photo_bytes:
+        try:
+            files = {"photo": ("card.jpg", photo_bytes, "image/jpeg")}
+            r = requests.post(f"{API}/sendPhoto", data=data, files=files, timeout=20)
+            if r.ok:
+                log.info(f"Telegram image sent (multipart) to thread={thread_id}")
+                return r.json()
+            elif "can't parse entities" in r.text.lower():
+                data.pop("parse_mode", None)
+                data["caption"] = _truncate(caption, 1024)
+                files = {"photo": ("card.jpg", photo_bytes, "image/jpeg")}
+                r2 = requests.post(f"{API}/sendPhoto", data=data, files=files, timeout=20)
+                if r2.ok:
+                    log.info(f"Telegram image sent (plain text) to thread={thread_id}")
+                    return r2.json()
+        except Exception as e:
+            log.warning(f"Multipart sendPhoto exception: {e}")
+
+    # 2. Try URL fallback
     payload = {
         "chat_id": int(CHAT_ID),
         "photo": image_url,
@@ -198,19 +242,20 @@ def send_image_to_telegram(image_url: str, caption: str = "") -> dict:
     try:
         r = requests.post(f"{API}/sendPhoto", json=payload, timeout=10)
         if not r.ok:
-            # If HTML parsing failed, retry as plain text
             payload.pop("parse_mode", None)
             payload["caption"] = _truncate(caption, 1024)
             r = requests.post(f"{API}/sendPhoto", json=payload, timeout=10)
 
         if r.ok:
             log.info(f"Telegram image sent to thread={thread_id}")
+            return r.json()
         else:
             log.warning(f"Telegram sendPhoto failed: {r.text}")
-        return r.json()
+            # Fallback to plain text so user gets content
+            return send_text_to_telegram(caption)
     except Exception as e:
         log.error(f"Telegram image error: {e}")
-        return {"error": str(e)}
+        return send_text_to_telegram(caption)
 
 
 def send_status_update(text: str) -> dict:
@@ -219,11 +264,11 @@ def send_status_update(text: str) -> dict:
         return {"error": "not_configured"}
 
     thread_id = get_or_create_thread()
+
     payload = {
         "chat_id": int(CHAT_ID),
-        "text": text,
+        "text": _truncate(text),
         "parse_mode": "HTML",
-        "disable_web_page_preview": True,
     }
     if thread_id:
         payload["message_thread_id"] = thread_id
@@ -233,6 +278,11 @@ def send_status_update(text: str) -> dict:
         return r.json()
     except Exception as e:
         return {"error": str(e)}
+
+
+def send_text_to_telegram(text: str) -> dict:
+    """Alias for sending text to the affiliate thread."""
+    return send_status_update(text)
 
 
 if __name__ == "__main__":

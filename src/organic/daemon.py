@@ -16,6 +16,7 @@ from datetime import datetime, timezone, timedelta
 from src.organic.publisher import execute_organic_post
 from src.organic.db import init_organic_db, get_today_post_count, get_last_post_time
 from src.logger import get_logger
+from src.singleton import ensure_single_instance
 
 
 def _check_affiliate_queue():
@@ -35,11 +36,10 @@ def _check_affiliate_queue():
         log.info(f"🛒 Affiliate queue: {len(pending)} pending item(s). Checking post thresholds...")
 
         for item in pending:
-            results = check_and_comment_our_posts(
-                affiliate_url=item["affiliate_url"],
-                likes_threshold=20,
-                replies_threshold=10,
-            )
+            # Thresholds come from comment_engine defaults: the post must have a
+            # live discussion (>=5 organic replies) and be past its initial push
+            # window (>=45m) before a link goes anywhere near it.
+            results = check_and_comment_our_posts(affiliate_url=item["affiliate_url"])
             fired = [r for r in results if r.get("status") == "commented"]
             if fired:
                 for f in fired:
@@ -57,8 +57,8 @@ MIN_INTERVAL = 80 * 60   # 80 minutes in seconds
 MAX_INTERVAL = 110 * 60  # 110 minutes
 JITTER_RANGE = 15 * 60   # ±15 minutes
 NIGHT_START = 1           # 01:00 WIB — go quiet
-NIGHT_END = 6             # 06:30 WIB — wake up
-NIGHT_END_MINUTE = 30
+NIGHT_END = 5             # 05:00 WIB — wake up (catches early morning active viewer peak)
+NIGHT_END_MINUTE = 0
 DAILY_TARGET = 12
 NIGHT_MAX_POSTS = 1       # At most 1 late-night thought
 
@@ -111,6 +111,7 @@ def run_daemon(single: bool = False):
     Main daemon loop.
     single=True: execute exactly one post and exit.
     """
+    ensure_single_instance("rara_daemon")
     init_organic_db()
     used_today = []
 

@@ -69,10 +69,11 @@ def send_threads_menu(api: str, chat_id: int, thread_id: int):
                 {"text": "🔗 Link Afiliasi", "callback_data": "th:/affiliate"},
             ],
             [
-                {"text": "✍️ Buat Konten Threads", "callback_data": "th:/threads"},
+                {"text": "📝 Draft Postingan Baru", "callback_data": "th:/post"},
                 {"text": "📋 Status Queue", "callback_data": "th:/queue"},
             ],
             [
+                {"text": "🎭 Ganti Persona", "callback_data": "th:/persona"},
                 {"text": "❓ Bantuan Lengkap", "callback_data": "th:/help"},
             ],
         ]
