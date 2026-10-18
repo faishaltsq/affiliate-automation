@@ -19,7 +19,7 @@ REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "affiliate_trend_bot")
 
-# ── LLM (9router / Ruvicode fallback) ────────────────
+# ── LLM (9router) ───────────────────────────────────
 HERMES_ENV_PATH = Path.home() / "AppData" / "Local" / "hermes" / ".env"
 _hermes_env = {}
 if HERMES_ENV_PATH.exists():
@@ -29,17 +29,14 @@ if HERMES_ENV_PATH.exists():
 # Primary: 9router local antigravity gemini 3.8 flash
 LLM_BASE_URL = os.getenv("LLM_BASE_URL") or _hermes_env.get("NINEROUTER_BASE_URL") or "http://localhost:20128/v1"
 LLM_MODEL = os.getenv("LLM_MODEL") or "ag/gemini-3.8-flash-high"
+# Fallback: tig/claude-opus-5.5 (custom:9router, same gateway, different model slot)
+LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL") or "tig/claude-opus-5.5"
 LLM_API_KEY = (
     os.getenv("LLM_API_KEY")
     or os.getenv("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or _hermes_env.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or "local-secret"
 )
-
-# Fallback 1: Ruvicode DeepSeek V4 Flash
-RUVICODE_BASE_URL = os.getenv("RUVICODE_BASE_URL") or "https://api.ruvicode.com/v1"
-RUVICODE_MODEL = os.getenv("RUVICODE_MODEL") or "deepseek-v4.1-flash"
-RUVICODE_API_KEY = os.getenv("RUVICODE_API_KEY") or _hermes_env.get("RUVICODE_API_KEY") or ""
 
 OPENROUTER_URL = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
 

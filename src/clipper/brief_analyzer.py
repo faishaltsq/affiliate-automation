@@ -18,6 +18,7 @@ _ALL = {**_h_env, **_p_env}
 
 LLM_URL = os.environ.get("OPENROUTER_BASE_URL", "http://localhost:20128/v1/chat/completions")
 MODEL = os.environ.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
+FALLBACK_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL") or _ALL.get("OPENROUTER_FALLBACK_MODEL", "tig/claude-opus-5.5")
 LLM_API_KEY = (
     os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or _ALL.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
@@ -91,26 +92,36 @@ def analyze_campaign_brief(campaign_detail: dict) -> dict:
 
     try:
         headers = {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
-        r = requests.post(
-            LLM_URL,
-            json={
-                "model": MODEL,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "stream": False,
-                "temperature": 0.3,
-            },
-            headers=headers,
-            timeout=18,
-        )
-        if r.ok:
+        payload = {
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+            "temperature": 0.3,
+        }
+        r = None
+        for model in dict.fromkeys((MODEL, FALLBACK_MODEL)):
+            if not model:
+                continue
+            payload["model"] = model
+            # fallback claude-opus-5.5 may need a longer window than the gemini primary
+            t = 18 if model == MODEL else 45
+            r = requests.post(LLM_URL, json=payload, headers=headers, timeout=t)
+            if r.ok:
+                break
+            logger.warning("LLM brief analysis (%s) HTTP %s, trying fallback...", model, r.status_code)
+        if r is not None and r.ok:
             content = r.json()["choices"][0]["message"]["content"].strip()
             if content.startswith("```"):
                 content = re.sub(r"^```(?:json)?\s*", "", content)
                 content = re.sub(r"\s*```$", "", content)
-            parsed = json.loads(content)
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                from src.clipper.punchline import _parse_json_loose
+                parsed = _parse_json_loose(content)
             analysis_res.update(parsed)
     except Exception as e:
         logger.warning("LLM brief analysis fallback: %s", e)

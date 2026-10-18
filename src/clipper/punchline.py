@@ -23,6 +23,50 @@ LLM_API_KEY = (
     or ""
 )
 LLM_MODEL = os.environ.get("OPENROUTER_MODEL") or _ALL.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
+LLM_FALLBACK_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL") or _ALL.get("OPENROUTER_FALLBACK_MODEL", "tig/claude-opus-5.5")
+
+
+def _llm_post(prompt: str, temperature: float = 0.2, timeout: int = 25) -> Optional[dict]:
+    """POST to 9router with tig/claude-opus-5.5 fallback. Returns parsed JSON body or None."""
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "stream": False,
+    }
+    headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
+    models = [m for m in dict.fromkeys((LLM_MODEL, LLM_FALLBACK_MODEL)) if m]
+    for model in models:
+        payload["model"] = model
+        # fallback claude-opus-5.5 may need a longer window than the gemini primary
+        t = timeout if model == LLM_MODEL else max(timeout, 45)
+        try:
+            resp = requests.post(LLM_ENDPOINT, headers=headers, json=payload, timeout=t)
+            if resp.status_code == 200:
+                return resp.json()
+            logger.error(f"LLM ({model}) failed HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            logger.error(f"LLM ({model}) error: {e}")
+    return None
+
+
+def _parse_json_loose(text: str):
+    """Parse JSON from LLM output, tolerating prose, fences, or trailing commentary."""
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        pass
+    for open_ch, close_ch in (("[", "]"), ("{", "}")):
+        i, j = t.find(open_ch), t.rfind(close_ch)
+        if i != -1 and j > i:
+            try:
+                return json.loads(t[i : j + 1])
+            except json.JSONDecodeError:
+                continue
+    raise ValueError(f"Unparseable LLM JSON: {t[:200]}")
 
 
 def transcribe_footage_clips(
@@ -134,32 +178,12 @@ Aturan Mutlak (Compliance & Factual Integrity):
     "reason": "Momen Juan mengungkap perhitungan harga naik 2 kali lipat"
 }}"""
 
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-        "stream": False,
-    }
-
+    body = _llm_post(prompt, temperature=0.2, timeout=25)
     try:
-        resp = requests.post(
-            LLM_ENDPOINT,
-            headers={
-                "Authorization": f"Bearer {LLM_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=25,
-        )
-        if resp.status_code != 200:
-            logger.error(f"LLM punchline query failed HTTP {resp.status_code}: {resp.text}")
+        if body is None:
             return None
-
-        content = resp.json()["choices"][0]["message"]["content"].strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-        data = json.loads(content)
+        content = body["choices"][0]["message"]["content"].strip()
+        data = _parse_json_loose(content)
         # Find matching full file path
         target_fn = data.get("target_filename", "")
         for t in transcripts:
@@ -254,17 +278,10 @@ Aturan:
   ...
 ]"""
         try:
-            resp = requests.post(
-                LLM_ENDPOINT,
-                headers={"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"},
-                json={"model": LLM_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "stream": False},
-                timeout=30,
-            )
-            if resp.status_code == 200:
-                raw_txt = resp.json()["choices"][0]["message"]["content"].strip()
-                if raw_txt.startswith("```"):
-                    raw_txt = raw_txt.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-                data = json.loads(raw_txt)
+            body = _llm_post(prompt, temperature=0.3, timeout=30)
+            if body is not None:
+                raw_txt = body["choices"][0]["message"]["content"].strip()
+                data = _parse_json_loose(raw_txt)
                 if isinstance(data, list) and len(data) > 0:
                     results = []
                     for item in data[:count]:

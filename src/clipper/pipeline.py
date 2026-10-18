@@ -7,7 +7,7 @@ import requests
 from typing import Optional, Callable
 from src.clipper.client import ClippoClient
 from src.clipper.motionklip_client import MotionklipClient
-from src.clipper.brief_analyzer import analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL
+from src.clipper.brief_analyzer import analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL, FALLBACK_MODEL
 from src.clipper.downloader import download_asset_videos, download_asset_video
 from src.clipper.editor import render_clipper_video
 from src.clipper.account_manager import list_accounts, get_account
@@ -43,18 +43,24 @@ def _generate_variant_caption(brief: dict, account_style: str, account_index: in
 
     try:
         headers = {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
-        r = requests.post(
-            LLM_URL,
-            json={
-                "model": MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-                "temperature": 0.75,
-            },
-            headers=headers,
-            timeout=12,
-        )
-        if r.ok:
+        payload = {
+            "model": MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "temperature": 0.75,
+        }
+        r = None
+        for model in dict.fromkeys((MODEL, FALLBACK_MODEL)):
+            if not model:
+                continue
+            payload["model"] = model
+            # fallback claude-opus-5.5 may need a longer window than the gemini primary
+            t = 12 if model == MODEL else 30
+            r = requests.post(LLM_URL, json=payload, headers=headers, timeout=t)
+            if r.ok:
+                break
+            logger.warning("Variant caption LLM (%s) HTTP %s, trying fallback...", model, r.status_code)
+        if r is not None and r.ok:
             caption = r.json()["choices"][0]["message"]["content"].strip()
             return re.sub(r'^["\']|["\']$', '', caption)
     except Exception as e:

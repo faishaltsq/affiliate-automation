@@ -14,10 +14,8 @@ import requests
 from src.config import (
     LLM_API_KEY,
     LLM_MODEL,
+    LLM_FALLBACK_MODEL,
     OPENROUTER_URL,
-    RUVICODE_BASE_URL,
-    RUVICODE_MODEL,
-    RUVICODE_API_KEY,
     DATA_DIR,
 )
 from src.logger import get_logger
@@ -83,21 +81,13 @@ def _llm(messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096)
     try:
         return _call_provider(OPENROUTER_URL, LLM_API_KEY, LLM_MODEL, full_messages, temperature, max_tokens)
     except Exception as e_primary:
-        log.warning(f"Primary 9router ({LLM_MODEL}) failed: {e_primary}. Attempting Ruvicode fallback...")
+        log.warning(f"Primary 9router ({LLM_MODEL}) failed: {e_primary}. Attempting fallback...")
 
-    # 2. Fallback: Ruvicode (DeepSeek V4 Flash)
-    if RUVICODE_API_KEY:
-        try:
-            ruvi_url = f"{RUVICODE_BASE_URL.rstrip('/')}/chat/completions"
-            return _call_provider(ruvi_url, RUVICODE_API_KEY, RUVICODE_MODEL, full_messages, temperature, max_tokens)
-        except Exception as e_ruvi:
-            log.warning(f"Ruvicode ({RUVICODE_MODEL}) fallback failed: {e_ruvi}")
-
-    # 3. Final Fallback: 9router tokenrouter DeepSeek V4 Flash
+    # 2. Fallback: 9router tig/claude-opus-5.5 (same gateway, resilient model slot)
     try:
-        return _call_provider(OPENROUTER_URL, LLM_API_KEY, "tokenrouter/deepseek/deepseek-v4-flash", full_messages, temperature, max_tokens)
-    except Exception as e_final:
-        raise RuntimeError(f"All LLM providers failed. Primary: {e_primary}, Final: {e_final}")
+        return _call_provider(OPENROUTER_URL, LLM_API_KEY, LLM_FALLBACK_MODEL, full_messages, temperature, max_tokens)
+    except Exception as e_fb:
+        raise RuntimeError(f"All LLM providers failed. Primary: {e_primary}, Fallback ({LLM_FALLBACK_MODEL}): {e_fb}")
 
 
 # ── 2.2 Generate Brief ───────────────────────────────────────────────────────

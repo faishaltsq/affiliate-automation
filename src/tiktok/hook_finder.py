@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 import requests
 
-from src.clipper.punchline import LLM_API_KEY, LLM_ENDPOINT, LLM_MODEL
+from src.clipper.punchline import LLM_API_KEY, LLM_ENDPOINT, LLM_MODEL, LLM_FALLBACK_MODEL, _llm_post, _parse_json_loose
 
 logger = logging.getLogger("tiktok.hook_finder")
 
@@ -108,32 +108,13 @@ Rules:
 Transcript:
 {transcript_text}"""
 
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.4,
-        "stream": False,
-    }
-
     try:
-        resp = requests.post(
-            LLM_ENDPOINT,
-            headers={
-                "Authorization": f"Bearer {LLM_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=90,
-        )
-        if resp.status_code != 200:
-            logger.error("Hook LLM failed HTTP %s: %s", resp.status_code, resp.text[:200])
+        body = _llm_post(prompt, temperature=0.4, timeout=90)
+        if body is None:
             return []
 
-        content = resp.json()["choices"][0]["message"]["content"].strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-        raw = json.loads(content)
+        content = body["choices"][0]["message"]["content"].strip()
+        raw = _parse_json_loose(content)
         if isinstance(raw, dict):
             raw = raw.get("clips", []) or raw.get("windows", [])
         return _sanitize_windows(raw, total_duration, count)

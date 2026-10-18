@@ -68,7 +68,7 @@ init_guardrails_db()
 def check_and_increment_openrouter() -> int:
     """
     Tracks daily LLM request counter in SQLite.
-    Local 9router & Ruvicode are unmetered, so this purely logs usage.
+    Local 9router is unmetered, so this purely logs usage.
     """
     today = date.today().isoformat()
     con = sqlite3.connect(DB_PATH)
@@ -82,7 +82,7 @@ def check_and_increment_openrouter() -> int:
     cur.execute("UPDATE daily_counters SET openrouter_requests = ? WHERE date = ?", (new_val, today))
     con.commit()
     con.close()
-    log.info(f"LLM requests today: {new_val} (9router/Ruvicode)")
+    log.info(f"LLM requests today: {new_val} (9router)")
     return new_val
 
 
