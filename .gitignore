@@ -49,3 +49,4 @@ tools/*.exe
 tools/yt-dlp.exe
 # Machine-specific launcher (hardcodes local venv path)
 scripts/run_telegram_bot.vbs
+data/image_cache/
