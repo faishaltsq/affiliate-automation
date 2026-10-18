@@ -2,7 +2,7 @@ import re
 import json
 import requests
 import lxml.html
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, unquote
 from src.logger import get_logger
 
 log = get_logger("scraper")
@@ -104,9 +104,25 @@ def extract_product_metadata(url: str, timeout: int = 15) -> dict:
             log.warning("Bot UA received minimal response, retrying with standard browser UA")
             headers["User-Agent"] = BROWSER_USER_AGENT
             resp = session.get(url, headers=headers, allow_redirects=True, timeout=timeout)
+            final_url = resp.url
 
         data = extract_product_from_html(resp.text, url)
         data["final_url"] = final_url
+
+        # Check if final_url contains og_info (common in TikTok Shop / Tokopedia Shop share links)
+        try:
+            parsed_final = urlparse(final_url)
+            qs = parse_qs(parsed_final.query)
+            if "og_info" in qs:
+                og_raw = qs["og_info"][0]
+                og_json = json.loads(og_raw)
+                if og_json.get("title") and (data.get("name") in ("TikTok Shop", "Tokopedia", "Shopping On TikTok Shop", "") or not data.get("name")):
+                    data["name"] = og_json["title"].replace("+", " ")
+                if og_json.get("image") and (not data.get("image_url") or "tts-logo" in data.get("image_url", "")):
+                    data["image_url"] = og_json["image"]
+        except Exception as e:
+            log.debug(f"Failed parsing og_info from final_url: {e}")
+
         log.info(f"Extraction successful: '{data['name']}', Image: {bool(data['image_url'])}")
         return data
 
