@@ -24,3 +24,28 @@ data/clippo/output/
 data/tiktok/accounts/*/cookies.txt
 data/tiktok/accounts/**/cookies.txt
 data/content_ops/
+data/muse_cookies.txt
+# Runtime state + scratch images from manual pipeline testing — never history
+*.pid
+data/pending_threads_drafts.json
+data/persona_state.json
+/*.jpg
+/*.png
+/bing_test_*.jpg
+/curl_test.jpg
+data/*_test.jpg
+data/test_*.jpg
+data/debug_*.jpg
+data/debug_card.jpg
+data/bot_100.jpg
+data/detik_*.jpg
+data/pandemic_style*.jpg
+data/pandemic_talks_perfect.jpg
+data/muse_*.jpg
+data/editorial_latest.jpg
+
+# Vendored binaries
+tools/*.exe
+tools/yt-dlp.exe
+# Machine-specific launcher (hardcodes local venv path)
+scripts/run_telegram_bot.vbs
