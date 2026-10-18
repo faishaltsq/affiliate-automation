@@ -18,7 +18,12 @@ _ALL = {**_h_env, **_p_env}
 
 LLM_URL = os.environ.get("OPENROUTER_BASE_URL", "http://localhost:20128/v1/chat/completions")
 MODEL = os.environ.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
-FALLBACK_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL") or _ALL.get("OPENROUTER_FALLBACK_MODEL", "tig/claude-opus-5.5")
+FALLBACK_MODEL = None  # retired: fallback is now Mortera Cloud direct (see below)
+MORTERA_URL = (
+    os.environ.get("MORTERA_BASE_URL") or _ALL.get("MORTERA_BASE_URL", "https://mortera.cloud/v1")
+).rstrip("/") + "/chat/completions"
+MORTERA_MODEL = os.environ.get("MORTERA_MODEL") or _ALL.get("MORTERA_MODEL", "muse-spark-1.3")
+MORTERA_API_KEY = os.environ.get("MORTERA_API_KEY") or _ALL.get("MORTERA_API_KEY") or ""
 LLM_API_KEY = (
     os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or _ALL.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
@@ -102,16 +107,17 @@ def analyze_campaign_brief(campaign_detail: dict) -> dict:
             "temperature": 0.3,
         }
         r = None
-        for model in dict.fromkeys((MODEL, FALLBACK_MODEL)):
-            if not model:
-                continue
-            payload["model"] = model
-            # fallback claude-opus-5.5 may need a longer window than the gemini primary
-            t = 18 if model == MODEL else 45
-            r = requests.post(LLM_URL, json=payload, headers=headers, timeout=t)
-            if r.ok:
-                break
-            logger.warning("LLM brief analysis (%s) HTTP %s, trying fallback...", model, r.status_code)
+        # 1. Primary: 9router
+        r = requests.post(LLM_URL, json=payload, headers=headers, timeout=18)
+        if not r.ok:
+            logger.warning("LLM brief analysis (%s) HTTP %s, trying Mortera fallback...", MODEL, r.status_code)
+            # 2. Fallback: Mortera Cloud direct (Muse Spark)
+            if MORTERA_API_KEY:
+                payload["model"] = MORTERA_MODEL
+                m_headers = {"Authorization": f"Bearer {MORTERA_API_KEY}"}
+                r = requests.post(MORTERA_URL, json=payload, headers=m_headers, timeout=45)
+            else:
+                logger.warning("Mortera fallback skipped: MORTERA_API_KEY missing")
         if r is not None and r.ok:
             content = r.json()["choices"][0]["message"]["content"].strip()
             if content.startswith("```"):

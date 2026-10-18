@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 import requests
 
-from src.clipper.punchline import LLM_API_KEY, LLM_ENDPOINT, LLM_MODEL, LLM_FALLBACK_MODEL, _llm_post, _parse_json_loose
+from src.clipper.punchline import LLM_API_KEY, LLM_ENDPOINT, LLM_MODEL, _llm_post, _parse_json_loose
 
 logger = logging.getLogger("tiktok.hook_finder")
 

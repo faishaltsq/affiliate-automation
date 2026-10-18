@@ -29,8 +29,11 @@ if HERMES_ENV_PATH.exists():
 # Primary: 9router local antigravity gemini 3.8 flash
 LLM_BASE_URL = os.getenv("LLM_BASE_URL") or _hermes_env.get("NINEROUTER_BASE_URL") or "http://localhost:20128/v1"
 LLM_MODEL = os.getenv("LLM_MODEL") or "ag/gemini-3.8-flash-high"
-# Fallback: tig/claude-opus-5.5 (custom:9router, same gateway, different model slot)
-LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL") or "tig/claude-opus-5.5"
+# Fallback: Mortera Cloud direct (NOT via 9router) — Muse Spark
+MORTERA_BASE_URL = os.getenv("MORTERA_BASE_URL") or "https://mortera.cloud/v1"
+MORTERA_MODEL = os.getenv("MORTERA_MODEL") or "muse-spark-1.3"
+MORTERA_API_KEY = os.getenv("MORTERA_API_KEY") or ""
+MORTERA_URL = f"{MORTERA_BASE_URL.rstrip('/')}/chat/completions"
 LLM_API_KEY = (
     os.getenv("LLM_API_KEY")
     or os.getenv("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")

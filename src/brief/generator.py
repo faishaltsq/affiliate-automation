@@ -14,7 +14,9 @@ import requests
 from src.config import (
     LLM_API_KEY,
     LLM_MODEL,
-    LLM_FALLBACK_MODEL,
+    MORTERA_API_KEY,
+    MORTERA_MODEL,
+    MORTERA_URL,
     OPENROUTER_URL,
     DATA_DIR,
 )
@@ -81,13 +83,16 @@ def _llm(messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096)
     try:
         return _call_provider(OPENROUTER_URL, LLM_API_KEY, LLM_MODEL, full_messages, temperature, max_tokens)
     except Exception as e_primary:
-        log.warning(f"Primary 9router ({LLM_MODEL}) failed: {e_primary}. Attempting fallback...")
+        primary_err = e_primary
+        log.warning(f"Primary 9router ({LLM_MODEL}) failed: {primary_err}. Attempting fallback...")
 
-    # 2. Fallback: 9router tig/claude-opus-5.5 (same gateway, resilient model slot)
+    # 2. Fallback: Mortera Cloud direct (NOT via 9router) — Muse Spark
+    if not MORTERA_API_KEY:
+        raise RuntimeError(f"All LLM providers failed. Primary: {primary_err}, Mortera: MORTERA_API_KEY missing")
     try:
-        return _call_provider(OPENROUTER_URL, LLM_API_KEY, LLM_FALLBACK_MODEL, full_messages, temperature, max_tokens)
+        return _call_provider(MORTERA_URL, MORTERA_API_KEY, MORTERA_MODEL, full_messages, temperature, max_tokens)
     except Exception as e_fb:
-        raise RuntimeError(f"All LLM providers failed. Primary: {e_primary}, Fallback ({LLM_FALLBACK_MODEL}): {e_fb}")
+        raise RuntimeError(f"All LLM providers failed. Primary: {primary_err}, Mortera fallback ({MORTERA_MODEL}): {e_fb}")
 
 
 # ── 2.2 Generate Brief ───────────────────────────────────────────────────────

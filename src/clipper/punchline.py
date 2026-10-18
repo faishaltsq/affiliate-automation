@@ -23,11 +23,19 @@ LLM_API_KEY = (
     or ""
 )
 LLM_MODEL = os.environ.get("OPENROUTER_MODEL") or _ALL.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
-LLM_FALLBACK_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL") or _ALL.get("OPENROUTER_FALLBACK_MODEL", "tig/claude-opus-5.5")
+
+# Fallback goes DIRECT to Mortera Cloud (not via 9router). Model IDs are
+# unprefixed there (no "mortera/" prefix — that prefix is a 9router slot).
+MORTERA_ENDPOINT = (
+    os.environ.get("MORTERA_BASE_URL") or _ALL.get("MORTERA_BASE_URL", "https://mortera.cloud/v1")
+).rstrip("/") + "/chat/completions"
+MORTERA_MODEL = os.environ.get("MORTERA_MODEL") or _ALL.get("MORTERA_MODEL", "muse-spark-1.3")
+MORTERA_API_KEY = os.environ.get("MORTERA_API_KEY") or _ALL.get("MORTERA_API_KEY") or ""
 
 
 def _llm_post(prompt: str, temperature: float = 0.2, timeout: int = 25) -> Optional[dict]:
-    """POST to 9router with tig/claude-opus-5.5 fallback. Returns parsed JSON body or None."""
+    """POST to 9router primary, Mortera Cloud direct fallback. Returns parsed JSON body or None."""
+    # 1. Primary: 9router
     payload = {
         "model": LLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
@@ -35,18 +43,26 @@ def _llm_post(prompt: str, temperature: float = 0.2, timeout: int = 25) -> Optio
         "stream": False,
     }
     headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
-    models = [m for m in dict.fromkeys((LLM_MODEL, LLM_FALLBACK_MODEL)) if m]
-    for model in models:
-        payload["model"] = model
-        # fallback claude-opus-5.5 may need a longer window than the gemini primary
-        t = timeout if model == LLM_MODEL else max(timeout, 45)
-        try:
-            resp = requests.post(LLM_ENDPOINT, headers=headers, json=payload, timeout=t)
-            if resp.status_code == 200:
-                return resp.json()
-            logger.error(f"LLM ({model}) failed HTTP {resp.status_code}: {resp.text[:200]}")
-        except Exception as e:
-            logger.error(f"LLM ({model}) error: {e}")
+    try:
+        resp = requests.post(LLM_ENDPOINT, headers=headers, json=payload, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.json()
+        logger.error(f"LLM ({LLM_MODEL}) failed HTTP {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"LLM ({LLM_MODEL}) error: {e}")
+    # 2. Fallback: Mortera Cloud direct (Muse Spark)
+    if not MORTERA_API_KEY:
+        logger.error("Mortera fallback skipped: MORTERA_API_KEY missing")
+        return None
+    try:
+        payload["model"] = MORTERA_MODEL
+        headers = {"Authorization": f"Bearer {MORTERA_API_KEY}", "Content-Type": "application/json"}
+        resp = requests.post(MORTERA_ENDPOINT, headers=headers, json=payload, timeout=max(timeout, 45))
+        if resp.status_code == 200:
+            return resp.json()
+        logger.error(f"Mortera ({MORTERA_MODEL}) failed HTTP {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"Mortera ({MORTERA_MODEL}) error: {e}")
     return None
 
 

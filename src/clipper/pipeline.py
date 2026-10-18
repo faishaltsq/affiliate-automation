@@ -7,7 +7,10 @@ import requests
 from typing import Optional, Callable
 from src.clipper.client import ClippoClient
 from src.clipper.motionklip_client import MotionklipClient
-from src.clipper.brief_analyzer import analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL, FALLBACK_MODEL
+from src.clipper.brief_analyzer import (
+    analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL,
+    MORTERA_URL, MORTERA_MODEL, MORTERA_API_KEY,
+)
 from src.clipper.downloader import download_asset_videos, download_asset_video
 from src.clipper.editor import render_clipper_video
 from src.clipper.account_manager import list_accounts, get_account
@@ -50,16 +53,17 @@ def _generate_variant_caption(brief: dict, account_style: str, account_index: in
             "temperature": 0.75,
         }
         r = None
-        for model in dict.fromkeys((MODEL, FALLBACK_MODEL)):
-            if not model:
-                continue
-            payload["model"] = model
-            # fallback claude-opus-5.5 may need a longer window than the gemini primary
-            t = 12 if model == MODEL else 30
-            r = requests.post(LLM_URL, json=payload, headers=headers, timeout=t)
-            if r.ok:
-                break
-            logger.warning("Variant caption LLM (%s) HTTP %s, trying fallback...", model, r.status_code)
+        # 1. Primary: 9router
+        r = requests.post(LLM_URL, json=payload, headers=headers, timeout=12)
+        if not r.ok:
+            logger.warning("Variant caption LLM (%s) HTTP %s, trying Mortera fallback...", MODEL, r.status_code)
+            # 2. Fallback: Mortera Cloud direct (Muse Spark)
+            if MORTERA_API_KEY:
+                payload["model"] = MORTERA_MODEL
+                m_headers = {"Authorization": f"Bearer {MORTERA_API_KEY}"}
+                r = requests.post(MORTERA_URL, json=payload, headers=m_headers, timeout=30)
+            else:
+                logger.warning("Mortera fallback skipped: MORTERA_API_KEY missing")
         if r is not None and r.ok:
             caption = r.json()["choices"][0]["message"]["content"].strip()
             return re.sub(r'^["\']|["\']$', '', caption)
