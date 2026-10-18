@@ -7,7 +7,7 @@ Monitoring & Analytics Layer (Section 6 & 7)
 
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.config import (
     FACEBOOK_PAGE_ID,
@@ -105,7 +105,7 @@ def save_metrics_snapshot() -> str:
     Collects all available metrics and writes to data/metrics_<timestamp>.json.
     Safe to run on a cron schedule (won't crash on missing credentials).
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     end = now.strftime("%Y-%m-%d")
     start = (now - timedelta(days=7)).strftime("%Y-%m-%d")
 

@@ -19,7 +19,7 @@ import json
 import time
 import sqlite3
 import hashlib
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pathlib import Path
 from functools import wraps
 
@@ -162,7 +162,7 @@ def sanitize_markdown(content: str) -> str:
 # ── Failure Logging (Checklist Item 5) ────────────────────────────────────────
 
 def log_failure(topic: str, error_type: str, details: str):
-    today = datetime.utcnow().isoformat()
+    today = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
     cur.execute(

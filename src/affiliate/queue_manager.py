@@ -6,7 +6,7 @@ Checked by daemon every cycle; fires when threshold reached.
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import DATA_DIR
@@ -71,7 +71,7 @@ def mark_fired(row_id: int, post_id: str, reply_id: str):
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
         "UPDATE affiliate_queue SET status='fired', fired_at=?, fired_post_id=?, fired_reply_id=? WHERE id=?",
-        (datetime.utcnow().isoformat(), post_id, reply_id, row_id),
+        (datetime.now(timezone.utc).replace(tzinfo=None).isoformat(), post_id, reply_id, row_id),
     )
     conn.commit()
     conn.close()
@@ -83,7 +83,7 @@ def mark_direct(row_id: int, reply_id: str):
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
         "UPDATE affiliate_queue SET status='fired', fired_at=?, fired_reply_id=? WHERE id=?",
-        (datetime.utcnow().isoformat(), reply_id, row_id),
+        (datetime.now(timezone.utc).replace(tzinfo=None).isoformat(), reply_id, row_id),
     )
     conn.commit()
     conn.close()

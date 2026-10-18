@@ -13,7 +13,7 @@ import sqlite3
 import time
 import traceback
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import DATA_DIR
@@ -58,7 +58,7 @@ def log_post(topic: str, keyword: str, fb_id: str, threads_id: str, img_url: str
     con.execute(
         "INSERT INTO posts (topic, keyword, fb_post_id, threads_id, cloudinary_url, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
-        (topic, keyword, fb_id, threads_id, img_url, datetime.utcnow().isoformat()),
+        (topic, keyword, fb_id, threads_id, img_url, datetime.now(timezone.utc).replace(tzinfo=None).isoformat()),
     )
     con.commit()
     con.close()
