@@ -50,6 +50,7 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
         post_format=post_format,
         post_style=post_style,
         post_structure=post_structure,
+        source_summary=plan.get("source_summary", ""),
     )
     content = post_data["content"]
     image_url = post_data["image_url"]
@@ -196,7 +197,10 @@ def execute_organic_post_custom(
         topic=custom_topic,
         pillar=pillar,
         post_format=post_format,
-        post_style=post_style
+        post_style=post_style,
+        # A hand-typed topic has no feed behind it, so the generator bans
+        # figures rather than letting the model supply its own.
+        source_summary="",
     )
     content = post_data["content"]
     image_url = post_data["image_url"]

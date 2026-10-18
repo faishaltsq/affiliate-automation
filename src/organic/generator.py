@@ -87,6 +87,111 @@ bonus_reply (satu kalimat, opsional tapi disarankan):
 """.replace("{n}", str(CHAIN_PART_COUNT))
 
 
+_FALLBACK_CONTENT = "Isu {topic} ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan."
+
+# A figure the post may not contain unless the source states it. Covers
+# percentages, plain integers, thousands separators and decimal points — the
+# shapes an LLM reaches for when it wants to sound precise. Digit runs glued
+# to letters are excluded: "3D", "4K", "5G" are product designations, not
+# statistics, and deleting them leaves "modeling D" behind.
+_FIGURE_RE = re.compile(
+    r"(?<![A-Za-z0-9])\d+(?:[.,]\d+)*(?:\s?%|persen|ribu juta|miliar|triliun|ribu)?(?![A-Za-z0-9])",
+    re.I,
+)
+# A bare year is a horizon marker, not a statistic. The chain's comment trigger
+# is a binary prediction against a year ("sebelum atau sesudah 2028?"), and
+# stripping it would remove the one mechanic the whole structure is built on.
+_YEAR_RE = re.compile(r"^(?:19|20)\d{2}$")
+
+
+def _figure_tokens(text: str) -> set:
+    """Returns the numeric strings written into a post, normalised."""
+    if not text:
+        return set()
+    out = set()
+    for m in _FIGURE_RE.finditer(text):
+        raw = m.group(0)
+        core = re.sub(r"[^\d]", "", raw)
+        if not core:
+            continue
+        # A bare year is a horizon marker, not a statistic — the chain's
+        # comment trigger is a binary prediction against a year, and blocking
+        # it would delete the mechanic the structure is built on.
+        if _YEAR_RE.match(raw.strip()):
+            continue
+        # Normalise so "40%", "40 %" and "40 persen" collapse to one token.
+        out.add(re.sub(r"^0+(?=\d)", "", core).lstrip("0") or "0")
+    return out
+
+
+def _sourced_tokens(topic: str, source_summary: str) -> set:
+    """Figures the headline or the feed description actually supports."""
+    return _figure_tokens(f"{topic} {source_summary or ''}")
+
+
+def _strip_unsourced_numbers(
+    content: str, parts: list, bonus_reply: str, topic: str, source_summary: str
+) -> tuple:
+    """Returns (content, parts, bonus_reply, fabricated).
+
+    fabricated is the set of numeric tokens the post used that the source never
+    stated. When non-empty the caller regenerates; the cleaned text it returns
+    is the safe fallback if that second attempt also fails.
+    """
+    allowed = _sourced_tokens(topic, source_summary)
+    combined = " \n\n ".join([content or ""] + [bonus_reply or ""]) + " \n ".join(parts or [])
+    fabricated = _figure_tokens(combined) - allowed
+    if not fabricated:
+        return content, parts, bonus_reply, set()
+
+    def _sub(m):
+        core = re.sub(r"[^\d]", "", m.group(0))
+        norm = re.sub(r"^0+(?=\d)", "", core).lstrip("0") or "0"
+        return "" if norm in fabricated else m.group(0)
+
+    def _clean(s: str) -> str:
+        if not s:
+            return s
+        s = re.sub(_FIGURE_RE.pattern, _sub, s, flags=re.I)
+        s = re.sub(r"[ \t]{2,}", " ", s)
+        # Deleting "70%" from "pangkas konsep 70%." would otherwise leave
+        # "konsep ." — a gap that reads as a typo on a live account.
+        s = re.sub(r"\s+([,.;:!?])", r"\1", s)
+        return s.strip()
+
+    parts = [_clean(p) for p in (parts or [])]
+    content = _clean(content) if content else ""
+    bonus_reply = _clean(bonus_reply) if bonus_reply else ""
+    return content, parts, bonus_reply, fabricated
+
+
+def _regenerate_without_numbers(
+    topic, pillar, post_format, post_style, persona, post_structure,
+    is_chain, source_summary,
+) -> tuple:
+    """One clean second attempt at the same slot.
+
+    Re-enters generate_organic_post with _retry_done set so the guard cannot
+    fire again — a model that fabricates twice must still yield a post, and
+    this time every figure has been purged from the material it is given.
+    """
+    try:
+        out = generate_organic_post(
+            topic=topic,
+            pillar=pillar,
+            post_format=post_format,
+            post_style=post_style,
+            persona=persona,
+            post_structure=post_structure,
+            source_summary=source_summary,
+            _retry_done=True,
+        )
+        return out.get("content", ""), out.get("parts") or [], out.get("bonus_reply", "")
+    except Exception as e:
+        log.warning(f"Number-free regeneration failed: {e}")
+        return "", [], ""
+
+
 def _normalize_chain(raw) -> tuple:
     """Validates the chain the LLM produced. Returns (parts, error).
 
@@ -110,6 +215,8 @@ def generate_organic_post(
     post_style: str = "snappy_take",
     persona: str = None,
     post_structure: str = "single",
+    source_summary: str = "",
+    _retry_done: bool = False,
 ) -> dict:
     """
     Generates an authentic organic Threads post in Netizen 'Warga Threads' voice or custom persona.
@@ -212,6 +319,24 @@ Nama Persona: {persona_cfg.name} {persona_cfg.emoji}
             '}'
         )
 
+    # Numbers can only come from a real source. Without this block the model
+    # was told "use the figures from the source" while being handed nothing but
+    # a headline, so it filled the gap with invented percentages.
+    source_section = ""
+    if source_summary.strip():
+        source_section = (
+            "SUMBER BERITA (deskripsi feed — INI SATU-SATUNYA tempat angka boleh diambil):\n"
+            f"{source_summary.strip()}\n"
+            "- Setiap angka, persentase, tanggal, dan nama lembaga di tulisan lo WAJIB ada di ringkasan di atas.\n"
+            "- Kalau ringkasan TIDAK memuat angka, tulis tanpa angka sama sekali. JANGAN mengarang.\n"
+        )
+    else:
+        source_section = (
+            "SUMBER BERITA: (tidak ada ringkasan tersedia)\n"
+            "- DILARANG memakai angka, persentase, atau statistik apa pun. Tulis versi tanpa angka.\n"
+            "- DILARANG menyebut nama lembaga/instansi yang tidak muncul di judul topik.\n"
+        )
+
     prompt = f"""Kamu adalah akun netizen Indonesia yang cerdas, to the point, santai, dan berwawasan luas (Warga Threads).
 {persona_section}
 FOKUS KONTEN HANYA 4 PILAR UTAMA:
@@ -246,6 +371,7 @@ KONTEKS WAKTU REAL-TIME:
 - Style: {post_style}
 - Format: {post_format}
 
+{source_section}
 {output_schema}
 Hanya output JSON valid tanpa markdown ticks.
 """
@@ -288,10 +414,36 @@ Hanya output JSON valid tanpa markdown ticks.
                 post_style=post_style,
                 persona=persona,
                 post_structure="single",
+                source_summary=source_summary,
             )
         log.warning(f"Failed to parse LLM JSON for organic post: {e}. Using fallback.")
         content = f"Isu {topic} ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan."
         vibe_query = f"{topic} berita indonesia"
+
+    # The chain rule bans invented figures, but a rule in prose is not
+    # enforcement. This is the enforcement: any figure the model wrote that the
+    # source never stated gets stripped, and the whole post is regenerated
+    # once. If the second attempt still fabricates, the caller gets a
+    # number-free version rather than a made-up statistic.
+    if not _retry_done:
+        content, parts, bonus_reply, fabricated = _strip_unsourced_numbers(
+            content, parts, bonus_reply, topic, source_summary
+        )
+        if fabricated:
+            log.warning(
+                f"Chain/post cited figures absent from the source "
+                f"({', '.join(sorted(fabricated)[:5])}); "
+                "regenerating without them."
+            )
+            content, parts, bonus_reply = _regenerate_without_numbers(
+                topic, pillar, post_format, post_style, persona, post_structure,
+                is_chain, source_summary,
+            )
+            if not content:
+                # Second attempt was worse than the first. Salvage the first one
+                # with the fabricated figures already removed.
+                content = "\n\n".join(parts) if parts else _FALLBACK_CONTENT.format(topic=topic)
+                bonus_reply = ""
 
     # The card carries the hook only: part 1 is what sells the scroll, and
     # printing all four parts onto one image turns the thread into a poster.

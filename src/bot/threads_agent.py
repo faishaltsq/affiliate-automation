@@ -42,6 +42,7 @@ from src.organic.personas import (
     set_active_manual_persona,
     extract_persona_tag,
 )
+from src.trends.multi_source import get_source_summary
 
 logger = logging.getLogger("bot.threads_agent")
 API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
@@ -716,6 +717,7 @@ def _create_and_preview_draft(
             post_style="snappy_take",
             persona=active_p_key,
             post_structure=post_structure,
+            source_summary=get_source_summary(topic),
         )
         content = post_data["content"]
         image_url = post_data.get("image_url", "")

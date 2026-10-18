@@ -32,6 +32,10 @@ ALL_PILLARS = [
     "market_finance_stocks",
 ]
 
+_SUMMARY_CACHE = {}
+SUMMARY_CACHE_MAX = 2000
+SUMMARY_CHARS = 400
+
 # Impact/urgency signals: a headline carrying these is a live national story,
 # not routine coverage. Weight = how strongly it signals "everyone is talking".
 HOT_SIGNALS = {
@@ -159,6 +163,38 @@ def _is_recent(pub_date_str: str, max_hours: int = 36) -> bool:
         return False
 
 
+def _remember_summary(headline: str, item) -> None:
+    """Keeps the RSS <description> that arrived with a headline.
+
+    The headline alone carries no data, so a generator asked to "use the
+    figures from the source" would have nothing to ground them in and invent
+    them instead. The description travels alongside, keyed by headline.
+    """
+    if len(_SUMMARY_CACHE) > SUMMARY_CACHE_MAX:
+        _SUMMARY_CACHE.clear()
+    try:
+        if headline in _SUMMARY_CACHE:
+            return
+        desc_elem = item.find("description")
+        if desc_elem is None or not desc_elem.text:
+            return
+        desc = re.sub(r"<[^>]+>", " ", desc_elem.text)
+        desc = re.sub(r"\s+", " ", desc).strip()
+        if desc:
+            _SUMMARY_CACHE[headline] = desc[:SUMMARY_CHARS]
+    except Exception:
+        pass
+
+
+def get_source_summary(headline: str) -> str:
+    """Returns the RSS description stored for a headline, or empty string.
+
+    Callers must treat an empty string as "no source data available", never as
+    permission to supply their own figures.
+    """
+    return _SUMMARY_CACHE.get(headline, "")
+
+
 def _fetch_rss(url: str, limit: int = 10, require_recent: bool = True) -> list[str]:
     """Helper to fetch and parse RSS feeds with strict date freshness verification."""
     headlines = []
@@ -178,6 +214,7 @@ def _fetch_rss(url: str, limit: int = 10, require_recent: bool = True) -> list[s
                     cleaned = _clean_headline(elem_title.text)
                     if _is_clean(cleaned) and cleaned not in headlines:
                         headlines.append(cleaned)
+                        _remember_summary(cleaned, item)
                         if len(headlines) >= limit:
                             break
     except Exception as e:

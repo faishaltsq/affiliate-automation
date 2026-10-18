@@ -13,6 +13,7 @@ from src.trends.multi_source import (
     fetch_trends_for_pillar,
     fetch_hot_topics,
     pillar_for_topic,
+    get_source_summary,
     EVERGREEN_BY_PILLAR,
 )
 from src.organic.db import is_topic_recent, get_today_post_count, get_today_chain_count
@@ -39,6 +40,19 @@ HOT_TOPIC_MIN_HEAT = 18
 # spontaneous texture by staying mostly single posts.
 CHAIN_MAX_PER_DAY = 5
 CHAIN_PROBABILITY = 0.75
+
+
+def _topic_summary(topic: str) -> str:
+    """Feed description captured for this headline, or '' when none was stored.
+
+    Evergreen topics are invented by this module rather than fetched, so there
+    is no feed behind them — the empty string is correct there, and the
+    generator treats it as "no figures allowed".
+    """
+    try:
+        return get_source_summary(topic)
+    except Exception:
+        return ""
 
 
 def _get_wib_hour() -> int:
@@ -226,6 +240,10 @@ def plan_single_post(used_today: list[str] = None) -> dict:
         "post_format": post_format,
         "post_style": post_style,
         "post_structure": post_structure,
+        # Without this the generator is told "use figures from the source" and
+        # handed only a headline, so it invents the figures. Empty string means
+        # no data was captured, and the generator then bans numbers outright.
+        "source_summary": _topic_summary(topic),
     }
 
 
