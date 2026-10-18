@@ -1,4 +1,11 @@
-"""Single-instance process lock via PID file."""
+"""Single-instance process lock via PID file.
+
+Contract: the FIRST live claimant wins. A newcomer that finds a live instance
+holding the same lock must EXIT, never kill. Killing the holder is what caused
+the watchdog↔singleton restart loop: watchdog spawned a replacement while the
+old process was still alive, the replacement killed the old one on startup,
+the watchdog saw churn and spawned again, every ~20 minutes.
+"""
 import os
 import sys
 import psutil
@@ -12,8 +19,14 @@ log = get_logger("singleton")
 def ensure_single_instance(process_name: str) -> None:
     """
     Ensures only ONE instance of `process_name` runs at any time.
-    If an existing instance is alive, terminates it before claiming the lock.
-    Writes current PID to `data/{process_name}.pid`.
+
+    First live claimant wins: if the PID file points at a running process
+    whose command line matches this lock, the newcomer logs and EXITS with
+    code 0. It never kills the holder — killing caused the restart loop
+    where every watchdog spawn murdered its healthy predecessor.
+
+    A stale PID file (PID dead, or PID recycled by an unrelated process)
+    is simply overwritten.
     """
     pid_file = DATA_DIR / f"{process_name}.pid"
     current_pid = os.getpid()
@@ -25,12 +38,22 @@ def ensure_single_instance(process_name: str) -> None:
                 try:
                     proc = psutil.Process(old_pid)
                     cmdline = " ".join(proc.cmdline() or [])
-                    if process_name in cmdline or "python" in proc.name().lower():
-                        log.info(f"Terminating older zombie instance PID {old_pid} for '{process_name}'")
-                        proc.kill()
-                        proc.wait(timeout=3)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
-                    log.warning(f"Could not kill old instance PID {old_pid}: {e}")
+                    if process_name in cmdline:
+                        log.info(
+                            f"Another live instance holds '{process_name}' "
+                            f"(PID {old_pid}); this process (PID {current_pid}) exits."
+                        )
+                        sys.exit(0)
+                    # PID recycled by an unrelated process — fall through and
+                    # overwrite the stale file below.
+                    log.info(
+                        f"Stale PID file for '{process_name}': PID {old_pid} "
+                        f"is now '{proc.name()}'. Overwriting."
+                    )
+                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                    log.warning(f"Could not inspect old PID {old_pid}: {e}")
+        except SystemExit:
+            raise
         except Exception as e:
             log.debug(f"Error reading old PID file: {e}")
 

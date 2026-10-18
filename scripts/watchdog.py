@@ -37,8 +37,11 @@ VBS_ORGANIC = PROJECT_DIR / "scripts" / "run_rara_daemon.vbs"
 LOG_FILE = PROJECT_DIR / "logs" / "watchdog.log"
 
 ALIVE_WS = 30 * 1024 * 1024   # >30MB working set = proses nyata (bukan trampoline venv)
-STALE_AGE = 150               # trampoline kecil & tua = instance mati
-SPAWN_GRACE = 20              # detik tunggu setelah spawn
+# Trampoline venv butuh >150 dtk untuk membesar. Grace lebih pendek dari
+# interval cron (5 mnt) supaya watchdog tidak membunuh proses yang SEHARUSNYA
+# hidup tapi tick cron jatuh di tengah masa loading.
+STALE_AGE = 300               # trampoline kecil & tua = instance mati
+SPAWN_GRACE = 60              # detik tunggu setelah spawn (cold start bisa >20 dtk)
 
 TARGETS = [
     ("bot", "main.py bot", VBS_BOT),
