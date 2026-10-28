@@ -503,8 +503,17 @@ class TestWriterNeverFills:
                               path=db, persist=False)
             assert out is None, bad
 
-    def test_valid_json_produces_draft(self, db):
+    def test_valid_json_produces_draft(self, db, monkeypatch):
         import json
+        from src.content import writer as writer_mod
+        from src.persona.voice import VoiceVariation
+
+        monkeypatch.setattr(
+            writer_mod, "varied_variation",
+            lambda history, rng=None: VoiceVariation(
+                "single_snappy", "observasi", "pendek", "ringan", "edukasi"
+            ),
+        )
         payload = json.dumps({
             "content": GOOD_DRAFT, "disclosure": "",
         })
@@ -543,11 +552,20 @@ class TestWriterNeverFills:
         # or it was a thread with no parts → None. Both are None.
         assert out is None
 
-    def test_persisted_draft_is_retrievable(self, db):
+    def test_persisted_draft_is_retrievable(self, db, monkeypatch):
         import json
-        from src.content.writer import reset_variation_history
+        from src.content import writer as writer_mod
+        from src.persona.voice import VoiceVariation
 
-        reset_variation_history()
+        # Pin a single-post variation: with an empty history the writer picks
+        # mini_thread ~20% of the time, and a thread payload is not what this
+        # test is about.
+        monkeypatch.setattr(
+            writer_mod, "varied_variation",
+            lambda history, rng=None: VoiceVariation(
+                "single_snappy", "observasi", "pendek", "ringan", "edukasi"
+            ),
+        )
         payload = json.dumps({"content": GOOD_DRAFT, "disclosure": ""})
         out = write_draft(pillar="relatable",
                           client=FakeLLMClient(default=payload),
@@ -557,7 +575,6 @@ class TestWriterNeverFills:
         row = get_draft(out.draft_id, path=db)
         assert row["content"] == GOOD_DRAFT
         assert row["status"] == "DRAFT"
-        reset_variation_history()
 
     def test_writer_never_receives_a_news_headline(self, db):
         """The prompt must be built from an audience problem, not a headline."""
