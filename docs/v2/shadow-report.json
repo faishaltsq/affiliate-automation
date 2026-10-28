@@ -1,0 +1,664 @@
+{
+  "generated_at": "2026-10-29T06:10:36.883554",
+  "seed": 20261028,
+  "mode": "offline_shadow",
+  "live_publishing": false,
+  "external_calls": 0,
+  "persona": "teman_tongkrongan_v1",
+  "fixture_count": 30,
+  "pillar_distribution": {
+    "relatable": 6,
+    "practical_tips": 6,
+    "opinions": 6,
+    "discoveries": 6,
+    "affiliate": 6
+  },
+  "verdict_distribution": {
+    "APPROVED_AUTO": 13,
+    "NEEDS_REVIEW": 14,
+    "REJECTED": 3
+  },
+  "accepted": 27,
+  "negative_controls": {
+    "total": 7,
+    "rejected": 7,
+    "all_rejected": true,
+    "detail": [
+      {
+        "control": "fabricated_firsthand",
+        "content": "Gue sudah beli power bank ini dan udah dipakai dua bulan, awet banget sampai 18 jam.",
+        "vetoes": [
+          "fabricated_firsthand_usage",
+          "unverified_numeric_claim"
+        ],
+        "rejected": true
+      },
+      {
+        "control": "unsourced_number",
+        "content": "Menurut data, power bank murah rata-rata cuma nyampe 60% dari kapasitas yang diiklankan.",
+        "vetoes": [
+          "unverified_numeric_claim"
+        ],
+        "rejected": true
+      },
+      {
+        "control": "generic_filler",
+        "content": "Isu power bank ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan.",
+        "vetoes": [
+          "generic_filler"
+        ],
+        "rejected": true
+      },
+      {
+        "control": "engagement_bait",
+        "content": "Power bank murah sering bohong soal kapasitas. Kalian tim mana nih?",
+        "vetoes": [
+          "engagement_bait_closer"
+        ],
+        "rejected": true
+      },
+      {
+        "control": "clickbait",
+        "content": "Jangan percaya sama angka di kemasan power bank, ada rahasia yang disembunyikan pabrikan.",
+        "vetoes": [
+          "clickbait_pattern"
+        ],
+        "rejected": true
+      },
+      {
+        "control": "hashtag",
+        "content": "Rapiin mejamu mulai dari kabel #setup #raapi #tips",
+        "vetoes": [
+          "hashtag_present"
+        ],
+        "rejected": true
+      },
+      {
+        "control": "no_disclosure",
+        "content": "Power bank ini worth it banget buat harian, beli di link ini ya.",
+        "vetoes": [
+          "no_disclosure"
+        ],
+        "rejected": true
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "index": 1,
+      "pillar": "relatable",
+      "angle": "satu detail kecil yang bikin kesel",
+      "audience_problem": "Kabel charger yang selalu kusut di tas dan putus di ujung",
+      "content": "Kok ya tiap kali buru-buru, kabel charger di tas selalu dalam kondisi paling kusut. Padahal tinggal lingkar sekali abis dipakai.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "langsung_ke_inti",
+        "length": "pendek",
+        "mood": "kritis",
+        "goal": "validasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 2,
+      "pillar": "practical_tips",
+      "angle": "kesalahan umum dan cara hindarinya",
+      "audience_problem": "Nggak tahu cara backup otomatis sebelum HP rusak",
+      "content": "Sebelum beli power bank, cek dulu output watt-nya di bodi atau manualnya. Angka mAh di kemasan sering bukan kapasitas nyata.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "pernyataan_lugas",
+        "length": "pendek",
+        "mood": "reflektif",
+        "goal": "validasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 3,
+      "pillar": "opinions",
+      "angle": "pendapat yang tidak populer tapi masuk akal",
+      "audience_problem": "Diskon besar kadang cuma mengembalikan harga normal",
+      "content": "Spesifikasi tinggi di atas kertas sering nggak terasa di pemakaian harian. Yang kerasa justru baterai yang awet dan layar yang enak dilihat.",
+      "structure": "single",
+      "variation": {
+        "format": "single_snappy",
+        "opening": "langsung_ke_inti",
+        "length": "sedang",
+        "mood": "kritis",
+        "goal": "validasi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 80.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 4,
+      "pillar": "discoveries",
+      "angle": "hal 'membosankan' yang sebenarnya penting",
+      "audience_problem": "Aksesori yang bikin setup rapi tanpa beli meja baru",
+      "content": "Kategori kecil yang sering terlupakan: organizer kabel, stand HP, lampu meja. Murah, tapi efeknya ke kerapian meja kerasa banget.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "kontras",
+        "length": "sedang",
+        "mood": "netral",
+        "goal": "peringatan"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 5,
+      "pillar": "affiliate",
+      "angle": "kapan TIDAK perlu beli yang baru",
+      "audience_problem": "Butuh panduan memilih kabel yang awet, bukan cuma murah",
+      "content": "Kalau lagi cari power bank, jangan langsung ambil yang mAh-nya paling gede. Cek dulu output watt dan apakah ada sertifikasi yang jelas.\n\nLink afiliasi — gue dapat komisi kecil kalau kalian beli, tanpa biaya tambahan.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "observasi",
+        "length": "pendek",
+        "mood": "ringan",
+        "goal": "edukasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 91.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 6,
+      "pillar": "relatable",
+      "angle": "observasi kebiasaan yang jarang disadari",
+      "audience_problem": "Kabel charger yang selalu kusut di tas dan putus di ujung",
+      "content": "Niat bangun pagi buat rapikan kamar. Nyatanya yang pertama kali dipegang tetap HP, dan satu jam hilang sebelum kasur ditinggalkan.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "kontras",
+        "length": "sangat_pendek",
+        "mood": "ringan",
+        "goal": "diskusi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 7,
+      "pillar": "practical_tips",
+      "angle": "urutan prioritas kalau budget terbatas",
+      "audience_problem": "Nggak tahu cara cek apakah charger benar-benar support fast charging",
+      "content": "Kabel USB-C murah kadang cuma bisa cas, nggak bisa transfer data. Coba colok ke laptop sebelum beli banyak.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "kontras",
+        "length": "sedang",
+        "mood": "reflektif",
+        "goal": "validasi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 8,
+      "pillar": "opinions",
+      "angle": "klaim marketing vs realita pemakaian",
+      "audience_problem": "Diskon besar kadang cuma mengembalikan harga normal",
+      "content": "Diskon besar kadang cuma mengembalikan harga normal. Kalau angkanya dibandingkan dari harga setahun lalu, ceritanya beda.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "langsung_ke_inti",
+        "length": "sangat_pendek",
+        "mood": "netral",
+        "goal": "peringatan"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 9,
+      "pillar": "discoveries",
+      "angle": "fitur yang ada tapi jarang dipakai",
+      "audience_problem": "Aksesori yang bikin setup rapi tanpa beli meja baru",
+      "content": "Fitur HP yang jarang dipakai padahal berguna: mode fokus dan batas pengisian baterai. Dua-duanya ada di setelan bawaan.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "langsung_ke_inti",
+        "length": "sedang",
+        "mood": "kritis",
+        "goal": "peringatan"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 10,
+      "pillar": "affiliate",
+      "angle": "kapan TIDAK perlu beli yang baru",
+      "audience_problem": "Butuh saran adaptor untuk laptop dan HP sekaligus",
+      "content": "Pilih kabel itu dari ketahanan, bukan dari harga termurah. Yang murah sering putus di ujung dalam beberapa bulan.\n\nLink afiliasi — gue dapat komisi kecil kalau kalian beli, tanpa biaya tambahan.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "observasi",
+        "length": "pendek",
+        "mood": "netral",
+        "goal": "diskusi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 91.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 11,
+      "pillar": "relatable",
+      "angle": "observasi kebiasaan yang jarang disadari",
+      "audience_problem": "Kabel charger yang selalu kusut di tas dan putus di ujung",
+      "content": "Beli gadget pas diskon besar, dipakai seminggu, abis itu nyimpen di laci. Ternyata yang dibeli bukan kegunaannya, tapi sensasinya.",
+      "structure": "single",
+      "variation": {
+        "format": "single_snappy",
+        "opening": "pernyataan_lugas",
+        "length": "pendek",
+        "mood": "kritis",
+        "goal": "diskusi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 12,
+      "pillar": "practical_tips",
+      "angle": "urutan prioritas kalau budget terbatas",
+      "audience_problem": "Nggak tahu cara cek apakah charger benar-benar support fast charging",
+      "content": "Kalau baterai HP boros tiba-tiba, lihat dulu daftar aplikasi yang jalan di background. Biasanya ada satu yang nggak perlu aktif terus.",
+      "structure": "single",
+      "variation": {
+        "format": "single_snappy",
+        "opening": "kontras",
+        "length": "sangat_pendek",
+        "mood": "reflektif",
+        "goal": "diskusi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 13,
+      "pillar": "opinions",
+      "angle": "klaim marketing vs realita pemakaian",
+      "audience_problem": "Diskon besar kadang cuma mengembalikan harga normal",
+      "content": "Review yang terlalu rapi dan positif itu tanda bahaya, bukan jaminan. Produk yang bagus biasanya punya catatan jelek juga.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "pernyataan_lugas",
+        "length": "pendek",
+        "mood": "kritis",
+        "goal": "peringatan"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 14,
+      "pillar": "discoveries",
+      "angle": "hal 'membosankan' yang sebenarnya penting",
+      "audience_problem": "Fitur HP yang jarang dipakai padahal berguna: mode fokus, batas pengisian",
+      "content": "Hal 'membosankan' yang sebenarnya penting: case, tempered glass, sarungan. Nggak seru dibahas, tapi nyelametin dompet belakangan.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "kontras",
+        "length": "sangat_pendek",
+        "mood": "kritis",
+        "goal": "validasi"
+      },
+      "verdict": "REJECTED",
+      "total_score": 0.0,
+      "vetoes": [
+        "excessive_repetition"
+      ],
+      "notes": "hard veto: excessive_repetition"
+    },
+    {
+      "index": 15,
+      "pillar": "affiliate",
+      "angle": "kapan TIDAK perlu beli yang baru",
+      "audience_problem": "Butuh rekomendasi power bank yang benar-benar sesuai kebutuhan harian",
+      "content": "Butuh adaptor buat laptop dan HP sekaligus? Cari yang punya beberapa port dengan total watt yang cukup, bukan cuma jumlah port-nya banyak.\n\nLink afiliasi — gue dapat komisi kecil kalau kalian beli, tanpa biaya tambahan.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "langsung_ke_inti",
+        "length": "sangat_pendek",
+        "mood": "ringan",
+        "goal": "edukasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 91.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 16,
+      "pillar": "relatable",
+      "angle": "observasi kebiasaan yang jarang disadari",
+      "audience_problem": "Kabel charger yang selalu kusut di tas dan putus di ujung",
+      "content": "Notifikasi grup itu bukan cuma ganggu fokus. Dia juga bikin rasa 'harus bales sekarang' padahal isinya cuma stiker.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "kontras",
+        "length": "sangat_pendek",
+        "mood": "reflektif",
+        "goal": "edukasi"
+      },
+      "verdict": "REJECTED",
+      "total_score": 0.0,
+      "vetoes": [
+        "excessive_repetition"
+      ],
+      "notes": "hard veto: excessive_repetition"
+    },
+    {
+      "index": 17,
+      "pillar": "practical_tips",
+      "angle": "langkah konkret yang bisa dicek hari ini",
+      "audience_problem": "Nggak tahu cara cek apakah charger benar-benar support fast charging",
+      "content": "Backup otomatis itu satu setelan, bukan pekerjaan manual. Nyalain sekarang supaya nggak perlu panik waktu HP-nya rusak.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "pernyataan_lugas",
+        "length": "pendek",
+        "mood": "kritis",
+        "goal": "edukasi"
+      },
+      "verdict": "REJECTED",
+      "total_score": 0.0,
+      "vetoes": [
+        "excessive_repetition"
+      ],
+      "notes": "hard veto: excessive_repetition"
+    },
+    {
+      "index": 18,
+      "pillar": "opinions",
+      "angle": "klaim marketing vs realita pemakaian",
+      "audience_problem": "Diskon besar kadang cuma mengembalikan harga normal",
+      "content": "Nggak semua orang butuh flagship. Banyak yang sebenernya butuh baterai yang nggak mati sebelum pulang kerja.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "langsung_ke_inti",
+        "length": "pendek",
+        "mood": "reflektif",
+        "goal": "diskusi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 19,
+      "pillar": "discoveries",
+      "angle": "hal 'membosankan' yang sebenarnya penting",
+      "audience_problem": "Fitur HP yang jarang dipakai padahal berguna: mode fokus, batas pengisian",
+      "content": "Aksesori yang bikin setup rapi tanpa harus beli meja baru: penggaris kabel dan klip. Dua-duanya nggak makan tempat.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "langsung_ke_inti",
+        "length": "sangat_pendek",
+        "mood": "kritis",
+        "goal": "diskusi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 20,
+      "pillar": "affiliate",
+      "angle": "panduan memilih sesuai kebutuhan, bukan harga termurah",
+      "audience_problem": "Butuh panduan memilih kabel yang awet, bukan cuma murah",
+      "content": "Kalau lagi cari earphone, cek dulu apakah volumenya cukup dan apakah bisa dipakai untuk panggilan, bukan cuma buat dengerin musik.\n\nLink afiliasi — gue dapat komisi kecil kalau kalian beli, tanpa biaya tambahan.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "kontras",
+        "length": "sedang",
+        "mood": "ringan",
+        "goal": "edukasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 91.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 21,
+      "pillar": "relatable",
+      "angle": "kontras antara niat dan kenyataan",
+      "audience_problem": "Kabel charger yang selalu kusut di tas dan putus di ujung",
+      "content": "Power bank dibawa tiap hari 'buat jaga-jaga'. Yang habis justru baterai power bank-nya sendiri karena jarganya nggak pernah dicabut.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "observasi",
+        "length": "pendek",
+        "mood": "ringan",
+        "goal": "peringatan"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 22,
+      "pillar": "practical_tips",
+      "angle": "urutan prioritas kalau budget terbatas",
+      "audience_problem": "Bingung pilih power bank: capacity nyata vs angka di kemasan",
+      "content": "Adaptor 30W, 65W, dan 100W beda di kecepatan cas, bukan di keselamatan. Pilih sesuai perangkat yang paling sering di-cas.",
+      "structure": "single",
+      "variation": {
+        "format": "multi_paragraph",
+        "opening": "pernyataan_lugas",
+        "length": "sedang",
+        "mood": "netral",
+        "goal": "diskusi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 76.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 23,
+      "pillar": "opinions",
+      "angle": "klaim marketing vs realita pemakaian",
+      "audience_problem": "Diskon besar kadang cuma mengembalikan harga normal",
+      "content": "Iklan 'harga spesial tiga hari' lebih sering trik tekanan waktu darurat kesempatan yang sebenernya selalu ada.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "langsung_ke_inti",
+        "length": "sangat_pendek",
+        "mood": "kritis",
+        "goal": "edukasi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 70.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 24,
+      "pillar": "discoveries",
+      "angle": "alat sederhana yang menghemat waktu",
+      "audience_problem": "Fitur HP yang jarang dipakai padahal berguna: mode fokus, batas pengisian",
+      "content": "Lampu meja yang warna suhunya bisa diatur sering lebih berguna daripada yang paling terang. Yang penting mata nggak cepat capek.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "observasi",
+        "length": "sangat_pendek",
+        "mood": "kritis",
+        "goal": "validasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 25,
+      "pillar": "affiliate",
+      "angle": "panduan memilih sesuai kebutuhan, bukan harga termurah",
+      "audience_problem": "Butuh panduan memilih kabel yang awet, bukan cuma murah",
+      "content": "Stand HP itu bukan cuma soal gaya. Yang penting tinggi dan sudutnya bikin leher nggak nunduk terlalu lama.\n\nLink afiliasi — gue dapat komisi kecil kalau kalian beli, tanpa biaya tambahan.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "observasi",
+        "length": "sedang",
+        "mood": "ringan",
+        "goal": "peringatan"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 91.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 26,
+      "pillar": "relatable",
+      "angle": "cerita singkat situasi yang biasa kejadian",
+      "audience_problem": "Kabel charger yang selalu kusut di tas dan putus di ujung",
+      "content": "Kulkas penuh tapi akhirnya pesan antar lagi. Bukan karena lapar, tapi karena nggak ada yang mau mulai masak dari nol.",
+      "structure": "single",
+      "variation": {
+        "format": "single_snappy",
+        "opening": "kontras",
+        "length": "sedang",
+        "mood": "reflektif",
+        "goal": "peringatan"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 27,
+      "pillar": "practical_tips",
+      "angle": "cara cek sebelum beli / sebelum rusak",
+      "audience_problem": "Nggak tahu cara backup otomatis sebelum HP rusak",
+      "content": "Kabel yang putus di ujung biasanya bukan karena dipakai keras, tapi karena ditekuk di sudut yang sama berulang kali.",
+      "structure": "single",
+      "variation": {
+        "format": "short_paragraph",
+        "opening": "langsung_ke_inti",
+        "length": "pendek",
+        "mood": "netral",
+        "goal": "peringatan"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 70.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 28,
+      "pillar": "opinions",
+      "angle": "kapan sesuatu yang mahal memang worth it",
+      "audience_problem": "Diskon besar kadang cuma mengembalikan harga normal",
+      "content": "Gadget murah yang awet sering lebih masuk akal daripada yang mahal tapi rusak setelah sekali jatuh.",
+      "structure": "single",
+      "variation": {
+        "format": "multi_paragraph",
+        "opening": "pernyataan_lugas",
+        "length": "sangat_pendek",
+        "mood": "ringan",
+        "goal": "diskusi"
+      },
+      "verdict": "NEEDS_REVIEW",
+      "total_score": 70.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 29,
+      "pillar": "discoveries",
+      "angle": "hal 'membosankan' yang sebenarnya penting",
+      "audience_problem": "Fitur HP yang jarang dipakai padahal berguna: mode fokus, batas pengisian",
+      "content": "Label atau spidol buat nandain kabel itu solusi kuno yang tetap jalan. Nggak perlu aplikasi buat tahu kabel mana milik siapa.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "observasi",
+        "length": "sangat_pendek",
+        "mood": "netral",
+        "goal": "edukasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 86.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    },
+    {
+      "index": 30,
+      "pillar": "affiliate",
+      "angle": "panduan memilih sesuai kebutuhan, bukan harga termurah",
+      "audience_problem": "Butuh saran adaptor untuk laptop dan HP sekaligus",
+      "content": "Sebelum beli case, pastiin akses ke port dan tombolnya tetap mudah. Case yang bagus tapi nyusahin tombol power cuma jadi beban.\n\nLink afiliasi — gue dapat komisi kecil kalau kalian beli, tanpa biaya tambahan.",
+      "structure": "single",
+      "variation": {
+        "format": "comparison",
+        "opening": "kontras",
+        "length": "pendek",
+        "mood": "reflektif",
+        "goal": "edukasi"
+      },
+      "verdict": "APPROVED_AUTO",
+      "total_score": 91.0,
+      "vetoes": [],
+      "notes": "penilaian otomatis shadow run"
+    }
+  ]
+}

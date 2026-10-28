@@ -86,3 +86,64 @@ Trigger: Daily at 08:00
 | Google Trends JSONP parse | Proper response key path + pytrends fallback |
 | TikTok unsigned request | Mobile UA + graceful warning to use RapidAPI in prod |
 | `hmac.new` → `hmac.new` | Uses stdlib `hmac.new(key, msg, digestmod)` correctly |
+
+---
+
+# Affiliate Automation V2 (persona-first)
+
+A parallel, additive implementation living on branch `feature/v2-persona-first`.
+The V1 pipeline above is **preserved and still running**. V2 replaces the
+news-first Threads content system with a persona-first one.
+
+**Documentation:** [`docs/v2/`](docs/v2/) — audit, product spec, architecture,
+migrations, Telegram guide, runbook, cutover/rollback, quality review.
+
+## V2 Quick Start (offline)
+
+```bash
+# Inspect flags — everything live is OFF by default
+python -m src.v2_cli health
+
+# Apply additive migrations
+python -m src.v2_cli migrate
+
+# Show the canonical persona
+python -m src.v2_cli persona
+
+# Build the 30-day content calendar
+python -m src.v2_cli plan --days 30
+
+# Generate candidate ideas (no news source, no network)
+python -m src.v2_cli ideas --n 3
+
+# Generate a draft without publishing
+python -m src.v2_cli draft --pillar practical_tips
+
+# The reproducible offline shadow run
+python -m src.shadow_run --count 30 --out docs/v2/shadow-report.json
+```
+
+## V2 Tests
+
+```bash
+python -m pytest tests/ -q --no-header -p no:cacheprovider \
+  --ignore=tests/bot --ignore=tests/clipper --ignore=tests/tiktok \
+  --ignore=tests/test_multi_topic_bot.py
+```
+
+`tests/bot/`, `tests/clipper/`, `tests/tiktok/`, and
+`tests/test_multi_topic_bot.py` require `cv2`, `psutil`, `praw`, and
+`playwright`, which are not installed in this environment. They were
+uncollectable before V2 as well.
+
+## V2 Safety Defaults
+
+| Flag | Default | Effect |
+|---|---|---|
+| `AUTOPUBLISH_ENABLED` | `false` | No live publishing |
+| `AFFILIATE_AUTO_ENABLED` | `false` | No affiliate links |
+| `DRY_RUN` | `true` | Every adapter is a no-op |
+| `V2_SCHEDULER_ENABLED` | `false` | V2 scheduler does not run |
+| `TELEGRAM_OPERATOR_IDS` | *(empty)* | Denies every mutation |
+
+See [`.env.example`](.env.example) for the full list.

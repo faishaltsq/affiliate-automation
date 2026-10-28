@@ -170,17 +170,42 @@ class TestSimilarity:
         assert "near_duplicate" in v.reason
 
     def test_repetitive_template_is_caught(self):
-        """Same sentence-length skeleton, different words."""
+        """Same sentence-length skeleton, different words.
+
+        The threshold is two-thirds of the window, so a shape has to dominate
+        the recent posts before it counts as a template.
+        """
         history = [
             "Kok ya tiap pagi selalu macet di jalan tol.",
             "Kok ya tiap siang selalu lempar di kantor.",
             "Kok ya tiap sore selalu lemot di rumah.",
             "Kok ya tiap malam selalu pusing di kasur.",
+            "Kok ya tiap dinih selalu hujan di trotoar.",
+            "Kok ya tiap jumat selalu macet di gerbang.",
         ]
-        draft = "Kok ya tiap dinih selalu hujan di trotoar."
+        draft = "Kok ya tiap sabtu selalu lemot di kamar."
         v = sim.check_against_history(draft, history, skeleton_window=8)
         assert v.ok is False
         assert "repetitive_template" in v.reason
+
+    def test_two_sentence_shape_is_not_a_template(self):
+        """'m-m' is a normal post shape; it must not be treated as spam."""
+        history = [
+            "Diskon besar kadang cuma mengembalikan harga normal. Kalau "
+            "angkanya dibandingkan dari harga setahun lalu, ceritanya beda.",
+            "Sebelum beli power bank, cek dulu output watt-nya di bodi atau "
+            "manualnya. Angka mAh di kemasan sering bukan kapasitas nyata.",
+            "Spesifikasi tinggi di atas kertas sering nggak terasa di pemakaian "
+            "harian. Yang kerasa justru baterai yang awet dan layar enak dilihat.",
+            "Kategori kecil yang sering terlupakan: organizer kabel, stand HP, "
+            "lampu meja. Murah, tapi efeknya ke kerapian meja kerasa banget.",
+        ]
+        draft = (
+            "Review yang terlalu rapi dan positif itu tanda bahaya, bukan "
+            "jaminan. Produk yang bagus biasanya punya catatan jelek juga."
+        )
+        v = sim.check_against_history(draft, history, skeleton_window=8)
+        assert v.ok is True
 
     def test_unique_draft_passes(self):
         history = [
@@ -326,11 +351,31 @@ class TestHardVetoes:
             "Kok ya tiap siang selalu lempar di kantor.",
             "Kok ya tiap sore selalu lemot di rumah.",
             "Kok ya tiap malam selalu pusing di kasur.",
+            "Kok ya tiap dinih selalu hujan di trotoar.",
+            "Kok ya tiap jumat selalu macet di gerbang.",
         ]
         vetoes = hard_vetoes(
-            "Kok ya tiap dinih selalu hujan di trotoar.", history=history
+            "Kok ya tiap sabtu selalu lemot di kamar.", history=history
         )
         assert V_EXCESSIVE_REPETITION in vetoes
+
+    def test_normal_two_sentence_shape_is_not_vetoed(self):
+        history = [
+            "Diskon besar kadang cuma mengembalikan harga normal. Kalau "
+            "angkanya dibandingkan dari harga setahun lalu, ceritanya beda.",
+            "Sebelum beli power bank, cek dulu output watt-nya di bodi atau "
+            "manualnya. Angka mAh di kemasan sering bukan kapasitas nyata.",
+            "Spesifikasi tinggi di atas kertas sering nggak terasa di pemakaian "
+            "harian. Yang kerasa justru baterai yang awet dan layar enak dilihat.",
+            "Kategori kecil yang sering terlupakan: organizer kabel, stand HP, "
+            "lampu meja. Murah, tapi efeknya ke kerapian meja kerasa banget.",
+        ]
+        vetoes = hard_vetoes(
+            "Review yang terlalu rapi dan positif itu tanda bahaya, bukan "
+            "jaminan. Produk yang bagus biasanya punya catatan jelek juga.",
+            history=history,
+        )
+        assert V_EXCESSIVE_REPETITION not in vetoes
 
     def test_affiliate_without_verification_is_vetoed(self):
         vetoes = hard_vetoes(

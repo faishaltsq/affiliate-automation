@@ -140,16 +140,24 @@ def check_against_history(
         )
 
     # 3. Template repetition: same sentence-length skeleton too often.
+    # The bar is deliberately high. Two medium sentences ('m-m') is a normal,
+    # natural post shape — most good posts are two or three sentences. Firing
+    # at half the window would reject perfectly varied writing, so the check
+    # only trips when the shape dominates the recent window outright.
     draft_skel = skeleton(draft_text)
     if draft_skel:
         recent = history[-skeleton_window:]
         repeats = sum(1 for h in recent if skeleton(h) == draft_skel)
-        if repeats >= max(2, skeleton_window // 2):
+        threshold = max(3, (skeleton_window * 2) // 3)
+        if repeats >= threshold:
             return SimilarityVerdict(
                 ok=False,
                 max_similarity=best,
                 matched_excerpt=best_excerpt,
-                reason=f"repetitive_template ({repeats}/{len(recent)} share this shape)",
+                reason=(
+                    f"repetitive_template ({repeats}/{len(recent)} share this "
+                    f"shape, threshold {threshold})"
+                ),
             )
 
     return SimilarityVerdict(ok=True, max_similarity=best, reason="unique")

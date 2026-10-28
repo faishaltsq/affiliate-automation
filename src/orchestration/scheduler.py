@@ -19,7 +19,7 @@ from typing import Callable, Optional
 
 from src.core.clock import (
     to_wib, utc_now, wib_date_key, wib_display, wib_hour,
-    is_quiet_hour, seconds_until_quiet_end,
+    is_quiet_hour, seconds_until_quiet_end, parse_sqlite_utc,
 )
 from src.core.config import get_settings
 from src.core.storage import connect, connection, transaction
@@ -99,32 +99,35 @@ def _kv_set(key: str, value: str, path=None) -> None:
 
 
 def posts_today(path=None) -> int:
-    """How many V2 posts already went out today (WIB calendar day)."""
+    """How many V2 posts already went out today (WIB calendar day).
+
+    `content_drafts.created_at` is stored in UTC by contract, but the day
+    boundary we care about is the WIB one — a post drafted at 20:00 WIB is
+    13:00 UTC and belongs to the same WIB day. Comparing the raw UTC date
+    against the WIB date would mis-count anything drafted after 17:00 WIB.
+    """
     from src.orchestration.publisher import PUBLISHED
 
-    today = wib_date_key()
+    today_wib = wib_date_key()
     with connection(path) as conn:
         rows = conn.execute(
             """
-            SELECT pj.published_id FROM publication_jobs pj
-            JOIN content_drafts cd ON cd.id = pj.draft_id
+            SELECT cd.created_at AS created_at
+            FROM content_drafts cd
+            JOIN publication_jobs pj ON pj.draft_id = cd.id
             WHERE pj.state = ?
             """,
             (PUBLISHED,),
         ).fetchall()
-    # publication_jobs has no WIB timestamp of its own; count by draft creation
-    # day, which is the day the slot was filled.
-    with connection(path) as conn:
-        n = conn.execute(
-            """
-            SELECT COUNT(*) AS n FROM content_drafts cd
-            JOIN publication_jobs pj ON pj.draft_id = cd.id
-            WHERE pj.state = ?
-              AND substr(cd.created_at, 1, 10) = ?
-            """,
-            (PUBLISHED, today),
-        ).fetchone()["n"]
-    return int(n)
+
+    count = 0
+    for r in rows:
+        dt = parse_sqlite_utc(r["created_at"])
+        if dt is None:
+            continue
+        if to_wib(dt).strftime("%Y-%m-%d") == today_wib:
+            count += 1
+    return count
 
 
 def extras_this_week(path=None) -> int:

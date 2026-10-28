@@ -83,10 +83,19 @@ _CLICKBAIT_PATTERNS = [
     r"plot twist",
 ]
 
+# Engagement-bait closers. Matched against the last 200 characters so a post
+# that legitimately asks a question mid-body is not penalised — only a bait
+# closer is.
 _ENGAGEMENT_BAIT_RE = re.compile(
-    r"(menurut\s+(?:kalian|kamu|anda)|gimana\s+menurut|"
-    r"kalian\s+tim\s+(?:mana|apa)|ada\s+yang\s+(?:ngerasain|merasain|pernah)|"
-    r"setuju\s+nggak\?|siapa\s+yang\s+(?:sama|pernah))\s*[?.!]*\s*$",
+    r"(?:"
+    r"menurut\s+(?:kalian|kamu|anda)"
+    r"|gimana\s+menurut"
+    r"|kalian\s+tim\s+(?:mana|apa)"
+    r"|tim\s+(?:mana|apa)\s*(?:nih|sih|ya|dong)?"
+    r"|ada\s+yang\s+(?:ngerasain|merasain|pernah)"
+    r"|setuju\s+nggak"
+    r"|siapa\s+yang\s+(?:sama|pernah)"
+    r")[\s?,.!]*(?:[a-zA-Z]+[\s?,.!]*){0,2}$",
     re.I,
 )
 
