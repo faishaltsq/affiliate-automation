@@ -16,7 +16,18 @@ DB_PATH = DATA_DIR / "posts.db"
 
 
 def init_organic_db():
-    """Initializes tables for organic posting and scheduler state."""
+    """Initializes tables for organic posting and scheduler state.
+
+    Delegates to the V2 migration runner: the legacy CREATE TABLE IF NOT EXISTS
+    statements below are kept for direct callers, but the additive V2 columns
+    (status, deleted_at, last_sync_status, ...) come from
+    src.core.storage.migrate so both code paths agree on one schema.
+    """
+    try:
+        from src.core.storage import migrate
+        migrate(DB_PATH)
+    except Exception as e:  # pragma: no cover - defensive
+        log.warning(f"V2 migration skipped during legacy init: {e}")
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -222,37 +233,36 @@ def get_recent_posts(limit: int = 5) -> list[dict]:
 
 
 def sync_with_threads_status() -> dict:
-    """Check each logged post with Threads API; remove deleted posts from DB."""
-    import requests
-    from src.publish.threads import ACCESS_TOKEN
+    """Reconcile logged posts against the Threads API — WITHOUT deleting rows.
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT id, threads_id, topic FROM organic_posts")
-    rows = c.fetchall()
+    V2 behaviour (see src/core/post_sync.py):
+      * 200              -> status='published'
+      * 404              -> status='deleted', row KEPT with deleted_at + reason
+      * 429/5xx/401/403/
+        timeout/transport -> last_sync_status records the outcome, row untouched
 
-    deleted_ids = []
-    alive_ids = []
-    for pid, tid, topic in rows:
-        if not tid:
-            deleted_ids.append(pid)
-            continue
-        try:
-            url = f"https://graph.threads.net/v1.0/{tid}"
-            r = requests.get(url, params={"fields": "id", "access_token": ACCESS_TOKEN}, timeout=4)
-            if r.status_code == 200:
-                alive_ids.append(pid)
-            else:
-                deleted_ids.append(pid)
-        except Exception:
-            pass
+    The previous implementation DELETEd rows on every non-200, which destroyed
+    content history on rate limits, token expiry, and socket timeouts. That is
+    the R1 data-loss bug; this function is the fix.
+    """
+    from src.core import post_sync
 
-    if deleted_ids:
-        placeholders = ",".join("?" for _ in deleted_ids)
-        c.execute(f"DELETE FROM organic_posts WHERE id IN ({placeholders})", deleted_ids)
-        conn.commit()
-    conn.close()
-    return {"alive": len(alive_ids), "deleted": len(deleted_ids)}
+    summary = post_sync.reconcile_all(
+        prober=post_sync.default_threads_prober, path=DB_PATH
+    )
+    log.info(
+        "Threads sync: checked=%s ok=%s tombstoned=%s rate_limited=%s "
+        "server_error=%s auth_error=%s transport_error=%s (0 rows deleted)",
+        summary["checked"], summary["ok"], summary["tombstoned"],
+        summary["rate_limited"], summary["server_error"],
+        summary["auth_error"], summary["transport_error"],
+    )
+    return {
+        "alive": summary["ok"],
+        "deleted": summary["tombstoned"],
+        "rows_removed": 0,
+        "detail": summary,
+    }
 
 
 if __name__ == "__main__":

@@ -20,7 +20,9 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from src.core.clock import sqlite_utc
-from src.core.storage import connection, transaction
+from src.core.storage import (
+    connection, transaction, column_names, table_exists,
+)
 
 # Sync outcomes, ordered by how much we trust them.
 OK = "ok"
@@ -136,6 +138,15 @@ def reconcile_all(
         "permission_error": 0, "transport_error": 0, "unknown": 0,
     }
     with connection(path) as conn:
+        if not table_exists(conn, "organic_posts"):
+            return summary
+        # The reconciler is called from the legacy daemon, which may still be
+        # running against a database that has not been migrated yet. Apply the
+        # additive columns first so the query below never explodes.
+        cols = column_names(conn, "organic_posts")
+        if "status" not in cols or "last_sync_status" not in cols:
+            from src.core.storage import migrate
+            migrate(path)
         rows = conn.execute(
             "SELECT id, threads_id FROM organic_posts "
             "WHERE threads_id IS NOT NULL AND threads_id != '' "
