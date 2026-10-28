@@ -598,25 +598,24 @@ class TestWriterNeverFills:
         assert "REVISI DIMINTA OPERATOR" in prompt
         assert "buat lebih pendek" in prompt
 
-    def test_single_variation_rejects_thread_payload(self, db):
+    def test_single_variation_rejects_thread_payload(self, db, monkeypatch):
         """A model that ignores the schema must not smuggle in a thread."""
         import json
-        from src.content.writer import reset_variation_history, _variation_history
+        from src.content import writer as writer_mod
         from src.persona.voice import VoiceVariation
 
-        reset_variation_history()
-        for _ in range(12):
-            _variation_history.append(
-                VoiceVariation("single_snappy", "observasi", "pendek",
-                               "ringan", "edukasi").key()
-            )
-        out = write_draft(
+        single_var = VoiceVariation("single_snappy", "observasi", "pendek",
+                                    "ringan", "edukasi")
+        monkeypatch.setattr(
+            writer_mod, "varied_variation",
+            lambda history, rng=None: single_var,
+        )
+        out = writer_mod.write_draft(
             pillar="practical_tips",
             client=FakeLLMClient(default=json.dumps({"parts": ["a.", "b."]})),
             path=db, persist=False,
         )
         assert out is None
-        reset_variation_history()
 
     def test_thread_variation_rejects_single_payload(self, db, monkeypatch):
         """When the variation IS a thread, a single-post reply is rejected."""
