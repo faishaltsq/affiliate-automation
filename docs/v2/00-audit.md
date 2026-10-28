@@ -236,3 +236,39 @@ documented in `docs/v2/06-cutover-rollback.md`.
 - [x] Rollback path defined (see `docs/v2/06-cutover-rollback.md`)
 
 **Phase 0 complete. Proceeding to Phase 1.**
+
+---
+
+## 10. Post-Implementation Observation (2026-10-29)
+
+Re-checked the live processes after all seven phases were committed.
+
+**Finding: the legacy daemon and Telegram listener are each running TWO
+instances.**
+
+| Process | PIDs observed |
+|---|---|
+| `main.py organic --daemon` | 26932, 35772 |
+| `main.py bot` | 32308, 9496 |
+
+The original PIDs (13584, 27300) were recycled by unrelated processes; the
+watchdog (`scripts/watchdog.py`) respawned replacements. The duplicates are
+consistent with the restart-loop history recorded in commit `d45d3ac`
+("fix(ops): hentikan restart beruntun watchdog-vs-singleton") — the singleton
+lock is advisory and a respawn can land while the previous holder is still
+alive.
+
+**Impact on V2: none.** No V2 code path was involved, and the database is
+healthy (131 posts, `integrity_check` ok, all `status='published'`). The
+additive V2 columns are present and the legacy daemon has been writing to the
+migrated schema without error, which is itself useful evidence that the
+migration is compatible with the live pipeline.
+
+**Recommendation for the operator (not acted on):** investigate the duplicate
+instances before enabling the V2 scheduler. Two daemons posting to the same
+account is a duplicate-content risk independent of V2. The V2 publisher's
+`operation_id` idempotency protects V2's own queue, but it cannot protect
+against two *legacy* daemons.
+
+**Not modified:** no process was killed, signalled, or restarted during this
+audit or during any phase of the V2 implementation.
