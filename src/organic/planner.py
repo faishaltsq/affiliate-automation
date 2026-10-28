@@ -16,8 +16,9 @@ from src.trends.multi_source import (
     get_source_summary,
     EVERGREEN_BY_PILLAR,
 )
-from src.organic.db import is_topic_recent, get_today_post_count, get_today_chain_count
+from src.organic.db import is_topic_recent, get_today_post_count, get_today_chain_count, get_pillar_performance
 from src.organic.generator import CHAIN_PILLARS
+from src.organic.personas import is_sensitive_topic
 from src.logger import get_logger
 
 log = get_logger("organic_planner")
@@ -69,11 +70,18 @@ def _get_post_format(hour: int, post_count_today: int) -> str:
     return random.choices(["with_image", "text_only"], weights=[80, 20])[0]
 
 
-def _get_post_style(hour: int) -> str:
+def _get_post_style(
+    hour: int, pillar: str = "", topic: str = "", source_summary: str = ""
+) -> str:
     """
     Selects direct, human netizen style based on time of day (WIB).
     Heavy bias towards snappy_take (to the point) to avoid boilerplate preamble.
+
+    A sensitive story overrides the clock: greetings, banter and "closing bell"
+    framing are wrong next to a death toll, whatever time it is.
     """
+    if is_sensitive_topic(pillar, topic, source_summary):
+        return "empathetic_update"
     if 5 <= hour < 10:
         return random.choices(["snappy_take", "morning_greeting"], weights=[7, 3])[0]
     elif 11 <= hour < 14:
@@ -106,13 +114,13 @@ def _get_post_structure(pillar: str) -> str:
     return "chain" if random.random() < CHAIN_PROBABILITY else "single"
 
 
-def _select_pillar(hour: int, post_count_today: int) -> str:
-    """
-    Picks content pillar based on real performance analytics:
-    - Football/Sports is the primary traffic & virality driver (~50-60% of volume).
-    - Market/Stocks (Local IDX & Global Bloomberg/Reuters/Wall Street).
-    - Tech/AI (Emerging gadgets, AI tools, chips).
-    - Disaster/BMKG reserved for urgent national events.
+def _pillar_weights(hour: int, perf: dict) -> dict:
+    """Static clock weights scaled by measured engagement per pillar.
+
+    ratio = a pillar's avg_views / best-effort overall avg_views. A pillar
+    pulling above-average reach gets boosted (capped 2x), an underperformer is
+    cut down (floored at 0.4x, and never below 15% of its original weight so
+    no pillar silently dies). Empty/absent perf → exact static weights.
     """
     if 5 <= hour < 10:
         # Pagi (05:00-10:00 WIB): Hasil bola semalam/EPL/UCL + pasar Wall St + Tech
@@ -147,9 +155,50 @@ def _select_pillar(hour: int, post_count_today: int) -> str:
             "breaking_disaster": 1,
         }
 
+    if not perf:
+        return weights
+
+    avg_views_all = sum(p["avg_views"] * p["posts"] for p in perf.values()) / max(
+        sum(p["posts"] for p in perf.values()), 1
+    )
+    scaled = {}
+    for pillar, w in weights.items():
+        stats = perf.get(pillar)
+        if stats and avg_views_all > 0:
+            ratio = stats["avg_views"] / avg_views_all
+        else:
+            ratio = 1.0
+        new_w = w * min(2.0, max(0.4, 0.6 + 0.8 * ratio))
+        new_w = max(new_w, w * 0.15)  # floor: every pillar stays alive
+        scaled[pillar] = new_w
+    return scaled
+
+def _select_pillar(hour: int, post_count_today: int) -> str:
+    """
+    Picks content pillar based on real performance analytics:
+    - Football/Sports is the primary traffic & virality driver (~50-60% of volume).
+    - Market/Stocks (Local IDX & Global Bloomberg/Reuters/Wall Street).
+    - Tech/AI (Emerging gadgets, AI tools, chips).
+    - Disaster/BMKG reserved for urgent national events.
+
+    Real engagement shifts the mix when at least 3 scored posts exist;
+    otherwise the static clock weights stand (zero data must not kill a pillar).
+    """
+    perf = {}
+    total_posts = 0
+    try:
+        perf = get_pillar_performance()
+        total_posts = sum(p["posts"] for p in perf.values())
+    except Exception as e:
+        log.warning(f"Pillar performance lookup failed ({e}); using static weights.")
+    if total_posts < 3:
+        perf = {}
+
+    weights = _pillar_weights(hour, perf)
+
     pool = []
     for pillar, weight in weights.items():
-        pool.extend([pillar] * weight)
+        pool.extend([pillar] * max(1, round(weight)))
 
     return random.choice(pool)
 
@@ -226,7 +275,11 @@ def plan_single_post(used_today: list[str] = None) -> dict:
         pillar = _select_pillar(hour, today_count)
         topic, source = _select_topic_for_pillar(pillar, used_today)
     post_format = _get_post_format(hour, today_count)
-    post_style = _get_post_style(hour)
+    # The story context decides whether this is a sensitive post, which overrides
+    # both the clock style and the persona. It has to be resolved before the
+    # style is chosen, not after.
+    source_summary = _topic_summary(topic)
+    post_style = _get_post_style(hour, pillar, topic, source_summary)
     post_structure = _get_post_structure(pillar)
 
     log.info(
@@ -259,7 +312,8 @@ def plan_daily_batch(count: int = 10) -> list[dict]:
         pillar = _select_pillar(simulated_hour, i)
         topic, source = _select_topic_for_pillar(pillar, used_topics)
         post_format = _get_post_format(simulated_hour, i)
-        post_style = _get_post_style(simulated_hour)
+        source_summary = _topic_summary(topic)
+        post_style = _get_post_style(simulated_hour, pillar, topic, source_summary)
         used_topics.append(topic)
 
         posts.append({
@@ -270,6 +324,7 @@ def plan_daily_batch(count: int = 10) -> list[dict]:
             "post_style": post_style,
             "post_structure": _get_post_structure(pillar),
             "planned_hour": simulated_hour,
+            "source_summary": source_summary,
         })
 
     log.info(f"Planned {len(posts)} posts for today across 4 core pillars")

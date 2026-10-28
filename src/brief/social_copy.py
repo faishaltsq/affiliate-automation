@@ -4,6 +4,7 @@ from src.brief.generator import _llm
 from src.trends.live_trends import get_live_id_trends
 from src.image.vibe_search import search_vibe_image
 from src.logger import get_logger
+from src.guardrails import repair_json
 
 log = get_logger("social_copy")
 
@@ -88,11 +89,7 @@ Hanya output JSON valid. Tanpa markdown ticks."""
     log.info(f"Generating viral bait + numpang lapak bundle for: '{title}'")
     resp_text = _llm([{"role": "user", "content": prompt}], temperature=0.8, max_tokens=1500)
 
-    # Clean potential markdown ticks
-    clean_json = re.sub(r"^```json\s*", "", resp_text.strip(), flags=re.I)
-    clean_json = re.sub(r"^```\s*", "", clean_json.strip())
-    clean_json = re.sub(r"\s*```$", "", clean_json.strip())
-
+    clean_json = repair_json(resp_text)
     try:
         bundle = json.loads(clean_json)
         required_keys = ["hook_viral_1", "threads_reply", "facebook_post"]

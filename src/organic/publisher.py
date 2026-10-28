@@ -170,6 +170,7 @@ def execute_organic_post(used_today: list[str] = None, dry_run: bool = False) ->
             image_url=image_url,
             threads_id=threads_id,
             post_structure="chain" if is_chain else "single",
+            source_summary=plan.get("source_summary", "") or post_data.get("source_summary_used", ""),
         )
 
     return {

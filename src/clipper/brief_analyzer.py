@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 import requests
 from dotenv import dotenv_values
+from src.guardrails import repair_json
 
 logger = logging.getLogger("clipper.brief_analyzer")
 
@@ -16,16 +17,18 @@ _h_env = dotenv_values(Path(HERMES_HOME) / ".env")
 _p_env = dotenv_values(Path(__file__).parent.parent.parent / ".env")
 _ALL = {**_h_env, **_p_env}
 
-LLM_URL = os.environ.get("OPENROUTER_BASE_URL", "http://localhost:20128/v1/chat/completions")
-MODEL = os.environ.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
-FALLBACK_MODEL = None  # retired: fallback is now Mortera Cloud direct (see below)
-MORTERA_URL = (
-    os.environ.get("MORTERA_BASE_URL") or _ALL.get("MORTERA_BASE_URL", "https://mortera.cloud/v1")
-).rstrip("/") + "/chat/completions"
-MORTERA_MODEL = os.environ.get("MORTERA_MODEL") or _ALL.get("MORTERA_MODEL", "muse-spark-1.3")
-MORTERA_API_KEY = os.environ.get("MORTERA_API_KEY") or _ALL.get("MORTERA_API_KEY") or ""
+LLM_URL = (os.environ.get("LLM_BASE_URL") or _ALL.get("LLM_BASE_URL", "https://api.trustisgold.web.id/v1")).rstrip("/") + "/chat/completions"
+MODEL = os.environ.get("LLM_MODEL") or _ALL.get("LLM_MODEL", "tig/laguna-s-2.1")
+FALLBACK_MODELS = [
+    m.strip() for m in (
+        os.environ.get("LLM_FALLBACK_MODELS")
+        or _ALL.get("LLM_FALLBACK_MODELS", "tig/laguna-xs-2.1,tig/step-3.7-flash,tig/step-5-unrestricted")
+    ).split(",") if m.strip()
+]
 LLM_API_KEY = (
-    os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    os.environ.get("LLM_API_KEY")
+    or _ALL.get("LLM_API_KEY")
+    or os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or _ALL.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or ""
 )
@@ -107,22 +110,15 @@ def analyze_campaign_brief(campaign_detail: dict) -> dict:
             "temperature": 0.3,
         }
         r = None
-        # 1. Primary: 9router
-        r = requests.post(LLM_URL, json=payload, headers=headers, timeout=18)
-        if not r.ok:
-            logger.warning("LLM brief analysis (%s) HTTP %s, trying Mortera fallback...", MODEL, r.status_code)
-            # 2. Fallback: Mortera Cloud direct (Muse Spark)
-            if MORTERA_API_KEY:
-                payload["model"] = MORTERA_MODEL
-                m_headers = {"Authorization": f"Bearer {MORTERA_API_KEY}"}
-                r = requests.post(MORTERA_URL, json=payload, headers=m_headers, timeout=45)
-            else:
-                logger.warning("Mortera fallback skipped: MORTERA_API_KEY missing")
+        # 1. Primary gateway: model + fallback chain
+        for model in [MODEL] + [m for m in FALLBACK_MODELS if m != MODEL]:
+            payload["model"] = model
+            r = requests.post(LLM_URL, json=payload, headers=headers, timeout=18)
+            if r.ok:
+                break
+            logger.warning("LLM brief analysis (%s) HTTP %s, trying next...", model, r.status_code)
         if r is not None and r.ok:
-            content = r.json()["choices"][0]["message"]["content"].strip()
-            if content.startswith("```"):
-                content = re.sub(r"^```(?:json)?\s*", "", content)
-                content = re.sub(r"\s*```$", "", content)
+            content = repair_json(r.json()["choices"][0]["message"]["content"])
             try:
                 parsed = json.loads(content)
             except json.JSONDecodeError:

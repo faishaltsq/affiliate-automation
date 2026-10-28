@@ -14,9 +14,7 @@ import requests
 from src.config import (
     LLM_API_KEY,
     LLM_MODEL,
-    MORTERA_API_KEY,
-    MORTERA_MODEL,
-    MORTERA_URL,
+    LLM_FALLBACK_MODELS,
     OPENROUTER_URL,
     DATA_DIR,
 )
@@ -79,20 +77,18 @@ def _llm(messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096)
     else:
         full_messages = messages
 
-    # 1. Primary: 9router local (Gemini 3.8 Flash High)
-    try:
-        return _call_provider(OPENROUTER_URL, LLM_API_KEY, LLM_MODEL, full_messages, temperature, max_tokens)
-    except Exception as e_primary:
-        primary_err = e_primary
-        log.warning(f"Primary 9router ({LLM_MODEL}) failed: {primary_err}. Attempting fallback...")
-
-    # 2. Fallback: Mortera Cloud direct (NOT via 9router) — Muse Spark
-    if not MORTERA_API_KEY:
-        raise RuntimeError(f"All LLM providers failed. Primary: {primary_err}, Mortera: MORTERA_API_KEY missing")
-    try:
-        return _call_provider(MORTERA_URL, MORTERA_API_KEY, MORTERA_MODEL, full_messages, temperature, max_tokens)
-    except Exception as e_fb:
-        raise RuntimeError(f"All LLM providers failed. Primary: {primary_err}, Mortera fallback ({MORTERA_MODEL}): {e_fb}")
+    # 1. Primary: Trust Is Gold gateway, then its model fallback chain.
+    # Same endpoint and key, so a 503 on one model usually means that upstream
+    # slot is cold — the next model in the chain is a fresh roll.
+    chain = [LLM_MODEL] + [m for m in LLM_FALLBACK_MODELS if m != LLM_MODEL]
+    errors = []
+    for model in chain:
+        try:
+            return _call_provider(OPENROUTER_URL, LLM_API_KEY, model, full_messages, temperature, max_tokens)
+        except Exception as e_model:
+            errors.append(f"{model}: {e_model}")
+            log.warning(f"LLM ({model}) failed: {e_model}. Trying next in chain...")
+    raise RuntimeError(f"All LLM providers failed. Chain: {'; '.join(errors)}")
 
 
 # ── 2.2 Generate Brief ───────────────────────────────────────────────────────

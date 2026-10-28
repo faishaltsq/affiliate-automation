@@ -8,6 +8,7 @@ from typing import List, Dict, Optional
 
 from pathlib import Path
 from dotenv import dotenv_values
+from src.guardrails import repair_json
 
 logger = logging.getLogger("clipper.punchline")
 
@@ -16,53 +17,41 @@ _h_env = dotenv_values(Path(HERMES_HOME) / ".env")
 _p_env = dotenv_values(Path(__file__).parent.parent.parent / ".env")
 _ALL = {**_h_env, **_p_env}
 
-LLM_ENDPOINT = os.environ.get("OPENROUTER_BASE_URL") or _ALL.get("OPENROUTER_BASE_URL", "http://localhost:20128/v1/chat/completions")
+LLM_ENDPOINT = (os.environ.get("LLM_BASE_URL") or _ALL.get("LLM_BASE_URL", "https://api.trustisgold.web.id/v1")).rstrip("/") + "/chat/completions"
 LLM_API_KEY = (
-    os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
+    os.environ.get("LLM_API_KEY")
+    or _ALL.get("LLM_API_KEY")
+    or os.environ.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or _ALL.get("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")
     or ""
 )
-LLM_MODEL = os.environ.get("OPENROUTER_MODEL") or _ALL.get("OPENROUTER_MODEL", "ag/gemini-3.8-flash-high")
-
-# Fallback goes DIRECT to Mortera Cloud (not via 9router). Model IDs are
-# unprefixed there (no "mortera/" prefix — that prefix is a 9router slot).
-MORTERA_ENDPOINT = (
-    os.environ.get("MORTERA_BASE_URL") or _ALL.get("MORTERA_BASE_URL", "https://mortera.cloud/v1")
-).rstrip("/") + "/chat/completions"
-MORTERA_MODEL = os.environ.get("MORTERA_MODEL") or _ALL.get("MORTERA_MODEL", "muse-spark-1.3")
-MORTERA_API_KEY = os.environ.get("MORTERA_API_KEY") or _ALL.get("MORTERA_API_KEY") or ""
+LLM_MODEL = os.environ.get("LLM_MODEL") or _ALL.get("LLM_MODEL", "tig/laguna-s-2.1")
+LLM_FALLBACK_MODELS = [
+    m.strip() for m in (
+        os.environ.get("LLM_FALLBACK_MODELS")
+        or _ALL.get("LLM_FALLBACK_MODELS", "tig/laguna-xs-2.1,tig/step-3.7-flash,tig/step-5-unrestricted")
+    ).split(",") if m.strip()
+]
 
 
 def _llm_post(prompt: str, temperature: float = 0.2, timeout: int = 25) -> Optional[dict]:
-    """POST to 9router primary, Mortera Cloud direct fallback. Returns parsed JSON body or None."""
-    # 1. Primary: 9router
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": temperature,
-        "stream": False,
-    }
-    headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
-    try:
-        resp = requests.post(LLM_ENDPOINT, headers=headers, json=payload, timeout=timeout)
-        if resp.status_code == 200:
-            return resp.json()
-        logger.error(f"LLM ({LLM_MODEL}) failed HTTP {resp.status_code}: {resp.text[:200]}")
-    except Exception as e:
-        logger.error(f"LLM ({LLM_MODEL}) error: {e}")
-    # 2. Fallback: Mortera Cloud direct (Muse Spark)
-    if not MORTERA_API_KEY:
-        logger.error("Mortera fallback skipped: MORTERA_API_KEY missing")
-        return None
-    try:
-        payload["model"] = MORTERA_MODEL
-        headers = {"Authorization": f"Bearer {MORTERA_API_KEY}", "Content-Type": "application/json"}
-        resp = requests.post(MORTERA_ENDPOINT, headers=headers, json=payload, timeout=max(timeout, 45))
-        if resp.status_code == 200:
-            return resp.json()
-        logger.error(f"Mortera ({MORTERA_MODEL}) failed HTTP {resp.status_code}: {resp.text[:200]}")
-    except Exception as e:
-        logger.error(f"Mortera ({MORTERA_MODEL}) error: {e}")
+    """POST to the gateway primary model, then its fallback chain."""
+    # 1. Trust Is Gold gateway: primary model + fallback chain
+    for model in [LLM_MODEL] + [m for m in LLM_FALLBACK_MODELS if m != LLM_MODEL]:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "stream": False,
+        }
+        headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
+        try:
+            resp = requests.post(LLM_ENDPOINT, headers=headers, json=payload, timeout=timeout)
+            if resp.status_code == 200:
+                return resp.json()
+            logger.error(f"LLM ({model}) failed HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            logger.error(f"LLM ({model}) error: {e}")
     return None
 
 
@@ -71,6 +60,9 @@ def _parse_json_loose(text: str):
     t = (text or "").strip()
     if t.startswith("```"):
         t = t.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    # Repair first: the gateway's smaller models emit missing commas and smart
+    # quotes often enough that a bare json.loads would reject valid intent.
+    t = repair_json(t)
     try:
         return json.loads(t)
     except json.JSONDecodeError:
@@ -146,7 +138,7 @@ def _query_punchline_llm(
 ) -> Optional[Dict]:
     """Query LLM to identify the exact punchline/climax moment from footage transcripts."""
     if not LLM_API_KEY:
-        logger.warning("HERMES_CUSTOM_LOCALHOST_20128_API_KEY not set for punchline LLM query.")
+        logger.warning("LLM_API_KEY not set for punchline LLM query.")
         return None
 
     import requests

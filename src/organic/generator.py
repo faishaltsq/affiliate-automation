@@ -8,9 +8,13 @@ import json
 import re
 from datetime import datetime, timezone, timedelta
 from src.brief.generator import _llm
+from src.guardrails import repair_json
 from src.image.vibe_search import search_vibe_image
 from src.logger import get_logger
-from src.organic.personas import get_persona
+from src.organic.personas import (
+    get_persona, EDITORIAL_VOICE_GUIDE, SENSITIVE_VOICE_GUIDE,
+    is_sensitive_topic, has_inappropriate_sensitive_tone,
+)
 
 log = get_logger("organic_generator")
 
@@ -88,6 +92,71 @@ bonus_reply (satu kalimat, opsional tapi disarankan):
 
 
 _FALLBACK_CONTENT = "Isu {topic} ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan."
+
+# Emotional charge per persona when the story is sensitive. The sensitive
+# guide bans devices (jokes, greetings, flair emoji); it must not flatten the
+# voice into a press release — these lenses keep the anger/grief/edge while
+# every clause stays inside the guard.
+_SENSITIVE_EMOTION_LENS: dict[str, str] = {
+    "angry": (
+        "MUATAN EMOSI KHUSUS: cari TITIK MARAHNYA di dalam fakta saja — angka korban, "
+        "penanganan yang molor, janji tak kunjung ditepati yang MEMANG ADA DI SUMBER. "
+        "Ritme pendek-pedas: kalimat pertama langsung menusuk ke kelalaian/kejadiannya. "
+        "Nada geram boleh ('Bukan sirene yang kurang, keputusan yang nggak jalan') — "
+        "asal kritik menyasar kejadian/penanganan yang terbukti, BUKAN menuduh pihak "
+        "tanpa bukti; tanpa capslock berlebihan, umpatan, atau eksploitasi korban. "
+        "Tutup dengan tuntutan konkret yang tertahan, bukan pertanyaan umum."
+    ),
+    "julid": (
+        "MUATAN EMOSI: sindiran sejuk yang menusuk dari FAKTA di sumber — kontras sikap "
+        "resmi versus kenyataan lapangan (satu kalimat fakta, satu kalimat tusukan). "
+        "Sindiran menyasar keputusan/penanganannya, tidak pernah mengejek korban. "
+        "Satu tusukan cukup; jangan bertele."
+    ),
+    "calm": (
+        "MUATAN EMOSI: kesunyian yang berat, bukan netralitas dingin. Tegaskan yang "
+        "hilangnya: satu detail manusiawi dari sumber (warga mengungsi, keluarga "
+        "menunggu). Kalimat lebih pendek dari biasanya; jeda terasa. Tanpa hikmah, "
+        "tanpa penutup menggurui; empati lewat apa yang dibahas, bukan kata 'semoga' klise."
+    ),
+    "nerd": (
+        "MUATAN EMOSI: kegelisahan yang presisi — satu angka/detail teknis dari sumber, "
+        "lalu tunjukkan artinya bagi orang biasa. Tidak pamer data, tidak mengubah "
+        "penderitaan jadi teka-teki; kepedulian lewat ketepatan, bukan jargon."
+    ),
+    "energic": (
+        "MUATAN EMOSI: tempo cepat tetap santun — sorot aksi tanggap yang sudah terbukti "
+        "di sumber (evakuasi, bantuan) dan yang belum. Tanpa hype/caps; pada musibah, "
+        "antusiasme diganti urgensi."
+    ),
+    "default": (
+        "MUATAN EMOSI: reaksi manusiawi warga biasa yang membaca berita ini — terkesan, "
+        "peduli, sedikit gelisah; konkret pada dampak nyata, tidak menggurui, tidak dramatis."
+    ),
+}
+
+# Tokens that identify the news entity in a topic; used to keep Bing image
+# candidates on-topic (a generic "banjir" photo must not illustrate a specific
+# bridge collapse).
+_ENTITY_STOPWORDS = {
+    "yang", "dari", "untuk", "pada", "dengan", "saat", "usai", "hari", "ini", "itu",
+    "akan", "sudah", "belum", "lebih", "bisa", "tidak", "para", "buat", "tahu",
+    "karena", "agar", "atau", "tapi", "tetapi", "oleh", "sebagai", "dalam",
+    "antara", "tanpa", "berita", "terbaru", "terkini", "update", "indonesia",
+    "warga", "pemerintah",
+}
+
+def entity_tokens(topic: str) -> list[str]:
+    """Content words that must appear in an on-topic image candidate URL."""
+    return [t for t in re.findall(r"[a-zA-Z]{4,}", topic.lower()) if t not in _ENTITY_STOPWORDS]
+
+
+def _image_url_on_topic(url: str, tokens: list[str]) -> bool:
+    """Whole-token match in the URL after splitting on separators."""
+    if not tokens:
+        return False
+    parts = re.split(r"[-_/.?=&%]", url.lower())
+    return all(tok in parts for tok in tokens)
 
 # A figure the post may not contain unless the source states it. Covers
 # percentages, plain integers, thousands separators and decimal points — the
@@ -188,6 +257,11 @@ def _regenerate_without_numbers(
         )
         return out.get("content", ""), out.get("parts") or [], out.get("bonus_reply", "")
     except Exception as e:
+        # A sensitive post that failed the tone check is a cancellation, not a
+        # transient LLM error: turning it into "" would let the caller publish
+        # the fallback filler the tone check exists to prevent.
+        if is_sensitive_topic(pillar, topic, source_summary):
+            raise
         log.warning(f"Number-free regeneration failed: {e}")
         return "", [], ""
 
@@ -233,9 +307,26 @@ def generate_organic_post(
     hour, mood, date_str, year = _get_wib_context()
     persona_cfg = get_persona(persona)
     is_chain = post_structure == "chain"
+    sensitive = is_sensitive_topic(pillar, topic, source_summary)
+    if sensitive:
+        post_style = "empathetic_update"
 
     style_guide = ""
-    if post_style == "morning_greeting":
+    if sensitive:
+        style_guide = SENSITIVE_VOICE_GUIDE
+        # An explicitly chosen persona colors the delivery, never the guard:
+        # the emotion lens keeps the voice charged (angry = firm, calm = heavy
+        # silence, julid = precise mockery) while staying inside the sensitive
+        # constraints above — no jokes, no greetings, no invented blame.
+        if persona and persona != "default":
+            style_guide += (
+                f"\nPEWARNAAN PERSONA ({persona_cfg.name} {persona_cfg.emoji}) — tetap dalam batas sensitif di atas:\n"
+                f"{persona_cfg.prompt_guide}\n"
+                f"{_SENSITIVE_EMOTION_LENS.get(persona, _SENSITIVE_EMOTION_LENS['default'])}"
+            )
+        else:
+            style_guide += f"\n{_SENSITIVE_EMOTION_LENS.get(persona, _SENSITIVE_EMOTION_LENS['default'])}"
+    elif post_style == "morning_greeting":
         style_guide = (
             "GAYA: Sapaan pagi yang singkat & langsung sambung ke inti bahasan.\n"
             "Contoh pembuka: 'morning wargaa threadss, udah pada ngopi belom? ...'\n"
@@ -285,8 +376,22 @@ Nama Persona: {persona_cfg.name} {persona_cfg.emoji}
 {persona_cfg.prompt_guide}
 """
 
+    # The editorial guide is what keeps a post from reading like a template: it
+    # bans the empty closers and the "warga Threads" greeting the model reaches
+    # for by default. The sensitive guide, when it applies, is carried by
+    # style_guide above.
+    editorial_section = EDITORIAL_VOICE_GUIDE
+
     # A chain stays scannable because each PART is short, not because the whole
     # thread is — the single-post ceiling would collapse 4 parts into one blob.
+    if sensitive:
+        length_rule = "- Ringkas: 1-3 kalimat pendek. Jangan memangkas konteks penting hanya demi terdengar tajam."
+        structure_rules = (
+            "STRUKTUR KABAR SENSITIF:\n"
+            "- Mulai dari peristiwa atau dampak terkonfirmasi, lalu satu kebutuhan atau catatan yang relevan.\n"
+            "- Tidak perlu hot take, open loop, bonus provokatif, atau pertanyaan pemancing komentar."
+        )
+
     if is_chain:
         length_rule = (
             "- DILARANG BERBELIT: tiap part maksimal 3 kalimat pendek dan 1 ide saja. "
@@ -322,13 +427,36 @@ Nama Persona: {persona_cfg.name} {persona_cfg.emoji}
     # Numbers can only come from a real source. Without this block the model
     # was told "use the figures from the source" while being handed nothing but
     # a headline, so it filled the gap with invented percentages.
-    source_section = ""
+    # Empty caller-supplied summary: the durable article_context row (written
+    # at RSS fetch time) survives daemon restarts and can still ground the post.
+    article_ctx = None
+    # Image guard needs the stored article URLs even when the caller already
+    # passed a summary (source grounding and image sync are separate concerns).
+    try:
+        from src.organic.db import get_article_context as _gac
+        article_ctx = _gac(topic)
+        if article_ctx and len(article_ctx.get("summary") or "") < 120:
+            article_ctx = {**article_ctx, "summary": source_summary} if source_summary.strip() else article_ctx
+    except Exception:
+        article_ctx = None
+    if not source_summary.strip() and article_ctx and len(article_ctx.get("summary") or "") >= 120:
+        source_summary = article_ctx["summary"]  # feeds the number whitelist below too
+    elif not source_summary.strip():
+        article_ctx = None
+    ctx_links = [s for s in ((article_ctx or {}).get("article_links") or "").split("|") if s]
+    ctx_names = [s.strip() for s in ((article_ctx or {}).get("source_names") or "").split("|") if s.strip()]
+    verify_clause = (
+        f"- Verifikasi: semua klaim faktual HARUS bersumber dari {', '.join(ctx_names) or 'sumber berita di atas'} (artikel: {ctx_links[0]}).\n"
+        "- DILARANG menambahkan fakta, nama, angka, atau tanggal di luar ringkasan.\n"
+        if ctx_links else ""
+    )
     if source_summary.strip():
         source_section = (
             "SUMBER BERITA (deskripsi feed — INI SATU-SATUNYA tempat angka boleh diambil):\n"
             f"{source_summary.strip()}\n"
             "- Setiap angka, persentase, tanggal, dan nama lembaga di tulisan lo WAJIB ada di ringkasan di atas.\n"
             "- Kalau ringkasan TIDAK memuat angka, tulis tanpa angka sama sekali. JANGAN mengarang.\n"
+            f"{verify_clause}"
         )
     else:
         source_section = (
@@ -339,6 +467,7 @@ Nama Persona: {persona_cfg.name} {persona_cfg.emoji}
 
     prompt = f"""Kamu adalah akun netizen Indonesia yang cerdas, to the point, santai, dan berwawasan luas (Warga Threads).
 {persona_section}
+{editorial_section}
 FOKUS KONTEN HANYA 4 PILAR UTAMA:
 1. Bencana Alam & Krisis Nasional (BMKG, BNPB, gempa, banjir bandang, cuaca ekstrem, mitigasi)
 2. Sepak Bola & Olahraga (Timnas Indonesia, Liga 1, Premier League, Liga Champions, bursa transfer)
@@ -380,45 +509,96 @@ Hanya output JSON valid tanpa markdown ticks.
     # A chain is four posts plus a bonus reply — 600 tokens would cut it off
     # mid-sentence.
     max_tokens = 900 if is_chain else 600
-    resp_text = _llm([{"role": "user", "content": prompt}], temperature=0.85, max_tokens=max_tokens)
+    messages = [{"role": "user", "content": prompt}]
+    for tone_attempt in range(2):
+        resp_text = _llm(
+            messages, temperature=0.45 if sensitive else 0.85, max_tokens=max_tokens
+        )
 
-    # Clean potential markdown ticks
-    clean_json = re.sub(r"^```json\s*", "", resp_text.strip(), flags=re.I)
-    clean_json = re.sub(r"^```\s*", "", clean_json.strip())
-    clean_json = re.sub(r"\s*```$", "", clean_json.strip())
+        # Clean potential markdown ticks
+        clean_json = re.sub(r"^```json\s*", "", resp_text.strip(), flags=re.I)
+        clean_json = re.sub(r"^```\s*", "", clean_json.strip())
+        clean_json = re.sub(r"\s*```$", "", clean_json.strip())
 
-    parts: list = []
-    bonus_reply = ""
-    try:
-        data = json.loads(clean_json)
-        vibe_query = data.get("image_query", data.get("vibe_image_query", "")).strip()
-        if is_chain:
-            parts, chain_err = _normalize_chain(data.get("parts"))
-            if not parts:
-                raise ValueError(f"unusable chain: {chain_err}")
-            bonus_reply = (data.get("bonus_reply") or "").strip()
-            content = "\n\n".join(parts)
-        else:
-            content = data.get("content", "").strip()
-            if not content:
-                raise ValueError("Empty content from LLM")
-    except Exception as e:
-        if is_chain:
-            # Publishing a half-formed chain to a live account costs more than
-            # one wasted LLM call.
-            log.warning(f"Chain generation failed ({e}). Falling back to a single post.")
-            return generate_organic_post(
-                topic=topic,
-                pillar=pillar,
-                post_format=post_format,
-                post_style=post_style,
-                persona=persona,
-                post_structure="single",
-                source_summary=source_summary,
-            )
-        log.warning(f"Failed to parse LLM JSON for organic post: {e}. Using fallback.")
-        content = f"Isu {topic} ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan."
-        vibe_query = f"{topic} berita indonesia"
+        parts: list = []
+        bonus_reply = ""
+        # glm-5.3-flash routinely emits recoverable JSON defects (missing
+        # comma between members, smart quotes, trailing comma). Repair once
+        # before giving up — the fallback template reads as spam when the
+        # same filler sentence hits the timeline eight times.
+        try:
+            data = json.loads(clean_json)
+        except Exception as first_err:
+            try:
+                data = json.loads(repair_json(clean_json))
+                log.warning(f"LLM JSON repaired successfully (was: {first_err}).")
+            except Exception:
+                data = None
+                first_parse_error = first_err
+        if data is not None:
+            try:
+                vibe_query = data.get("image_query", data.get("vibe_image_query", "")).strip()
+                if is_chain:
+                    parts, chain_err = _normalize_chain(data.get("parts"))
+                    if not parts:
+                        raise ValueError(f"unusable chain: {chain_err}")
+                    bonus_reply = (data.get("bonus_reply") or "").strip()
+                    content = "\n\n".join(parts)
+                else:
+                    content = data.get("content", "").strip()
+                    if not content:
+                        raise ValueError("Empty content from LLM")
+            except Exception as e:
+                data = None
+                first_parse_error = e
+        if data is None:
+            e = first_parse_error
+            if sensitive:
+                if not tone_attempt:
+                    # Broken JSON is a model flake, not a content verdict — one
+                    # clean rewrite ask before cancelling the draft (a parse
+                    # failure used to kill manual /post_photo outright).
+                    log.warning(f"Sensitive-news copy invalid ({e}); requesting JSON rewrite.")
+                    messages = messages + [
+                        {"role": "assistant", "content": resp_text},
+                        {"role": "user", "content": (
+                            "Output kamu BUKAN JSON valid. TULIS ULANG tepat satu objek JSON mengikuti skema, tanpa teks lain. "
+                            "Ini kabar sensitif: hapus sapaan, tawa, candaan, dan emoji ceria. "
+                            "Langsung ke peristiwa dan dampak terkonfirmasi; jangan menambah fakta baru."
+                        )},
+                    ]
+                    continue
+                raise ValueError("Invalid sensitive-news copy; refusing generic filler") from e
+            if is_chain:
+                # Publishing a half-formed chain to a live account costs more than
+                # one wasted LLM call.
+                log.warning(f"Chain generation failed ({e}). Falling back to a single post.")
+                return generate_organic_post(
+                    topic=topic,
+                    pillar=pillar,
+                    post_format=post_format,
+                    post_style=post_style,
+                    persona=persona,
+                    post_structure="single",
+                    source_summary=source_summary,
+                )
+            log.warning(f"Failed to parse LLM JSON for organic post: {e}. Using fallback.")
+            content = f"Isu {topic} ini punya implikasi nyata kalau dicermati secara objektif. Dampaknya ke depan bakal signifikan."
+            vibe_query = f"{topic} berita indonesia"
+
+        if not sensitive or not has_inappropriate_sensitive_tone(f"{content}\n{bonus_reply}"):
+            break
+        if tone_attempt:
+            raise ValueError("Inappropriate tone for sensitive news after rewrite; post cancelled")
+        log.warning("Sensitive-news tone check failed; rewriting before card generation.")
+        messages = messages + [
+            {"role": "assistant", "content": resp_text},
+            {"role": "user", "content": (
+                "TULIS ULANG JSON dengan format yang sama. Ini kabar sensitif, bukan obrolan ringan. "
+                "Hapus sapaan, kopi/sarapan, tawa, candaan, dan emoji ceria. "
+                "Langsung ke peristiwa dan dampak terkonfirmasi; jangan menambah fakta baru."
+            )},
+        ]
 
     # The chain rule bans invented figures, but a rule in prose is not
     # enforcement. This is the enforcement: any figure the model wrote that the
@@ -458,6 +638,7 @@ Hanya output JSON valid tanpa markdown ticks.
         "content": content,
         "parts": parts,
         "bonus_reply": bonus_reply,
+        "source_summary_used": source_summary,
     }
 
     image_url = None
@@ -505,8 +686,45 @@ Hanya output JSON valid tanpa markdown ticks.
                 "image_url": image_url,
             }
 
-        # Fetch authentic real-life HD photo from news portals / internet
-        raw_photo_url = search_vibe_image(vibe_query, raw_topic=topic)
+        # Fetch authentic real-life HD photo from news portals / internet.
+        # On-topic guard: the same article's og:image first (synchronized
+        # by construction), then a Bing pass whose candidates must carry the
+        # topic's entity tokens; no passage → publish text-only rather than a
+        # generic photo that contradicts the headline. The legacy
+        # search_vibe_image path is untouched and runs last as before.
+        raw_photo_url = ""
+        entity_toks = entity_tokens(topic)
+        article_links = [s for s in ((article_ctx or {}).get("article_links") or "").split("|") if s]
+        if article_links:
+            from src.image.vibe_search import search_news_article_image
+
+            # The og:image of the article we actually sourced the summary from —
+            # synchronized with the story by construction.
+            raw_photo_url = search_news_article_image(topic)
+
+        if not raw_photo_url and entity_toks:
+            from src.image.vibe_search import _bing_image_search, _is_clean_url, _verify_image_url
+
+            query = vibe_query or f"{topic} berita"
+            for q in (query, topic):
+                try:
+                    candidates = [u for u in _bing_image_search(q, count=35) if _is_clean_url(u)]
+                except Exception:
+                    candidates = []
+                winners = [u for u in candidates if _image_url_on_topic(u, entity_toks)]
+                log.info(f"topic image: {len(winners)}/{len(candidates)} Bing candidates matched topic entities")
+                for u in winners:
+                    if _verify_image_url(u):
+                        raw_photo_url = u
+                        break
+                if raw_photo_url:
+                    break
+
+        if not raw_photo_url:
+            # Legacy path (og:image → Bing → news domains → fallbacks). Kept:
+            # its relevance ranking predates the entity guard and other flows
+            # (threads_agent custom posts) rely on it.
+            raw_photo_url = search_vibe_image(vibe_query, raw_topic=topic)
 
         if raw_photo_url:
             from src.image.card_generator import generate_editorial_card
@@ -519,6 +737,7 @@ Hanya output JSON valid tanpa markdown ticks.
             )
         else:
             image_url = ""
+            log.info("topic image: no on-topic photo; publishing text-only")
 
     return {
         **result_base,

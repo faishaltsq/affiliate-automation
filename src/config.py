@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(Path(__file__).parent.parent / ".env", override=True)
 
 # ── Paths ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
@@ -26,14 +26,20 @@ if HERMES_ENV_PATH.exists():
     from dotenv import dotenv_values
     _hermes_env = dotenv_values(HERMES_ENV_PATH)
 
-# Primary: 9router local antigravity gemini 3.8 flash
-LLM_BASE_URL = os.getenv("LLM_BASE_URL") or _hermes_env.get("NINEROUTER_BASE_URL") or "http://localhost:20128/v1"
-LLM_MODEL = os.getenv("LLM_MODEL") or "ag/gemini-3.8-flash-high"
-# Fallback: Mortera Cloud direct (NOT via 9router) — Muse Spark
-MORTERA_BASE_URL = os.getenv("MORTERA_BASE_URL") or "https://mortera.cloud/v1"
-MORTERA_MODEL = os.getenv("MORTERA_MODEL") or "muse-spark-1.3"
-MORTERA_API_KEY = os.getenv("MORTERA_API_KEY") or ""
-MORTERA_URL = f"{MORTERA_BASE_URL.rstrip('/')}/chat/completions"
+# Primary: Trust Is Gold gateway (see .env LLM_*)
+LLM_BASE_URL = os.getenv("LLM_BASE_URL") or _hermes_env.get("NINEROUTER_BASE_URL") or "https://api.trustisgold.web.id/v1"
+LLM_MODEL = os.getenv("LLM_MODEL") or "tig/laguna-s-2.1"
+# Fallback chain, tried in order after the primary model fails.
+# Ranked by measured latency on realistic prompts (2026-10-23):
+# laguna-xs-2.1 ~5-10s, step-3.7-flash ~26s but strongest copy, step-5-unrestricted ~15s.
+LLM_FALLBACK_MODELS = [
+    m.strip()
+    for m in (
+        os.getenv("LLM_FALLBACK_MODELS")
+        or "tig/laguna-xs-2.1,tig/step-3.7-flash,tig/step-5-unrestricted"
+    ).split(",")
+    if m.strip()
+]
 LLM_API_KEY = (
     os.getenv("LLM_API_KEY")
     or os.getenv("HERMES_CUSTOM_LOCALHOST_20128_API_KEY")

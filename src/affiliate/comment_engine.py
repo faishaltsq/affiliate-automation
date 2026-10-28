@@ -22,7 +22,7 @@ from src.brief.generator import _llm
 from src.scraper.product_extractor import extract_product_metadata
 from src.logger import get_logger
 
-load_dotenv(Path(__file__).parent.parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent.parent / '.env', override=True)
 
 log = get_logger("comment_engine")
 

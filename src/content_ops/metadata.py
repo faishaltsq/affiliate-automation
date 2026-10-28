@@ -9,6 +9,7 @@ import re
 from typing import Dict, Any
 
 from src.brief.generator import _llm
+from src.guardrails import repair_json
 
 logger = logging.getLogger("content_ops.metadata")
 
@@ -132,8 +133,7 @@ Kembalikan HANYA format JSON valid berikut tanpa markdown/teks lain:
 """
     try:
         raw = _llm([{"role": "user", "content": prompt}], temperature=0.4, max_tokens=1024)
-        clean = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.MULTILINE)
-        clean = re.sub(r"\s*```$", "", clean.strip(), flags=re.MULTILINE).strip()
+        clean = repair_json(raw)
         data = json.loads(clean)
         if "hook_text" in data and "tiktok" in data and "shorts" in data:
             # Enforce uppercase hook

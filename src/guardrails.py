@@ -105,6 +105,11 @@ def extract_json_safely(raw_text: str) -> dict | None:
             return json.loads(candidate)
         except json.JSONDecodeError:
             pass
+        # Second pass: repair the malformed shapes small models emit.
+        try:
+            return json.loads(repair_json(candidate))
+        except (json.JSONDecodeError, ValueError):
+            pass
 
     return None
 
@@ -149,6 +154,45 @@ def get_unsplash_fallback(keyword: str) -> str:
 
 
 # ── Edge Case 8: HTML Sanitizer ───────────────────────────────────────────────
+
+def repair_json(raw_text: str) -> str:
+    """Repairs the JSON shapes small models actually emit.
+
+    The gateway's cheaper models routinely write syntactically invalid JSON:
+    a missing comma between members, a trailing comma before a closing brace,
+    smart quotes instead of straight ones. json.loads rejects all of these, and
+    a rejected parse costs a full regeneration cycle. Repair the common cases
+    first, then fall back to the original text so genuine syntax errors still
+    surface as errors rather than being silently mangled.
+    """
+    if not raw_text:
+        return raw_text
+    t = raw_text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    # Smart quotes are the most common single defect and the easiest to fix.
+    t = t.replace("\u201c", '"').replace("\u201d", '"')
+    t = t.replace("\u2018", "'").replace("\u2019", "'")
+    # Missing comma between members: a closing quote/brace/bracket followed by
+    # whitespace and then an opening quote is always a separator omission.
+    t = re.sub(r'(["\}\]\d])(\s*\n\s*)(")', r"\1,\2\3", t)
+    # Trailing comma before a closing brace or bracket.
+    t = re.sub(r",(\s*[}\]])", r"\1", t)
+    # A key with no value at all — "image_query": followed by a newline and the
+    # next member or the closing brace. The model dropped the value; supply an
+    # empty string so the member still parses.
+    t = re.sub(r'("\s*:\s*)(?=\n\s*[",}\]])', r'\1""', t)
+    return t
+
+
+def loads_json_tolerant(raw_text: str) -> dict | None:
+    """json.loads with one repair pass. Returns None when unrepairable."""
+    candidate = repair_json(raw_text)
+    try:
+        return json.loads(candidate)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
 
 def sanitize_markdown(content: str) -> str:
     """Strips stray HTML tags and verifies structural Markdown."""

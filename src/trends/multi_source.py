@@ -33,8 +33,9 @@ ALL_PILLARS = [
 ]
 
 _SUMMARY_CACHE = {}
+_ITEM_META = {}  # headline -> {'link','source','pubdate'} from the RSS item
 SUMMARY_CACHE_MAX = 2000
-SUMMARY_CHARS = 400
+SUMMARY_CHARS = 900
 
 # Impact/urgency signals: a headline carrying these is a live national story,
 # not routine coverage. Weight = how strongly it signals "everyone is talking".
@@ -129,6 +130,17 @@ EVERGREEN_BY_PILLAR = {
 }
 
 
+SOURCE_NAME_STRIP_RE = re.compile(r"\s+-\s+.*$")
+
+# Compiled once: plain substring scoring double-counted e.g. "banjir" inside
+# "banjir bandang" (6 + 10 = 16 for one story). Word boundaries keep "halt"
+# from matching "halfway"; the span-overlap check in _heat_score drops a
+# shorter signal already covered by a longer one. Precompiled for speed.
+_HOT_SIGNAL_RES = sorted(
+    ((re.compile(r"\b(?:%s)\b" % re.escape(sig)), w) for sig, w in HOT_SIGNALS.items()),
+    key=lambda pw: -len(pw[0].pattern),
+)
+
 def _is_clean(text: str) -> bool:
     if not text or len(text.strip()) < 3:
         return False
@@ -172,6 +184,7 @@ def _remember_summary(headline: str, item) -> None:
     """
     if len(_SUMMARY_CACHE) > SUMMARY_CACHE_MAX:
         _SUMMARY_CACHE.clear()
+        _ITEM_META.clear()
     try:
         if headline in _SUMMARY_CACHE:
             return
@@ -182,6 +195,14 @@ def _remember_summary(headline: str, item) -> None:
         desc = re.sub(r"\s+", " ", desc).strip()
         if desc:
             _SUMMARY_CACHE[headline] = desc[:SUMMARY_CHARS]
+            elem_pub = item.find("pubDate")
+            elem_link = item.find("link")
+            elem_src = item.find("source")
+            _ITEM_META[headline] = {
+                "pubdate": (elem_pub.text or "") if elem_pub is not None else "",
+                "link": (elem_link.text or "").strip() if elem_link is not None else "",
+                "source": SOURCE_NAME_STRIP_RE.sub("", (elem_src.text or "")).strip() if elem_src is not None and elem_src.text else "",
+            }
     except Exception:
         pass
 
@@ -192,7 +213,53 @@ def get_source_summary(headline: str) -> str:
     Callers must treat an empty string as "no source data available", never as
     permission to supply their own figures.
     """
-    return _SUMMARY_CACHE.get(headline, "")
+    if headline in _SUMMARY_CACHE:
+        return _SUMMARY_CACHE[headline]
+    # Cache miss = in-process cache reset (daemon restart, fresh process).
+    # The article_context row is the durable copy of the same summary.
+    try:
+        from src.organic.db import get_article_context  # circular at module level
+        ctx = get_article_context(headline)
+        if ctx and ctx.get("summary"):
+            _SUMMARY_CACHE[headline] = ctx["summary"]
+            return ctx["summary"]
+    except Exception:
+        pass
+    return ""
+
+def _remember_context(headline: str) -> None:
+    """Persists feed context (summary, source, article link) to the DB.
+
+    The in-process cache dies with the daemon; the DB row keeps the generator's
+    "numbers only from the source" grounding alive across restarts. DB failure
+    must never break RSS fetching, hence the blanket except.
+    """
+    try:
+        meta = _ITEM_META.get(headline) or {}
+        if not _SUMMARY_CACHE.get(headline):
+            return
+        from src.organic.db import save_article_context  # circular at module level
+        save_article_context(headline, _SUMMARY_CACHE[headline], meta.get("source", ""), meta.get("link", ""))
+    except Exception as e:
+        log.debug(f"article_context save failed for '{headline[:40]}': {e}")
+
+def get_source_names(topic: str) -> list[str]:
+    """Publisher names recorded for this headline, e.g. ['CNBC Indonesia']."""
+    try:
+        from src.organic.db import get_article_context  # circular at module level
+    except Exception:
+        return []
+    ctx = get_article_context(topic)
+    return [s.strip() for s in (ctx.get("source_names") or "").split("|") if s.strip()] if ctx else []
+
+def get_article_links(topic: str) -> list[str]:
+    """Article URLs recorded for this headline, most relevant first."""
+    try:
+        from src.organic.db import get_article_context  # circular at module level
+    except Exception:
+        return []
+    ctx = get_article_context(topic)
+    return [s for s in (ctx.get("article_links") or "").split("|") if s] if ctx else []
 
 
 def _fetch_rss(url: str, limit: int = 10, require_recent: bool = True) -> list[str]:
@@ -215,6 +282,7 @@ def _fetch_rss(url: str, limit: int = 10, require_recent: bool = True) -> list[s
                     if _is_clean(cleaned) and cleaned not in headlines:
                         headlines.append(cleaned)
                         _remember_summary(cleaned, item)
+                        _remember_context(cleaned)
                         if len(headlines) >= limit:
                             break
     except Exception as e:
@@ -363,11 +431,28 @@ def _signature(headline: str) -> str:
     return " ".join(sorted(set(keys)))
 
 
-def _heat_score(headline: str) -> int:
+def _heat_score(headline: str, pub_date_str: str = "") -> int:
     lower = headline.lower()
-    hot = sum(w for sig, w in HOT_SIGNALS.items() if sig in lower)
+    # Longer phrases claim their spans first; a shorter signal whose span is
+    # already covered ("banjir" inside "banjir bandang") scores once, not twice.
+    covered: list[tuple[int, int]] = []
+    hot = 0
+    for pat, w in _HOT_SIGNAL_RES:
+        for m in pat.finditer(lower):
+            if any(s <= m.start() and m.end() <= e for s, e in covered):
+                continue
+            covered.append((m.start(), m.end()))
+            hot += w
     routine = sum(w for sig, w in ROUTINE_SIGNALS.items() if sig in lower)
-    return hot - routine
+    # Fresher stories outrank yesterday's; undated headlines get no bonus.
+    recency = 0
+    if pub_date_str:
+        try:
+            hours_old = (datetime.now(timezone.utc) - parsedate_to_datetime(pub_date_str)).total_seconds() / 3600
+            recency = max(0, 12 - int(hours_old) // 2)
+        except Exception:
+            pass
+    return hot - routine + recency
 
 
 def fetch_hot_topics(top_n: int = 6, per_pillar_limit: int = 14) -> list[dict]:
@@ -391,14 +476,21 @@ def fetch_hot_topics(top_n: int = 6, per_pillar_limit: int = 14) -> list[dict]:
             continue
         # Rank within the pillar before truncating, otherwise a 46-item feed
         # pushes the single hottest story past the cutoff and it never competes.
-        headlines.sort(key=_heat_score, reverse=True)
+        # Recency bonus uses each headline's own pubDate; undated → no bonus.
+        headlines.sort(key=lambda h: _heat_score(h, _ITEM_META.get(h, {}).get("pubdate", "")), reverse=True)
         for h in headlines[:per_pillar_limit]:
             sig = _signature(h)
             if not sig:
                 continue
-            c = clusters.setdefault(sig, {"topic": h, "heat": 0, "corroboration": 0, "pillar": pillar})
+            meta = _ITEM_META.get(h) or {}
+            c = clusters.setdefault(sig, {"topic": h, "heat": 0, "corroboration": 0, "pillar": pillar,
+                                          "source_names": [], "article_links": []})
             c["corroboration"] += 1
-            c["heat"] += _heat_score(h)
+            c["heat"] += _heat_score(h, meta.get("pubdate", ""))
+            if meta.get("source") and meta["source"] not in c["source_names"]:
+                c["source_names"].append(meta["source"])
+            if meta.get("link") and meta["link"] not in c["article_links"]:
+                c["article_links"].append(meta["link"])
             # Prefer the longest, most informative headline as the cluster label
             if len(h) > len(c["topic"]):
                 c["topic"] = h
@@ -436,7 +528,26 @@ def pillar_for_topic(topic: str) -> str:
     if any(k in lower for k in ["ai", "teknologi", "gadget", "hp", "smartphone", "chip", "nvidia",
                                 "apple", "samsung", "internet", "data", "robot", "startup"]):
         return "tech_gadget_ai"
-    return "breaking_disaster"
+    # Headline gave nothing: scan the article summary fetched alongside it
+    # before guessing — "cuti bersama" headlines mention banks, etc.
+    try:
+        ctx_summary = (get_source_summary(topic) or "").lower()
+    except Exception:
+        ctx_summary = ""
+    if ctx_summary:
+        if any(k in ctx_summary for k in ["saham", "ihsg", "bursa", "rupiah", "dolar", "inflasi",
+                                          "bank indonesia", "fed", "msci", "obligasi", "dividen"]):
+            return "market_finance_stocks"
+        if any(k in ctx_summary for k in ["bola", "liga", "timnas", "pemain", "klub", "piala", "fifa"]):
+            return "football_sports"
+        if any(k in ctx_summary for k in ["bencana", "banjir", "gempa", "bmkg", "cuaca", "karhutla", "tsunami"]):
+            return "breaking_disaster"
+        if any(k in ctx_summary for k in ["ai", "teknologi", "gadget", "smartphone", "chip", "robot"]):
+            return "tech_gadget_ai"
+    # Wrong-way-safe default: a misrouted market take costs a boring post; a
+    # false-positive disaster take scares the timeline. Also never invent a
+    # tragedy that did not happen.
+    return "market_finance_stocks"
 
 
 def fetch_topic_image_query(topic: str, pillar: str = "") -> str:

@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from src.logger import get_logger
 
-load_dotenv(Path(__file__).parent.parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent.parent / '.env', override=True)
 
 log = get_logger("publish.threads")
 

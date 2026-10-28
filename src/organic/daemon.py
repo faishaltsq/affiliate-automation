@@ -131,6 +131,13 @@ def run_daemon(single: bool = False):
         except Exception as e:
             log.debug(f"Sync error: {e}")
 
+        # Pull Threads engagement for published posts; feeds pillar weighting.
+        try:
+            from src.organic.feedback import refresh_post_metrics
+            refresh_post_metrics()
+        except Exception as e:
+            log.debug(f"Metrics refresh error: {e}")
+
         today_count = get_today_post_count()
 
         # Reset used_today at midnight

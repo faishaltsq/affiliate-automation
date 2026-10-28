@@ -8,8 +8,7 @@ from typing import Optional, Callable
 from src.clipper.client import ClippoClient
 from src.clipper.motionklip_client import MotionklipClient
 from src.clipper.brief_analyzer import (
-    analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL,
-    MORTERA_URL, MORTERA_MODEL, MORTERA_API_KEY,
+    analyze_campaign_brief, LLM_URL, LLM_API_KEY, MODEL, FALLBACK_MODELS,
 )
 from src.clipper.downloader import download_asset_videos, download_asset_video
 from src.clipper.editor import render_clipper_video
@@ -53,17 +52,13 @@ def _generate_variant_caption(brief: dict, account_style: str, account_index: in
             "temperature": 0.75,
         }
         r = None
-        # 1. Primary: 9router
-        r = requests.post(LLM_URL, json=payload, headers=headers, timeout=12)
-        if not r.ok:
-            logger.warning("Variant caption LLM (%s) HTTP %s, trying Mortera fallback...", MODEL, r.status_code)
-            # 2. Fallback: Mortera Cloud direct (Muse Spark)
-            if MORTERA_API_KEY:
-                payload["model"] = MORTERA_MODEL
-                m_headers = {"Authorization": f"Bearer {MORTERA_API_KEY}"}
-                r = requests.post(MORTERA_URL, json=payload, headers=m_headers, timeout=30)
-            else:
-                logger.warning("Mortera fallback skipped: MORTERA_API_KEY missing")
+        # 1. Primary gateway: model + fallback chain
+        for model in [MODEL] + [m for m in FALLBACK_MODELS if m != MODEL]:
+            payload["model"] = model
+            r = requests.post(LLM_URL, json=payload, headers=headers, timeout=12)
+            if r.ok:
+                break
+            logger.warning("Variant caption LLM (%s) HTTP %s, trying next...", model, r.status_code)
         if r is not None and r.ok:
             caption = r.json()["choices"][0]["message"]["content"].strip()
             return re.sub(r'^["\']|["\']$', '', caption)
