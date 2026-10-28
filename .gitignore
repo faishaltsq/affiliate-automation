@@ -50,3 +50,6 @@ tools/yt-dlp.exe
 # Machine-specific launcher (hardcodes local venv path)
 scripts/run_telegram_bot.vbs
 data/image_cache/
+
+# V2 verified database backups — restore artifacts, not source
+data/backups/
