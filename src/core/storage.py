@@ -400,14 +400,18 @@ class Migration002PersonaStrategy(Migration):
                       "CREATE INDEX IF NOT EXISTS idx_publication_jobs_state "
                       "ON publication_jobs(state, lease_expires_at)")
 
+        # views/likes/replies are NULLABLE ON PURPOSE. NULL means "the API did
+        # not give us a number"; 0 means "we measured zero". Collapsing the two
+        # is what made V1 treat a failed insights fetch as a post with no
+        # reach, dragging every pillar average toward 0.
         _create_table(conn, """
             CREATE TABLE IF NOT EXISTS performance_snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 threads_id TEXT NOT NULL,
                 fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                views INTEGER NOT NULL DEFAULT 0,
-                likes INTEGER NOT NULL DEFAULT 0,
-                replies INTEGER NOT NULL DEFAULT 0,
+                views INTEGER,
+                likes INTEGER,
+                replies INTEGER,
                 source_status TEXT NOT NULL DEFAULT 'ok'
             )
         """, "performance_snapshots")
