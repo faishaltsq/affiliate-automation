@@ -487,3 +487,60 @@ they will return on next login unless one of the above is done.
 A process check that only looks at `watchdog.py` and Scheduled Tasks is not a
 complete answer on Windows. The Startup folder, `Run` registry keys, and
 services all need checking before claiming nothing will respawn a process.
+
+
+---
+
+## 15. Legacy Scheduler Permanently Shut Down (2026-10-29, operator approved)
+
+Operator instruction: "shutdown the old scheduler."
+
+### Backup taken first
+
+`data/backups/v2/posts_pre_scheduler_shutdown_20261029_142630.db`
+SHA-256 `dde39411abf5d4748961100390e61c2cad552bc986bbd3f7931f01b7eeecde86`,
+integrity `ok`, 140 posts.
+
+### What was done
+
+Two layers, because killing processes alone had already failed twice (see §14).
+
+**Layer 1 — processes stopped.** All `main.py organic --daemon` and `main.py bot`
+processes killed.
+
+**Layer 2 — respawn chain neutralised.**
+
+| Action | Detail |
+|---|---|
+| Moved out of Startup | `DailyPrivateOrganicDaemon.vbs`, `DailyPrivateAgentBot.vbs` → `scripts/startup-disabled/` |
+| Disabled launchers | `scripts/run_rara_daemon.vbs` → `.vbs.disabled`, `scripts/run_telegram_bot.vbs` → `.vbs.disabled` |
+
+The Startup launchers check `FileExists` and quit silently, so disabling the
+underlying scripts alone would also have worked — both layers are in place for
+defence in depth.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| Python processes referencing `affiliate-automation` | **0** |
+| Project launchers in Startup | **none** |
+| Post count after 25 s wait | 140 — stable, no new posts |
+| `PRAGMA integrity_check` | `ok` |
+
+### Note on process enumeration
+
+A `CommandLine -like '*main.py organic*'` filter matches the querying
+PowerShell process itself, producing false positives. The reliable check is
+`Name -eq 'python.exe' -and CommandLine -like '*affiliate-automation*'`, which
+returns 0.
+
+The single remaining `python.exe` running a `main.py` is the **Hermes
+dashboard** (`hermes_cli/main.py`, port 9119) — a different project, left
+running deliberately.
+
+### Consequence
+
+The news-first content system is no longer posting. The account will go quiet
+until the V2 scheduler is enabled. That is the intended state for cutover: one
+system writing, not two.

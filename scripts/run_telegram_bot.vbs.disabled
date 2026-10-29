@@ -1,0 +1,11 @@
+' Daily Private Agent Bot Background Runner (@dailyprivateagentbot)
+Option Explicit
+Dim WshShell, projectDir, pythonExe, cmd
+
+Set WshShell = CreateObject("WScript.Shell")
+projectDir = "C:\Users\cubeb\OneDrive\Documents\coding\projects\affiliate-automation"
+pythonExe = "C:\Users\cubeb\AppData\Local\hermes\installs\e53b2a297b9d149d\environments\144c22db562846a89a2d63db56e9fd49\venv\Scripts\python.exe"
+
+cmd = """" & pythonExe & """ main.py bot"
+WshShell.CurrentDirectory = projectDir
+WshShell.Run cmd, 0, False
