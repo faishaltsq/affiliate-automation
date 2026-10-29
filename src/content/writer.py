@@ -69,6 +69,7 @@ def _writer_prompt(
     variation: VoiceVariation,
     evidence: str,
     revision_feedback: Optional[str] = None,
+    path=None,
 ) -> str:
     persona = get_active_persona()
     identity = persona_prompt_block(persona)
@@ -103,6 +104,20 @@ def _writer_prompt(
             f"{revision_feedback.strip()}\n"
         )
 
+    # Durable feedback memory. Distinct from `revision_feedback`: that is the
+    # operator's note on THIS draft, this is the rolling window of everything
+    # they have rejected recently. Without it a rejection is a message that
+    # scrolls away and the next draft is generated from the same prompt.
+    memory_block = ""
+    try:
+        from src.persona.editorial_memory import revision_guidance
+
+        guidance = revision_guidance(path=path)
+        if guidance:
+            memory_block = f"\n{guidance}\n"
+    except Exception:  # noqa: BLE001 — memory is an enhancement, never a blocker
+        memory_block = ""
+
     is_thread = structure_for_format(variation.format) == "thread"
     if is_thread:
         schema = (
@@ -131,6 +146,8 @@ Tulis satu postingan untuk masalah audiens ini:
   Pilar konten: {idea.pillar}
 
 {evidence_block}
+{revision_block}
+{memory_block}
 
 VARIASI POSTINGAN INI (identitas tetap sama):
 {var_lines}
@@ -214,7 +231,9 @@ def write_draft(
                 break
 
     variation = varied_variation(_variation_history, r)
-    prompt = _writer_prompt(idea, signal, variation, evidence, revision_feedback)
+    prompt = _writer_prompt(
+        idea, signal, variation, evidence, revision_feedback, path=path
+    )
 
     try:
         resp = llm.complete(

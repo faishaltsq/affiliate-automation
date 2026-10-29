@@ -14,7 +14,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
 
-from src.core.storage import connect, transaction
+from src.core.storage import connect, table_exists, transaction
 from src.logger import get_logger
 
 log = get_logger("editorial_memory")
@@ -42,6 +42,7 @@ def record_feedback(
         category = "other"
     with connect(path) as conn:
         with transaction(conn):
+            _ensure_table(conn)
             cur = conn.execute(
                 """
                 INSERT INTO feedback_events (draft_id, actor_id, category, reason)
@@ -52,8 +53,23 @@ def record_feedback(
             return int(cur.lastrowid)
 
 
+def _ensure_table(conn) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS feedback_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER,
+            actor_id TEXT NOT NULL,
+            category TEXT NOT NULL,
+            reason TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
 def recent_feedback(limit: int = DEFAULT_WINDOW, path=None) -> list[dict]:
     with connect(path) as conn:
+        if not table_exists(conn, "feedback_events"):
+            return []
         rows = conn.execute(
             "SELECT * FROM feedback_events ORDER BY id DESC LIMIT ?",
             (limit,),
@@ -63,6 +79,8 @@ def recent_feedback(limit: int = DEFAULT_WINDOW, path=None) -> list[dict]:
 
 def feedback_for_draft(draft_id: int, path=None) -> list[dict]:
     with connect(path) as conn:
+        if not table_exists(conn, "feedback_events"):
+            return []
         rows = conn.execute(
             "SELECT * FROM feedback_events WHERE draft_id = ? ORDER BY id ASC",
             (draft_id,),
@@ -139,5 +157,7 @@ def prune(keep: int = 200, path=None) -> int:
 
 def has_feedback(path=None) -> bool:
     with connect(path) as conn:
+        if not table_exists(conn, "feedback_events"):
+            return False
         row = conn.execute("SELECT COUNT(*) AS n FROM feedback_events").fetchone()
     return int(row["n"]) > 0
