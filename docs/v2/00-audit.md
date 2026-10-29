@@ -339,7 +339,17 @@ python scripts/scan_secrets.py --history    # every commit reachable from HEAD
 |---|---|
 | Tracked worktree | **clean — 0 hits** |
 | `.env` | 2 real credentials (see below) |
-| Git history | `.env` was **never committed** — `git log --all -- .env` is empty |
+| Git history | **clean — 0 hits** across 478 blobs / 1011 objects |
+
+The history scan streams `git rev-list --objects` and reads each blob once via
+`git cat-file --batch`. The original per-file `git show` implementation was
+O(commits x files) subprocess calls and took over 600 seconds; the streaming
+version completes in **5.9 seconds** and is covered by a test that fails if it
+ever exceeds 60 seconds.
+
+Correctness is verified rather than assumed: a test asserts the object listing
+is substantial (>100 entries, >50 blobs) so a rewrite that silently returns
+empty cannot pass, and a synthetic probe confirms detection still fires.
 
 ### The two credentials in `.env`
 

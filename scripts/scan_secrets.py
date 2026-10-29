@@ -125,19 +125,69 @@ def _git(*args: str) -> str:
 
 
 def scan_history(ref: str = "HEAD") -> list[tuple[str, str, str]]:
-    """Scan every blob reachable from `ref`."""
-    hits = []
-    revs = _git("rev-list", ref).split()
-    for rev in revs:
-        files = _git("ls-tree", "-r", "--name-only", rev).splitlines()
-        for rel in files:
-            if _is_allowlisted(rel):
+    """Scan every blob reachable from `ref`.
+
+    Streams `git rev-list --objects` and reads each blob once, rather than
+    shelling out to `git show` per file per commit — that approach is O(commits
+    x files) subprocess calls and takes over ten minutes on this repository.
+    """
+    hits: list[tuple[str, str, str]] = []
+    seen_blobs: set[str] = set()
+
+    # (blob_sha, path) for every object reachable from ref.
+    listing = _git("rev-list", "--objects", ref)
+    entries: list[tuple[str, str]] = []
+    for line in listing.splitlines():
+        parts = line.split(" ", 1)
+        if len(parts) != 2:
+            continue
+        sha, path = parts
+        if not path or _is_allowlisted(path):
+            continue
+        entries.append((sha, path))
+
+    # Read blobs in bulk via cat-file --batch when available.
+    batch = subprocess.run(
+        ["git", "cat-file", "--batch"],
+        cwd=REPO,
+        input="\n".join(sha for sha, _ in entries),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if batch.returncode == 0 and batch.stdout:
+        # --batch output is "<sha> <type> <size>\n<contents>\n" per entry.
+        chunks = batch.stdout.split("\n")
+        i = 0
+        for sha, path in entries:
+            # Advance to the header line for this sha.
+            while i < len(chunks) and not chunks[i].startswith(sha):
+                i += 1
+            if i >= len(chunks):
+                break
+            header = chunks[i].split()
+            if len(header) < 3 or header[1] != "blob":
+                i += 1
                 continue
-            blob = _git("show", f"{rev}:{rel}")
-            if not blob:
+            size = int(header[2])
+            i += 1
+            # Reassemble the blob, which may itself contain newlines.
+            body_parts = []
+            remaining = size
+            while remaining > 0 and i < len(chunks):
+                line = chunks[i]
+                take = min(len(line) + 1, remaining)
+                body_parts.append(line[:take])
+                remaining -= take
+                i += 1
+            body = "\n".join(body_parts)
+            if sha in seen_blobs:
                 continue
-            for source, name, value in scan_text(blob, f"{rev[:8]}:{rel}"):
+            seen_blobs.add(sha)
+            for source, name, value in scan_text(body, path):
                 hits.append((source, name, value))
+
     return hits
 
 

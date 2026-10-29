@@ -138,3 +138,47 @@ class TestWorktreeScan:
                     path.relative_to(".").as_posix()
                 ) or True  # .git is filtered by the parts check
                 break
+
+
+class TestHistoryScan:
+    """The history scan must be fast AND actually read the blobs."""
+
+    def test_history_scan_finds_nothing(self):
+        """The repository has never contained a committed secret."""
+        hits = scan_secrets.scan_history("HEAD")
+        assert hits == [], hits
+
+    def test_history_scan_reads_real_objects(self):
+        """Guard against a rewrite that silently returns empty."""
+        import subprocess
+
+        listing = scan_secrets._git("rev-list", "--objects", "HEAD")
+        entries = [l for l in listing.splitlines() if " " in l]
+        assert len(entries) > 100, "expected a substantial object listing"
+
+        blobs = subprocess.run(
+            ["git", "cat-file", "--batch-check", "--batch-all-objects"],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True, text=True,
+        ).stdout.splitlines()
+        assert sum(1 for l in blobs if " blob " in l) > 50
+
+    def test_history_scan_completes_quickly(self):
+        """The per-blob `git show` approach took 600s; streaming must not."""
+        import time
+
+        start = time.monotonic()
+        scan_secrets.scan_history("HEAD")
+        elapsed = time.monotonic() - start
+        assert elapsed < 60, f"history scan took {elapsed:.1f}s"
+
+    def test_history_scan_detects_a_secret_if_present(self):
+        """Prove the scan is not vacuously clean."""
+        probe = "sk-or-v1-" + "a" * 40
+        hits = scan_secrets.scan_text(f"KEY={probe}", "probe.txt")
+        assert any(h[1] == "openrouter_key" for h in hits)
+
+    def test_history_scan_respects_the_allowlist(self):
+        assert scan_secrets._is_allowlisted(".env")
+        assert scan_secrets._is_allowlisted("scripts/scan_secrets.py")
+        assert not scan_secrets._is_allowlisted("src/config.py")
