@@ -318,3 +318,60 @@ treats a dead PID as stale and overwrites it rather than exiting.
 `Get-CimInstance … -like '*main.py*'` also matches PID 13064, the **Hermes
 dashboard** (`hermes_cli/main.py dashboard --port 9119`). It is a different
 project that happens to share the filename and was deliberately left running.
+
+
+---
+
+## 12. Secret Scan (2026-10-29)
+
+Master plan §11 requires a secret scanner over the worktree **and** git history.
+`scripts/scan_secrets.py` implements it.
+
+```
+python scripts/scan_secrets.py              # tracked files
+python scripts/scan_secrets.py --include-env  # also the local .env
+python scripts/scan_secrets.py --history    # every commit reachable from HEAD
+```
+
+### Result
+
+| Scope | Result |
+|---|---|
+| Tracked worktree | **clean — 0 hits** |
+| `.env` | 2 real credentials (see below) |
+| Git history | `.env` was **never committed** — `git log --all -- .env` is empty |
+
+### The two credentials in `.env`
+
+| Type | Status |
+|---|---|
+| Telegram bot token | Present in `.env`, gitignored, never committed |
+| OpenRouter API key | Present in `.env`, gitignored, never committed |
+
+`.gitignore` covers `.env`, `*.env`, and `.env.*` with an exception only for
+`.env.example`, so neither value has ever entered git history. **No history
+rewrite is required.**
+
+### Action required from the operator
+
+The scanner's own output initially printed these values in full. That is a leak
+vector in itself — scanner output ends up in CI logs and chat transcripts — so
+`_mask()` now shows only the first 6 and last 2 characters plus the length.
+
+**Even so, both credentials should be rotated.** They have been displayed in
+plaintext during this audit, and the Telegram bot token in particular grants
+control of the bot. Rotation is a provider-side action only the operator can
+take:
+
+1. Telegram — `@BotFather` → `/revoke` → new token → update `.env`
+2. OpenRouter — dashboard → revoke the key → new key → update `.env`
+
+Deleting or editing `.env` is **not** sufficient on its own; the values were
+exposed and must be considered compromised.
+
+### Design note
+
+`.env` is allowlisted in the default scan. Flagging the operator's legitimate
+local credential store on every run trains them to ignore the report, so it is
+checked only under `--include-env`. The default scan answers the question that
+matters: *is anything secret committed?*
