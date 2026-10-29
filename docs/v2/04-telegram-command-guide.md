@@ -95,7 +95,41 @@ Your user ID (999888777) is not on the operator allowlist.
 The attempt is recorded in `audit_events` with `actor_type='operator'` and the
 denied action. No state changes.
 
-## 6. Secrets
+## 6. Enabling the V2 Command Set
+
+The commands above are **dark by default**. The existing bot keeps working
+untouched until this is set:
+
+```
+V2_TELEGRAM_COMMANDS_ENABLED=true
+```
+
+`handle_message()` in `src/bot/telegram_listener.py` tries the V2 router first.
+It only claims a message when:
+
+1. the text starts with `/`,
+2. the command is one V2 recognises, and
+3. `V2_TELEGRAM_COMMANDS_ENABLED` is true.
+
+Anything else falls through to the legacy handlers unchanged. A V2 routing
+error is caught and logged, then falls through too — a broken V2 command can
+never take the existing bot down.
+
+### Implementation
+
+`src/bot/v2_commands.py`. Every handler receives the caller's database `path`
+and (for `/draft`) an injectable LLM client, so:
+
+- a test dispatches against an isolated database and a fake model,
+- `tests/v2/test_no_live_db_writes.py` asserts that a full command sweep leaves
+  the live `data/posts.db` byte-for-byte unchanged,
+- `organic_posts` is checked for immutability on every run.
+
+That guard exists because an earlier iteration accepted `path` but never
+forwarded it, and every test run wrote its fixtures into the production
+database beside real operator history.
+
+## 7. Secrets
 
 No command ever prints a token, API key, or full access token. `redact_secrets()`
 strips:

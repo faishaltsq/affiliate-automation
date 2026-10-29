@@ -60,6 +60,24 @@ def handle_message(msg: dict):
 
     log.info("Incoming message [Chat: %s, Thread: %s, ID: %s]: %s", chat_id, thread_id, msg_id, text[:60])
 
+    # V2 command center. Runs first and only claims messages it recognises AND
+    # is enabled for; everything else falls through to the legacy handlers
+    # untouched. This keeps the existing bot working while V2 is dark.
+    try:
+        from src.bot.v2_commands import handle_v2_command
+
+        v2_result = handle_v2_command(msg, text, msg_id, raw_thread_id)
+        if v2_result.handled:
+            if v2_result.text:
+                from src.bot.threads_agent import _send_reply
+
+                target = int(thread_id) if thread_id else int(THREADS_THREAD_ID)
+                _send_reply(v2_result.text, reply_to_message_id=msg_id,
+                            thread_id=target)
+            return
+    except Exception as e:
+        log.warning("V2 command routing failed, falling back to legacy: %s", e)
+
     # Route based on thread_id
     if thread_id == CLIPPER_THREAD_ID:
         handle_clipper_message(msg, text, msg_id, int(thread_id))
