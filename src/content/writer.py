@@ -167,9 +167,92 @@ Skema:
 {schema}"""
 
 
+def _repair_json(raw: str) -> str:
+    """Repair the structural JSON defects real models actually emit.
+
+    Observed against tig/step-5-unrestricted on this prompt:
+
+        {
+         "content": "...."
+         "disclosure":
+        }
+
+    A key with **no value at all**. `json.loads` rejects it and the draft is
+    lost even though the prose is fine. Other defects handled: a missing comma
+    between members, structural smart quotes, a trailing comma, and a stray
+    markdown fence.
+
+    Rules this repair obeys:
+      * It only ever supplies EMPTY values. It never invents, truncates, or
+        rewrites content — a repaired draft carries exactly the words the
+        model produced.
+      * Smart quotes are only converted when they are *structural*. A smart
+        quote that opens a value (right after `:` `,` `[` `{`) or closes one
+        (right before `,` `}` `]`) is a delimiter and becomes `"`. A smart
+        quote inside a string is content and is left alone.
+      * It is idempotent: repairing already-repaired text is a no-op, so a
+        retry cannot corrupt a draft that was already recovered.
+      * It is bounded: one pass per rule, no recursion.
+      * If it cannot produce parseable JSON it returns the input unchanged and
+        the caller fails closed.
+    """
+    import re
+
+    t = raw.strip()
+
+    # Strip a markdown fence if the model added one despite instructions.
+    if t.startswith("```"):
+        t = t.split("\n", 1)[-1] if "\n" in t else t
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()[:-3]
+        t = t.strip()
+
+    # Structural smart quotes only.
+    t = re.sub(r'([:,\[{]\s*)\u201c', r'\1"', t)
+    t = re.sub(r'\u201d(?=\s*[,}\]])', '"', t)
+
+    # A key with no value: `"key":` followed by , } ] or a newline. The colon,
+    # any whitespace, AND the newline are all consumed, and `""` is written in
+    # their place. Consuming the newline is what makes this idempotent — if it
+    # were left behind, a second pass would read it as a missing comma.
+    t = re.sub(
+        r'("(?:[^"\\]|\\.)*"\s*:\s*)[\n\r\s]*(?=[,}\]])',
+        r'\1""',
+        t,
+    )
+
+    # Missing comma between members: a closing quote or bracket at end of line
+    # followed by a key on the next line.
+    t = re.sub(r'("\s*|\]\s*)\n(\s*")', r'\1,\n\2', t)
+
+    # Trailing comma before a closing bracket.
+    t = re.sub(r",\s*([}\]])", r"\1", t)
+
+    return t
+
+
 def _parse_draft_payload(raw: str) -> tuple[str, list[str], str]:
-    """Parse the writer's JSON. Raises on anything unusable — no fallback."""
-    data = complete_json(_StaticClient(raw), [{"role": "user", "content": ""}])
+    """Parse the writer's JSON. Raises on anything unusable — no fallback.
+
+    One bounded structural repair is attempted before giving up. The repair
+    only supplies empty values for malformed keys; it never fabricates
+    content, so a draft that survives it is still entirely the model's words.
+    """
+    import json
+
+    text = raw.strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        repaired = _repair_json(raw)
+        try:
+            data = json.loads(repaired)
+        except json.JSONDecodeError as exc:
+            raise LLMError(f"model returned non-JSON: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise LLMError("model returned JSON that is not an object")
+
     disclosure = str(data.get("disclosure") or "").strip()
     if "parts" in data:
         parts = data.get("parts")

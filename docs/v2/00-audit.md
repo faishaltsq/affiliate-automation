@@ -385,3 +385,53 @@ exposed and must be considered compromised.
 local credential store on every run trains them to ignore the report, so it is
 checked only under `--include-env`. The default scan answers the question that
 matters: *is anything secret committed?*
+
+
+---
+
+## 13. Credential Audit (2026-10-29, operator-supplied)
+
+The operator supplied `.env` contents and authorised checking them. All probes
+were **read-only `GET` requests** — nothing was published, sent, or posted.
+
+### Live and working
+
+| Credential | Evidence |
+|---|---|
+| `THREADS_USER_ID` + `THREADS_ACCESS_TOKEN` | HTTP 200, account `@ranaraaa911` |
+| `TELEGRAM_BOT_TOKEN` | HTTP 200, bot `@dailyprivateagentbot` (id 8696721987) |
+| `LLM_API_KEY` | HTTP 200 on `/chat/completions`; `tig/step-5-unrestricted` ~4.7 s, `tig/step-5-preview` ~2.9 s |
+
+### Broken
+
+| Credential | Error | Impact |
+|---|---|---|
+| `FACEBOOK_ACCESS_TOKEN` | OAuth 190, subcode 467 — "user logged out" | Facebook/Instagram publishing unavailable. Not used by V2. |
+| `REPLICATE_API_TOKEN` | HTTP 401 Unauthenticated | Image generation unavailable. V2 is text-first, so no impact. |
+
+### Configuration defect found
+
+`LLM_BASE_URL` ends with a trailing slash (`.../v1/`), which makes a naive
+`f"{base}/chat/completions"` produce `//chat/completions` → 404. Both
+`src/config.py` and `src/core/config.py` already call `.rstrip("/")`, so **the
+code is correct** — this is documented here only because it cost time to
+diagnose and would bite anyone adding a third config path.
+
+### Rotation still required
+
+Two credentials were displayed in plaintext in chat during this session and
+should be treated as compromised:
+
+1. `TELEGRAM_BOT_TOKEN` — revoke via `@BotFather` → `/revoke`
+2. `OPENROUTER_API_KEY` — revoke in the OpenRouter dashboard
+
+Neither is in git history (verified: `git log --all -- .env` is empty, and the
+history secret scan reports 0 hits across 478 blobs).
+
+### TikTok affiliate
+
+`TIKTOK_AFFILIATE_ID` is set to a username. No TikTok affiliate API credentials
+exist (`TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`, `TIKTOK_ACCESS_TOKEN` are all
+absent). Per the master plan this means **no automatic affiliate link
+generation is possible** — products must be imported manually from the official
+dashboard with provenance and expiry. The V2 catalog enforces exactly that.

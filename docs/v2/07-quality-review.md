@@ -138,12 +138,74 @@ for voice, meaningful variation, and accuracy. The full fixture set is in
 
 ### Honest limitations
 
-- The fixtures are hand-written exemplars, not live LLM output. They prove the
-  **gate** works; they do not prove the **writer** produces this quality from a
-  cold start. That requires a live LLM run, which needs operator approval.
 - 20 of 30 rated, as specified. The remaining 10 are in the JSON report.
 - No engagement data exists — nothing has been published. No claim about
   reach, saves, or follower growth is made or implied.
+
+---
+
+## 3b. Live LLM Verification (2026-10-29)
+
+The limitation above — "the writer has never run against a real model" — has
+now been closed. The operator supplied credentials and authorised a live run.
+
+### Credential audit (read-only probes, no writes)
+
+| Credential | Status |
+|---|---|
+| `THREADS_USER_ID` + `THREADS_ACCESS_TOKEN` | **LIVE** — HTTP 200, account `@ranaraaa911` |
+| `TELEGRAM_BOT_TOKEN` | **LIVE** — HTTP 200, bot `@dailyprivateagentbot` |
+| `LLM_API_KEY` (Trust Is Gold gateway) | **LIVE** — HTTP 200, `tig/step-5-unrestricted` ~4.7 s, `tig/step-5-preview` ~2.9 s |
+| `FACEBOOK_ACCESS_TOKEN` | **EXPIRED** — OAuth 190, subcode 467 "user logged out" |
+| `REPLICATE_API_TOKEN` | **INVALID** — HTTP 401 Unauthenticated |
+| `TIKTOK_AFFILIATE_ID` | Set (13 chars) — no affiliate API configured, so it is a username, not a trackable link |
+| `DISCORD_TOKEN`, `MOTIONKLIP_GUILD_ID` | Set — used by the Clipper pipeline, not probed |
+
+**None of these were used to publish, send, or post anything.** The probes were
+`GET` requests only.
+
+### Bug found by the live run
+
+The writer produced **zero drafts** against the real model. Every unit test
+passed because the tests fed it clean JSON.
+
+The gateway returns near-valid JSON with a **key that has no value at all**:
+
+```json
+{
+ "content": "Kamu nggak akan pernah sadar kenapa kabel charger di tas selalu kusut..."
+ "disclosure":
+}
+```
+
+`json.loads` rejects this, and the gate then correctly refused to publish
+anything — so the failure was silent and total.
+
+Fixed with a bounded structural repair (`_repair_json` in
+`src/content/writer.py`) that supplies empty values for malformed keys. It
+**never invents, truncates, or rewrites content**: a repaired draft carries
+exactly the words the model produced. It is idempotent, and if it cannot
+produce parseable JSON the draft still fails closed.
+
+### Live writer output
+
+Three pillars, real model, no human editing:
+
+| Pillar | Angle | Output |
+|---|---|---|
+| `relatable` | cerita singkat situasi yang biasa kejadian | "Kabel charger di tas tuh jago banget nyimpulin diri sendiri. Yang bikin kesel, ujungnya pelan-pelan mulai kebuka. Coba cek ujung kabel yang paling sering dipakai, kalau keliatan ada yang mulai terkelupas, mungkin itu tandanya kabelnya udah mau lepas." |
+| `practical_tips` | kesalahan umum dan cara hindarinya | "Pernah lihat angka di kemasan power bank, tapi ternyata nggak sebesar yang diharapkan? Kapasitas nyata biasanya lebih kecil dari label. Perhatikan tegangan output dan efisiensi konversinya, jangan cuma tergiur angka besar." |
+| `opinions` | klaim marketing vs realita pemakaian | "Liat diskon gede di layar ponsel, kadang kita cuma dibikin senang sebentar. Harganya balik normal, bukan turun beneran. Cek harga sebelum tanggal promo, biar nggak salah senyum-senyum sendiri." |
+
+All three are in-persona, distinct, and free of unsourced numbers. The writer
+works.
+
+### What is still unverified
+
+- **Critic scores against live drafts.** The critic is a second LLM call; a
+  full writer→critic→gate run on live output was in progress when this document
+  was written.
+- **Engagement.** Nothing has been published, so there is no reach data.
 
 ---
 
