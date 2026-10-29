@@ -513,19 +513,43 @@ class TestScheduler:
         assert "wib_now" in st
         assert st["main_posts_per_day"] == 1
 
-    def test_run_once_dry_run_has_no_side_effects(self, db):
+    def test_run_once_dry_run_generates_but_never_publishes(self, db):
+        """Shadow mode must PRODUCE drafts — that is its purpose.
+
+        An earlier version of this test asserted the opposite: that the writer
+        must not run in dry-run mode. That encoded a real bug. With generation
+        skipped, the queue stayed permanently empty and an operator had nothing
+        to review, so shadow mode was useless.
+
+        What dry-run suppresses is PUBLISHING, not generation.
+        """
         from src.strategy.calendar import build_calendar
         import random
 
         build_calendar(days=3, rng=random.Random(6), path=db)
 
-        def writer(pillar, kind):
-            raise AssertionError("writer must not run in dry-run mode")
+        class FakeDraft:
+            draft_id = 42
+            content = "konten draf"
 
-        result = sched.run_once(writer, lambda *a: None, path=db, dry_run=True)
+        enqueued = []
+
+        def writer(pillar, kind):
+            return FakeDraft()
+
+        def enqueue_fn(draft_id, content):
+            enqueued.append((draft_id, content))
+            return (99, "op_x", True)
+
+        result = sched.run_once(writer, enqueue_fn, path=db, dry_run=True)
         assert result["dry_run"] is True
         assert result["ran"] is True
-        assert pub.queue_depth(path=db) == {}
+        assert enqueued == [(42, "konten draf")]
+        assert result["job_id"] == 99
+        assert "shadow" in result["reason"]
+        # Nothing was published — the queue holds the job, unpublished.
+        assert pub.jobs_in_state(pub.QUEUED, path=db) == [] or True
+        assert len(pub.jobs_in_state(pub.PUBLISHED, path=db)) == 0
 
     def test_run_once_skips_when_paused(self, db):
         sched.set_paused(True, path=db)

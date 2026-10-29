@@ -157,6 +157,39 @@ def cmd_shadow(args) -> int:
     return 0
 
 
+def cmd_shadow(args) -> int:
+    """Run the V2 scheduler in shadow mode: generate and queue, never publish."""
+    from src.core.llm import get_llm_client
+    from src.orchestration import scheduler as sched
+
+    passes = []
+
+    def on_pass(result):
+        passes.append(result)
+        ran = "RUN " if result.get("ran") else "SKIP"
+        print(f"  [{ran}] {result.get('reason', '')[:90]}")
+
+    print(f"Shadow mode — {args.passes} pass(es), publishing suppressed.")
+    print()
+    summary = sched.run_loop(
+        dry_run=True,
+        client=get_llm_client(),
+        sleeper=lambda s: None,
+        max_passes=args.passes,
+        on_pass=on_pass,
+    )
+    print()
+    from src.orchestration.publisher import queue_depth
+
+    print(f"Summary: {summary}")
+    print(f"Queue:   {queue_depth()}")
+    print()
+    print("Drafts are queued for review. Nothing was published.")
+    if summary.get("enqueued"):
+        print("Review them with: python -m src.v2_cli status")
+    return 0
+
+
 def cmd_sync(args) -> int:
     from src.core import post_sync
 
@@ -214,6 +247,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("shadow", help="offline shadow run, fixtures only")
     p.add_argument("--n", type=int, default=30)
+    p.set_defaults(func=cmd_shadow)
+
+    p = sub.add_parser("run", help="run the V2 scheduler in shadow mode (no publish)")
+    p.add_argument("--passes", type=int, default=1)
     p.set_defaults(func=cmd_shadow)
 
     p = sub.add_parser("sync", help="reconcile posts against Threads (no delete)")

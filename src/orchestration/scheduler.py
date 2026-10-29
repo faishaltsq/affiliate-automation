@@ -99,14 +99,18 @@ def _kv_set(key: str, value: str, path=None) -> None:
 
 
 def posts_today(path=None) -> int:
-    """How many V2 posts already went out today (WIB calendar day).
+    """How many V2 posts today already claimed a slot (WIB calendar day).
+
+    Counts QUEUED and PUBLISHED. Counting only PUBLISHED would let shadow mode
+    bypass the day cap entirely — nothing is ever published there, so the
+    counter would stay at zero and the loop would enqueue without bound.
 
     `content_drafts.created_at` is stored in UTC by contract, but the day
     boundary we care about is the WIB one — a post drafted at 20:00 WIB is
     13:00 UTC and belongs to the same WIB day. Comparing the raw UTC date
     against the WIB date would mis-count anything drafted after 17:00 WIB.
     """
-    from src.orchestration.publisher import PUBLISHED
+    from src.orchestration.publisher import PUBLISHED, QUEUED
 
     today_wib = wib_date_key()
     with connection(path) as conn:
@@ -115,9 +119,9 @@ def posts_today(path=None) -> int:
             SELECT cd.created_at AS created_at
             FROM content_drafts cd
             JOIN publication_jobs pj ON pj.draft_id = cd.id
-            WHERE pj.state = ?
+            WHERE pj.state IN (?, ?)
             """,
-            (PUBLISHED,),
+            (PUBLISHED, QUEUED),
         ).fetchall()
 
     count = 0
@@ -288,19 +292,22 @@ def run_once(
     `writer_fn(pillar, slot_kind)` produces a draft (or None).
     `enqueue_fn(draft_id, content)` puts it on the publication queue.
     Both are injected so the scheduler itself never touches the LLM or the
-    Threads API — and so a dry run has no side effects at all.
+    Threads API.
+
+    `dry_run` controls PUBLISHING, not generation. Shadow mode
+    (`dry_run=True`) still writes drafts and fills the queue - that is
+    the whole point: an operator reviews what *would* have gone out.
+    Only the publish step is suppressed. Skipping generation in dry-run
+    mode left the queue permanently empty and made shadow mode useless.
     """
     decision = should_post_now(path=path)
-    result = {"decision": decision.describe(), "ran": decision.should_run}
+    result = {"decision": decision.describe(), "ran": decision.should_run,
+              "dry_run": dry_run}
 
     if not decision.should_run:
         result["reason"] = decision.reason
         return result
 
-    if dry_run:
-        result["reason"] = "dry_run — draft not generated, nothing enqueued"
-        result["dry_run"] = True
-        return result
 
     draft = writer_fn(decision.pillar, decision.slot_kind)
     if draft is None:
@@ -308,9 +315,160 @@ def run_once(
         result["reason"] = "no acceptable draft produced; slot skipped safely"
         return result
 
-    job = enqueue_fn(draft.id, draft.content)
+    draft_id = getattr(draft, "draft_id", None) or getattr(draft, "id", None)
+    job = enqueue_fn(draft_id, draft.content)
     record_post(decision.slot_kind, path=path)
-    result["reason"] = f"draft {draft.id} enqueued as job {job[0]}"
-    result["draft_id"] = getattr(draft, "id", None)
+    result["reason"] = (
+        f"draft {draft_id} enqueued as job {job[0]}"
+        + (" (shadow - not published)" if dry_run else "")
+    )
+    result["draft_id"] = draft_id
     result["job_id"] = job[0]
     return result
+
+
+# ── The long-running loop ───────────────────────────────────────────────────
+_running = True
+
+
+def request_shutdown() -> None:
+    """Ask the loop to exit after the current pass. Safe from a signal handler."""
+    global _running
+    _running = False
+    log.info("Scheduler shutdown requested.")
+
+
+def is_running() -> bool:
+    return _running
+
+
+def default_writer(pillar: str, slot_kind: str, path=None, client=None):
+    """The production writer: audience problem -> draft -> quality gate.
+
+    Returns a DraftResult or None. None is a normal outcome meaning the slot is
+    skipped; the writer never emits filler.
+    """
+    from src.content.writer import write_draft
+
+    return write_draft(pillar=pillar, persist=True, path=path, client=client)
+
+
+def default_enqueue(draft_id: int, content: str, path=None):
+    from src.orchestration.publisher import enqueue
+
+    return enqueue(draft_id, content, path=path)
+
+
+def run_loop(
+    path=None,
+    dry_run: bool = True,
+    client=None,
+    sleeper=None,
+    max_passes: Optional[int] = None,
+    on_pass=None,
+) -> dict:
+    """Run the scheduler until shutdown is requested.
+
+    `dry_run=True` (the default) generates drafts and enqueues them but never
+    publishes — that is shadow mode. `dry_run=False` additionally runs the
+    publisher, which requires AUTOPUBLISH_ENABLED and DRY_RUN=false.
+
+    `sleeper` is injected so tests do not actually sleep. `max_passes` bounds
+    the loop for tests and one-shot runs.
+    """
+    import time as _time
+
+    sleep = sleeper or _time.sleep
+    passes = 0
+    summary = {"passes": 0, "enqueued": 0, "skipped": 0, "errors": 0,
+               "published": 0}
+
+    log.info(
+        "Scheduler loop starting (dry_run=%s, main/day=%s, extras/week=%s).",
+        dry_run,
+        get_settings().scheduler.main_posts_per_day,
+        get_settings().scheduler.max_extra_posts_per_week,
+    )
+
+    while _running:
+        if max_passes is not None and passes >= max_passes:
+            break
+        passes += 1
+        try:
+            result = run_once(
+                writer_fn=lambda pillar, kind: default_writer(
+                    pillar, kind, path=path, client=client
+                ),
+                enqueue_fn=lambda did, content: default_enqueue(
+                    did, content, path=path
+                ),
+                path=path,
+                dry_run=dry_run,
+            )
+            summary["passes"] = passes
+            if result.get("job_id"):
+                summary["enqueued"] += 1
+            elif not result.get("ran", True):
+                summary["skipped"] += 1
+            if on_pass:
+                on_pass(result)
+
+            if not dry_run and result.get("job_id"):
+                published = _drain_queue(path=path)
+                summary["published"] += published
+
+        except Exception as exc:  # noqa: BLE001 — the loop must survive
+            summary["errors"] += 1
+            log.error("Scheduler pass failed: %s", exc, exc_info=True)
+
+        if max_passes is not None and passes >= max_passes:
+            break
+        if not _running:
+            break
+
+        delay = next_run_delay(path=path)
+        # Sleep in short slices so a shutdown request is honoured promptly.
+        waited = 0.0
+        while waited < delay and _running:
+            step = min(30.0, delay - waited)
+            sleep(step)
+            waited += step
+
+    log.info("Scheduler loop stopped after %d pass(es): %s", passes, summary)
+    return summary
+
+
+def _drain_queue(path=None) -> int:
+    """Claim and publish queued jobs. Returns how many were published.
+
+    Only runs when live publishing is allowed; otherwise it is a no-op so a
+    misconfigured flag cannot publish by accident.
+    """
+    from src.adapters.threads import get_threads_adapter
+    from src.content.writer import get_draft
+    from src.orchestration.publisher import (
+        AdapterThreadsPublisher, claim_next_job, publish_job,
+    )
+
+    flags = get_settings().flags
+    if not flags.live_publishing_allowed:
+        return 0
+
+    adapter = get_threads_adapter()
+    bridge = AdapterThreadsPublisher(adapter)
+    published = 0
+    while True:
+        job = claim_next_job(path=path)
+        if job is None:
+            break
+        draft = get_draft(job.draft_id, path=path) or {}
+        content = draft.get("content") or ""
+        parts = draft.get("parts") or []
+        outcome = publish_job(
+            job.id, bridge, content=content, parts=parts, path=path
+        )
+        if outcome.succeeded:
+            published += 1
+        if outcome.state == "UNKNOWN_OUTCOME":
+            break  # never continue past an ambiguous outcome
+    return published

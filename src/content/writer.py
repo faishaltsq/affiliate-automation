@@ -327,6 +327,16 @@ def write_draft(
     except LLMError as exc:
         log.warning("Writer LLM failed: %s — slot skipped, no filler.", exc)
         return None
+    except Exception as exc:  # noqa: BLE001
+        # A transport error, a timeout, or an unexpected provider response is
+        # still "no draft", not a crash. The scheduler loop has its own guard,
+        # but a writer that raises on a bad HTTP status turns one flaky call
+        # into a failed scheduling pass.
+        log.warning(
+            "Writer call failed unexpectedly (%s: %s) — slot skipped, no filler.",
+            type(exc).__name__, exc,
+        )
+        return None
 
     try:
         content, parts, disclosure = _parse_draft_payload(resp.text)
