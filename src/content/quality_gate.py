@@ -83,7 +83,7 @@ _CLICKBAIT_PATTERNS = [
     r"plot twist",
 ]
 
-# Engagement-bait closers. Matched against the last 200 characters so a post
+# Engagement-bait CLOSERS. Matched against the last 200 characters so a post
 # that legitimately asks a question mid-body is not penalised — only a bait
 # closer is.
 _ENGAGEMENT_BAIT_RE = re.compile(
@@ -96,6 +96,29 @@ _ENGAGEMENT_BAIT_RE = re.compile(
     r"|setuju\s+nggak"
     r"|siapa\s+yang\s+(?:sama|pernah)"
     r")[\s?,.!]*(?:[a-zA-Z]+[\s?,.!]*){0,2}$",
+    re.I,
+)
+
+# Engagement-bait OPENERS. A question is not automatically bait — the persona
+# guide explicitly allows `pertanyaan_jujur`, an honest question. What is bait
+# is a question that addresses the audience as a bloc and asks them to
+# self-identify: "Kalian sering nunggu diskon gede ya?" is a poll, not a
+# question. So this only fires on second-person-plural + a tag question, which
+# is the shape that farms replies rather than starting a thought.
+_BAIT_OPENER_RE = re.compile(
+    r"^\s*(?:"
+    # Direct bloc address: "Kalian tim mana", "Kamu nih"
+    r"(?:kalian|kamu|anda|loe|lu)\s+(?:tim\s+(?:mana|apa)|nih|sih|semua)\b"
+    # Self-identification poll aimed at the reader
+    r"|ada\s+yang\s+(?:ngerasain|merasain|pernah|sama)\b"
+    # "Kamu/Kalian pernah ngerasain/merasain ..." — a poll dressed as a
+    # question. The self-identification verb is the tell, wherever the tag sits.
+    r"|(?:kamu|kalian|anda|loe|lu)\s+\S{0,20}\s*pernah\s+\S{0,20}\s*"
+    r"(?:ngerasain|merasain|rasain)\b"
+    # Second-person-plural sentence ending in a tag question
+    r"|(?:kalian|kamu|anda|loe|lu)\s+[^.?!]{5,120}?"
+    r"(?:nggak\s+siH|\bsih\b|\bdong\b|\bdeh\b|\bya\b|\bkan\b)\s*[?.!]"
+    r")",
     re.I,
 )
 
@@ -145,8 +168,13 @@ def _check_clickbait(text: str) -> list[str]:
 
 
 def _check_engagement_bait(text: str) -> list[str]:
-    tail = text.strip()[-200:]
-    return [V_ENGAGEMENT_BAIT] if _ENGAGEMENT_BAIT_RE.search(tail) else []
+    """Bait closers and bait openers. Honest questions are allowed."""
+    body = text.strip()
+    if _ENGAGEMENT_BAIT_RE.search(body[-200:]):
+        return [V_ENGAGEMENT_BAIT]
+    if _BAIT_OPENER_RE.search(body[:200]):
+        return [V_ENGAGEMENT_BAIT]
+    return []
 
 
 def _check_hashtag(text: str) -> list[str]:

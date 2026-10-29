@@ -329,6 +329,34 @@ class TestHardVetoes:
             "Power bank murah sering bohong soal kapasitas. Kalian tim mana?"
         )
 
+    @pytest.mark.parametrize("draft", [
+        # Real output from the live gateway that the closer-only regex missed.
+        "Kalian sering nunggu diskon gede ya? Terus pas beli, harganya sama "
+        "aja kayak biasanya.",
+        "Kalian tim mana nih?",
+        "Kamu pernah ngerasain nggak sih kabel putus di ujung?",
+        "Ada yang ngerasain hal serupa?",
+    ])
+    def test_bait_openers_are_vetoed(self, draft):
+        """A poll dressed as a question farms replies; it is bait.
+
+        The persona guide allows `pertanyaan_jujur` — an honest question — so
+        this must not ban question openers wholesale.
+        """
+        assert V_ENGAGEMENT_BAIT in hard_vetoes(draft)
+
+    @pytest.mark.parametrize("draft", [
+        # Honest questions the persona explicitly permits.
+        "Pernah nggak sih HP dipakai tidur, besoknya baterai tetap penuh?",
+        "Power bank lama masih idup? Jangan buru-buru beli baru.",
+        "Kabel charger di tas punya agenda sendiri.",
+        "Banyak yang pikir charger cepat itu yang colokannya muat.",
+        "Kamu perlu cek standar watt sebelum beli charger.",
+        "Spesifikasi tinggi di atas kertas sering nggak terasa.",
+    ])
+    def test_honest_questions_are_not_vetoed(self, draft):
+        assert V_ENGAGEMENT_BAIT not in hard_vetoes(draft)
+
     def test_hashtag_is_vetoed(self):
         assert V_HASHTAG in hard_vetoes("Rapiin meja #setup #desk")
 

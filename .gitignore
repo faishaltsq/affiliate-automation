@@ -53,3 +53,9 @@ data/image_cache/
 
 # V2 verified database backups — restore artifacts, not source
 data/backups/
+
+# SQLite WAL sidecars — transient, must never be committed
+*.db-shm
+*.db-wal
+data/*.db-shm
+data/*.db-wal

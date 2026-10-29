@@ -200,12 +200,45 @@ Three pillars, real model, no human editing:
 All three are in-persona, distinct, and free of unsourced numbers. The writer
 works.
 
+### Full live pipeline: writer → critic → gate
+
+All five pillars, real model, no human editing:
+
+| Pillar | Verdict | Score | Vetoes |
+|---|---|---|---|
+| `relatable` | `NEEDS_REVIEW` | 84.0 | none |
+| `practical_tips` | `NEEDS_REVIEW` | 76.0 | none |
+| `opinions` | `NEEDS_REVIEW` | 74.0 | none |
+| `discoveries` | `REJECTED` | 0.0 | `critic_unavailable` |
+| `affiliate` | `NEEDS_REVIEW` | 73.0 | none |
+
+Two things this run proved:
+
+1. **The gate fails closed correctly.** When the critic returned empty output
+   for `discoveries`, the draft was rejected with `critic_unavailable` rather
+   than waved through. A draft nobody checked does not publish.
+2. **The critic caught a defect the regex missed.** The `opinions` draft opened
+   with *"Kalian sering nunggu diskon gede ya?"* — a poll dressed as a question.
+   The bait regex only inspected closers, so it passed; the critic scored the
+   draft lowest of the set (74) for exactly that reason.
+
+### Fix prompted by the live run
+
+`_BAIT_OPENER_RE` now catches bloc-address openers and self-identification
+polls. It deliberately does **not** ban question openers wholesale, because the
+persona guide explicitly permits `pertanyaan_jujur` — an honest question.
+"Pernah nggak sih HP dipakai tidur, besoknya baterai tetap penuh?" is allowed;
+"Kalian tim mana nih?" is not. Eleven cases pin the distinction.
+
 ### What is still unverified
 
-- **Critic scores against live drafts.** The critic is a second LLM call; a
-  full writer→critic→gate run on live output was in progress when this document
-  was written.
-- **Engagement.** Nothing has been published, so there is no reach data.
+- **Engagement.** Nothing has been published, so there is no reach data and no
+  claim about reach, saves, or follower growth is made anywhere.
+- **Thread publishing.** The live `THREADS_ACCESS_TOKEN` was verified with a
+  read-only profile probe only. No container was created and nothing was
+  posted.
+- **Affiliate attribution.** No product has been verified, so the commerce path
+  has never executed end-to-end with a real link.
 
 ---
 
