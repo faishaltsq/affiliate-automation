@@ -435,3 +435,55 @@ exist (`TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`, `TIKTOK_ACCESS_TOKEN` are all
 absent). Per the master plan this means **no automatic affiliate link
 generation is possible** — products must be imported manually from the official
 dashboard with provenance and expiry. The V2 catalog enforces exactly that.
+
+
+---
+
+## 14. Respawn Mechanism Found (2026-10-29)
+
+Section 11 recorded that the legacy processes were stopped and that "no
+watchdog process was running, and no Windows Scheduled Task matches rara /
+watchdog / affiliate / telegram." **That check was incomplete and the
+conclusion was wrong.** The processes came back.
+
+### What actually respawns them
+
+The Windows **Startup folder**, not a Scheduled Task:
+
+```
+C:\Users\cubeb\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
+    DailyPrivateOrganicDaemon.vbs   -> scripts\run_rara_daemon.vbs
+    DailyPrivateAgentBot.vbs        -> scripts\run_telegram_bot.vbs
+```
+
+These run on every login/boot, which is why killing the processes appeared to
+work and then silently reversed.
+
+### Observed behaviour
+
+After the first shutdown the daemon returned and posted **7 news-first posts**
+between 05:17 and 07:01 WIB (`organic_posts` 131 -> 138). It also spawned a
+child of itself, and the bot did the same — four processes again, matching the
+restart-loop pattern recorded in commit `d45d3ac`.
+
+### Corrected procedure
+
+To keep them stopped, either:
+
+1. Move the two `.vbs` files out of the Startup folder, **or**
+2. Delete/rename `scripts/run_rara_daemon.vbs` and `scripts/run_telegram_bot.vbs`
+   (the Startup launchers check `FileExists` and quit silently if missing).
+
+Option 2 is what the launchers themselves are written to tolerate.
+
+### Not actioned
+
+The Startup entries were **left in place**. Removing them changes boot behaviour
+on the operator's machine, which is their decision. The processes are stopped;
+they will return on next login unless one of the above is done.
+
+### Lesson for the audit
+
+A process check that only looks at `watchdog.py` and Scheduled Tasks is not a
+complete answer on Windows. The Startup folder, `Run` registry keys, and
+services all need checking before claiming nothing will respawn a process.
