@@ -272,3 +272,49 @@ against two *legacy* daemons.
 
 **Not modified:** no process was killed, signalled, or restarted during this
 audit or during any phase of the V2 implementation.
+
+
+---
+
+## 11. Legacy Processes Stopped (2026-10-29, operator request)
+
+The operator asked for all process instances to be killed.
+
+**Verified backup taken first:** `data/backups/v2/posts_pre_kill_20261029_091617.db`
+(SHA-256 `166fcc322f9da4a4dc6c090ac17b5715a3609a1d83a0b53c6412b0c3939012b6`,
+integrity `ok`, 131 posts).
+
+### Stopped
+
+| PID | Command |
+|---|---|
+| 4956 | `main.py organic --daemon` |
+| 28848 | `main.py organic --daemon` |
+| 32308 | `main.py bot` |
+| 9496 | `main.py bot` |
+
+### Checks performed before stopping
+
+- **Watchdog:** no `watchdog.py` process was running, and no Windows Scheduled
+  Task matches `rara` / `watchdog` / `affiliate` / `telegram`. Nothing would
+  respawn them.
+- **Database:** backed up and checksum-verified before any signal was sent.
+- **Post-stop:** waited 20 s and re-enumerated. No respawn occurred.
+
+### Verified after stopping
+
+| Check | Result |
+|---|---|
+| Processes referencing `affiliate-automation` | none (only the agent's own `omp.exe` / `bun.exe` / `powershell.exe`) |
+| `PRAGMA integrity_check` | `ok` |
+| `organic_posts` | 131 |
+| Stale PID files | `data/rara_daemon.pid` (28848), `data/telegram_listener.pid` (9496) |
+
+The stale PID files are harmless: `src/singleton.py::ensure_single_instance()`
+treats a dead PID as stale and overwrites it rather than exiting.
+
+### Note on a false positive
+
+`Get-CimInstance … -like '*main.py*'` also matches PID 13064, the **Hermes
+dashboard** (`hermes_cli/main.py dashboard --port 9119`). It is a different
+project that happens to share the filename and was deliberately left running.
