@@ -143,7 +143,40 @@ The scheduler sleeps until quiet hours end rather than polling.
 | `oldest_pending_age_seconds` | well under the lease (300 s) |
 | `metric_coverage.coverage_ratio` | ≥ 0.5 (below that, averages are indicative only) |
 
-## 10. Known Limitations
+## 10. Offline Integration Rehearsal
+
+Runs the entire chain — calendar → scheduler → ideation → writer → quality gate
+→ publication queue → publish → recovery — against an isolated database with a
+fake LLM and the dry-run adapter.
+
+```bash
+python -m src.integration_check --verbose
+python -m src.integration_check --out docs/v2/integration-report.json
+```
+
+18 checks, all of which must pass. It is part of the test suite
+(`tests/v2/test_integration_check.py`), so a regression fails the build.
+
+This is the check that found the publisher/adapter interface mismatch: the
+state machine expected `submit()` while the adapter exposed
+`publish_text()`, so injecting the real dry-run adapter raised
+`NotImplementedError` and every dry-run publish failed. Unit tests missed it
+because each used its own fake.
+
+## 11. Cutover Preflight
+
+Read-only. Reports what would block a live cutover without changing anything.
+
+```bash
+python -m src.integration_check --preflight
+```
+
+Current output flags one item: **`TELEGRAM_OPERATOR_IDS` is empty.** With no
+allowlist the V2 command centre denies every mutation, so `/approve`, `/pause`,
+and `/rollback` would all be unusable. Populate it with the numeric Telegram
+user IDs of the real operators before enabling `V2_TELEGRAM_COMMANDS_ENABLED`.
+
+## 12. Known Limitations
 
 - `cv2`, `psutil`, `praw`, and `playwright` are not installed in this
   environment, so `tests/bot/`, `tests/clipper/`, `tests/tiktok/`, and

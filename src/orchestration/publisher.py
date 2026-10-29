@@ -277,10 +277,17 @@ class PublishOutcome:
 
 
 class ThreadsPublisher:
-    """Adapter around the Threads publish API.
+    """The publish seam the state machine talks to.
 
-    Injected, not imported, so tests supply a fake and nothing touches the
-    network. `submit` may raise TimeoutError to simulate the ambiguous case.
+    Deliberately narrow: `submit` performs one publication and returns a dict
+    carrying `post_id`; `lookup` answers whether a container actually went out.
+    `submit` may raise TimeoutError to simulate the ambiguous case.
+
+    This is NOT the same type as `src.adapters.threads.ThreadsAdapter`. The
+    adapter is the *external side-effect* seam (it owns credentials, HTTP, and
+    dry-run suppression); this is the *state-machine* seam (it owns the
+    contract publish_job depends on). `AdapterThreadsPublisher` below bridges
+    the two, so production code injects the adapter and tests inject a fake.
     """
 
     def submit(self, content: str, parts: list[str], image_url: str = "") -> dict:
@@ -291,8 +298,29 @@ class ThreadsPublisher:
         raise NotImplementedError
 
 
+class AdapterThreadsPublisher(ThreadsPublisher):
+    """Bridges a `src.adapters.threads.ThreadsAdapter` into the state machine.
+
+    Without this the two abstractions never meet: the publisher's `submit()`
+    raises NotImplementedError, which publish_job catches as a generic failure,
+    so a dry-run publish could never reach PUBLISHED. That is exactly what the
+    offline integration rehearsal caught.
+    """
+
+    def __init__(self, adapter):
+        self._adapter = adapter
+
+    def submit(self, content: str, parts: list[str], image_url: str = "") -> dict:
+        if parts:
+            return self._adapter.publish_chain(parts, image_url=image_url)
+        return self._adapter.publish_text(content, image_url=image_url)
+
+    def lookup(self, container_id: str) -> dict:
+        return self._adapter.lookup_post(container_id)
+
+
 class FakeThreadsPublisher(ThreadsPublisher):
-    """Deterministic test double. `script` decides what each submit does."""
+    """Deterministic test double. `outcomes` decides what each submit does."""
 
     def __init__(self, outcomes=None, lookups=None):
         # outcomes: list of either {"post_id": "x"} or an Exception to raise

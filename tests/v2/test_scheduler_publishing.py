@@ -659,7 +659,9 @@ class TestAdapters:
         a = DryRunThreadsAdapter()
         r = a.publish_text("halo")
         assert r["dry_run"] is True
-        assert r["post_id"] == ""
+        # A synthetic id, not a real one: the publisher requires a non-empty
+        # post_id, and a dry run must still be able to reach PUBLISHED.
+        assert r["post_id"].startswith("dryrun_")
         assert len(a.calls) == 1
 
     def test_dry_run_chain(self):

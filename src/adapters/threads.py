@@ -38,22 +38,39 @@ class ThreadsAdapter:
 
 
 class DryRunThreadsAdapter(ThreadsAdapter):
-    """No side effects whatsoever. The default for every offline path."""
+    """No side effects whatsoever. The default for every offline path.
+
+    A dry run reports a *synthetic* post id rather than an empty one. The
+    publisher treats a missing post id as a failure — correctly, because for a
+    live adapter it means the API gave us nothing. Returning "" here made every
+    dry-run publish fail, which broke the offline rehearsal path entirely: the
+    state machine could never reach PUBLISHED without touching the network.
+
+    The synthetic id is namespaced `dryrun_` so it can never be confused with a
+    real Threads id downstream, and `dry_run: True` marks the result for any
+    caller that cares.
+    """
 
     def __init__(self):
         self.calls: list[dict] = []
+        self._counter = 0
+
+    def _synthetic_id(self, kind: str) -> str:
+        self._counter += 1
+        return f"dryrun_{kind}_{self._counter}"
 
     def publish_text(self, text: str, image_url: str = "") -> dict:
         self.calls.append({"op": "publish_text", "text": text,
                            "image_url": image_url, "at": utc_iso()})
-        log.info("[DRY RUN] publish_text suppressed: %s", redact_secrets(text[:60]))
-        return {"dry_run": True, "post_id": ""}
+        log.info("[DRY RUN] publish_text suppressed: %s",
+                 redact_secrets(text[:60]))
+        return {"dry_run": True, "post_id": self._synthetic_id("text")}
 
     def publish_chain(self, parts: list[str], image_url: str = "") -> dict:
         self.calls.append({"op": "publish_chain", "parts": parts,
                            "image_url": image_url, "at": utc_iso()})
         log.info("[DRY RUN] publish_chain suppressed (%d parts)", len(parts))
-        return {"dry_run": True, "post_id": ""}
+        return {"dry_run": True, "post_id": self._synthetic_id("chain")}
 
     def lookup_post(self, post_id: str) -> dict:
         self.calls.append({"op": "lookup_post", "post_id": post_id})
