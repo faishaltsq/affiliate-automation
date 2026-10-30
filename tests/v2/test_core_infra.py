@@ -589,6 +589,83 @@ class TestLLM:
         fake = FakeLLMClient(default='```json\n{"content": "ok"}\n```')
         data = complete_json(fake, [{"role": "user", "content": "x"}])
         assert data["content"] == "ok"
+    def test_complete_json_strips_single_backtick_fence(self):
+        """The live model emits `json (one backtick, no closing fence).
+
+        A fence the old parser did not recognise reached json.loads intact and
+        failed at position 0, which read as a malformed payload rather than a
+        formatting quirk.
+        """
+        from src.core.llm import FakeLLMClient, complete_json
+
+        fake = FakeLLMClient(default='`json\n{"content": "ok"}')
+        data = complete_json(fake, [{"role": "user", "content": "x"}])
+        assert data["content"] == "ok"
+
+    def test_complete_json_recovers_missing_member_commas(self):
+        """The live model drops separators between object members.
+
+        Every field the schema asked for is present; only the punctuation is
+        missing. Discarding that verdict costs a critic call and a draft.
+        """
+        from src.core.llm import FakeLLMClient, complete_json
+
+        fake = FakeLLMClient(default=(
+            '{\n "persona_voice": 17\n "audience_relevance": 18\n'
+            ' "notes": "ok"\n}'
+        ))
+        data = complete_json(fake, [{"role": "user", "content": "x"}])
+        assert data["persona_voice"] == 17
+        assert data["audience_relevance"] == 18
+        assert data["notes"] == "ok"
+
+    def test_complete_json_recovers_missing_array_commas(self):
+        """Array elements lose their commas too, not just object members."""
+        from src.core.llm import FakeLLMClient, complete_json
+
+        fake = FakeLLMClient(default=(
+            '{\n "concerns": [\n "pertama"\n "kedua"\n ]\n}'
+        ))
+        data = complete_json(fake, [{"role": "user", "content": "x"}])
+        assert data["concerns"] == ["pertama", "kedua"]
+
+    def test_complete_json_recovers_fence_and_commas_together(self):
+        from src.core.llm import FakeLLMClient, complete_json
+
+        fake = FakeLLMClient(default=(
+            '`json\n{\n "scores": [\n "a"\n "b"\n ]\n "total": 3\n}'
+        ))
+        data = complete_json(fake, [{"role": "user", "content": "x"}])
+        assert data["scores"] == ["a", "b"]
+        assert data["total"] == 3
+
+    def test_complete_json_repair_leaves_valid_json_untouched(self):
+        """The repair runs on every parse failure, so it must be a no-op on
+        payloads that were already valid, commas inside strings included."""
+        from src.core.llm import _repair_missing_commas
+
+        for valid in (
+            '{"a": 1, "b": 2}',
+            '{"a": "x, y", "b": 2}',
+            '{\n "a": 1,\n "b": 2\n}',
+            '{\n "c": [\n "a",\n "b"\n ]\n}',
+            '{"a": "line1\\nline2", "b": 2}',
+            '{"a": "ends with quote\\"", "b": 3}',
+        ):
+            assert _repair_missing_commas(valid) == valid, valid
+
+    def test_complete_json_still_rejects_prose(self):
+        """Recovery must not turn a non-answer into an empty verdict.
+
+        The model sometimes replies conversationally instead of with JSON;
+        that has no fields to salvage and must still fail closed.
+        """
+        from src.core.llm import FakeLLMClient, LLMError, complete_json
+
+        fake = FakeLLMClient(default="cold coffee, warm LO, I can't lose him!")
+        with pytest.raises(LLMError):
+            complete_json(fake, [{"role": "user", "content": "x"}])
+
 
     def test_fake_client_can_fail_specific_calls(self):
         from src.core.llm import FakeLLMClient, LLMError

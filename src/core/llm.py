@@ -6,6 +6,7 @@ No business module imports `requests` directly after this exists.
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional, Protocol
@@ -164,6 +165,51 @@ def set_llm_client(client: Optional[LLMClient]) -> None:
     _client = client
 
 
+def _strip_code_fence(text: str) -> str:
+    """Remove a surrounding markdown fence, however many backticks it uses.
+
+    Models emit ```json, ``` and — observed in production — a bare `json with
+    no closing fence at all. A fence that is not stripped reaches json.loads
+    and fails at position 0, which is indistinguishable from a genuinely
+    malformed payload.
+    """
+    text = text.strip()
+    if not text.startswith("`"):
+        return text
+    # Drop the opening run of backticks plus an optional language tag.
+    text = text.lstrip("`")
+    first_newline = text.find("\n")
+    if first_newline != -1:
+        tag = text[:first_newline].strip().lower()
+        if tag in ("", "json", "json5", "javascript", "js"):
+            text = text[first_newline + 1:]
+    # Drop a closing fence if one is present.
+    stripped = text.rstrip()
+    if stripped.endswith("```"):
+        stripped = stripped[:-3]
+    elif stripped.endswith("`"):
+        stripped = stripped.rstrip("`")
+    return stripped.strip()
+
+
+def _repair_missing_commas(text: str) -> str:
+    """Insert commas between members and elements separated only by newlines.
+
+    A real model reply observed in production emitted one entry per line with
+    no separators at all, in both object bodies and arrays. The payload carries
+    every field the schema asked for; only the punctuation is absent, so
+    recovering it preserves the critic's judgement instead of discarding a
+    usable verdict.
+
+    The match requires the previous line to end with a value terminator
+    (`}`, `]`, `"` or a digit) and the next to begin with a `"`. A comma that
+    is already present is left alone, so valid JSON is returned byte-identical
+    — which is what makes it safe to run this unconditionally on a parse
+    failure rather than only on a known-bad shape.
+    """
+    return re.sub(r'(?<=[}\]"\d])\s*\n\s*(?=")', ",\n", text)
+
+
 def complete_json(
     client: LLMClient,
     messages: list[dict],
@@ -172,20 +218,27 @@ def complete_json(
 ) -> dict:
     """Complete and parse JSON. Raises LLMError on anything unparseable.
 
-    Deliberately does NOT repair or invent a payload — a malformed model reply
-    must fail closed so the quality gate can reject the draft.
+    Deliberately does NOT invent a payload — a reply missing required fields
+    still fails closed so the quality gate can reject the draft. What it does
+    recover is presentation damage the model adds around an otherwise complete
+    object: markdown fences and omitted separators.
     """
     resp = client.complete(messages, temperature=temperature, max_tokens=max_tokens)
-    text = resp.text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1] if "\n" in text else text
-        if text.rstrip().endswith("```"):
-            text = text.rstrip()[:-3]
-        text = text.strip()
+    text = _strip_code_fence(resp.text)
     try:
         data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise LLMError(f"model returned non-JSON: {exc}") from exc
+    except json.JSONDecodeError as first_error:
+        repaired = _repair_missing_commas(text)
+        if repaired == text:
+            raise LLMError(
+                f"model returned non-JSON: {first_error}"
+            ) from first_error
+        try:
+            data = json.loads(repaired)
+        except json.JSONDecodeError as exc:
+            raise LLMError(
+                f"model returned non-JSON: {first_error}"
+            ) from exc
     if not isinstance(data, dict):
         raise LLMError("model returned JSON that is not an object")
     return data
