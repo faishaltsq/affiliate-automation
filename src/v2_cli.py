@@ -133,41 +133,21 @@ def cmd_draft(args) -> int:
 
 
 def cmd_shadow(args) -> int:
-    from src.content.writer import write_draft
-    from src.content.quality_gate import evaluate_draft
+    """Run the V2 scheduler in shadow mode: generate, gate and queue.
 
-    produced = 0
-    accepted = 0
-    pillars: dict[str, int] = {}
-    for i in range(args.n):
-        draft = write_draft(seed=i)
-        if draft is None:
-            continue
-        produced += 1
-        pillars[draft.idea_pillar] = pillars.get(draft.idea_pillar, 0) + 1
-        verdict = evaluate_draft(draft)
-        if verdict.verdict in ("APPROVED_AUTO", "NEEDS_REVIEW"):
-            accepted += 1
-    print(f"Shadow run: {produced} drafts produced, {accepted} accepted")
-    print("Pillar distribution:")
-    for pillar, count in sorted(pillars.items(), key=lambda kv: -kv[1]):
-        print(f"  {pillar:<16} {count}")
-    print()
-    print("No external calls were made. Nothing was published.")
-    return 0
-
-
-def cmd_shadow(args) -> int:
-    """Run the V2 scheduler in shadow mode: generate and queue, never publish."""
+    Nothing is published: the scheduler is called with `dry_run=True`, so the
+    publish step is suppressed while generation and the quality gate still
+    run. That is what makes the queue a preview of what *would* have gone out.
+    """
     from src.core.llm import get_llm_client
     from src.orchestration import scheduler as sched
-
-    passes = []
+    from src.orchestration.publisher import queue_depth
 
     def on_pass(result):
-        passes.append(result)
         ran = "RUN " if result.get("ran") else "SKIP"
-        print(f"  [{ran}] {result.get('reason', '')[:90]}")
+        verdict = result.get("verdict")
+        tail = f" [{verdict}]" if verdict else ""
+        print(f"  [{ran}]{tail} {result.get('reason', '')[:90]}")
 
     print(f"Shadow mode — {args.passes} pass(es), publishing suppressed.")
     print()
@@ -177,16 +157,54 @@ def cmd_shadow(args) -> int:
         sleeper=lambda s: None,
         max_passes=args.passes,
         on_pass=on_pass,
+        review_required=True,
     )
     print()
-    from src.orchestration.publisher import queue_depth
-
     print(f"Summary: {summary}")
     print(f"Queue:   {queue_depth()}")
     print()
     print("Drafts are queued for review. Nothing was published.")
     if summary.get("enqueued"):
         print("Review them with: python -m src.v2_cli status")
+    return 0
+
+
+def cmd_run(args) -> int:
+    """Run the scheduler for N passes, honouring the live flags.
+
+    Unlike `shadow`, this path is not forced offline: with
+    `AUTOPUBLISH_ENABLED=true`, `DRY_RUN=false` and review satisfied, a pass
+    can publish. With default flags it behaves like shadow mode.
+    """
+    from src.core.llm import get_llm_client
+    from src.orchestration import scheduler as sched
+    from src.orchestration.publisher import queue_depth
+
+    flags = get_settings().flags
+    dry_run = not flags.live_publishing_allowed
+
+    def on_pass(result):
+        ran = "RUN " if result.get("ran") else "SKIP"
+        verdict = result.get("verdict")
+        tail = f" [{verdict}]" if verdict else ""
+        print(f"  [{ran}]{tail} {result.get('reason', '')[:90]}")
+
+    print(f"Run mode — {args.passes} pass(es), dry_run={dry_run}, "
+          f"review_required={flags.v2_review_required}")
+    print()
+    summary = sched.run_loop(
+        dry_run=dry_run,
+        client=get_llm_client(),
+        sleeper=lambda s: None,
+        max_passes=args.passes,
+        on_pass=on_pass,
+        review_required=flags.v2_review_required,
+    )
+    print()
+    print(f"Summary: {summary}")
+    print(f"Queue:   {queue_depth()}")
+    if dry_run:
+        print("Nothing was published.")
     return 0
 
 
@@ -245,13 +263,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pillar", default=None)
     p.set_defaults(func=cmd_draft)
 
-    p = sub.add_parser("shadow", help="offline shadow run, fixtures only")
-    p.add_argument("--n", type=int, default=30)
-    p.set_defaults(func=cmd_shadow)
-
-    p = sub.add_parser("run", help="run the V2 scheduler in shadow mode (no publish)")
+    p = sub.add_parser("shadow", help="run the scheduler offline: gate + queue, no publish")
     p.add_argument("--passes", type=int, default=1)
     p.set_defaults(func=cmd_shadow)
+
+    p = sub.add_parser("run", help="run the scheduler for N passes (respects flags)")
+    p.add_argument("--passes", type=int, default=1)
+    p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("sync", help="reconcile posts against Threads (no delete)")
     p.set_defaults(func=cmd_sync)

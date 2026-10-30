@@ -285,6 +285,59 @@ class TestReadOnlyCommands:
         assert result.handled is True
         assert "perintah" in result.text
 
+    def test_pending_lists_queued_draft_with_its_pillar(self, flags_on, db):
+        """`pillar` lives on content_ideas, not content_drafts.
+
+        The listing joins through idea_id; querying the column off
+        content_drafts raises `no such column` and the operator sees a
+        failure notice instead of the queue.
+        """
+        from src.orchestration.publisher import QUEUED, enqueue
+
+        with connect(db) as conn:
+            with transaction(conn):
+                conn.execute(
+                    "INSERT INTO content_ideas (pillar, angle) "
+                    "VALUES ('practical_tips', 'angle')"
+                )
+                idea_id = conn.execute(
+                    "SELECT last_insert_rowid()"
+                ).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO content_drafts (idea_id, content, status) "
+                    "VALUES (?, 'isi draf', 'EVALUATED')", (idea_id,)
+                )
+                draft_id = conn.execute(
+                    "SELECT last_insert_rowid()"
+                ).fetchone()[0]
+        enqueue(draft_id, "isi draf", path=db)
+
+        result, _ = _run(_msg(OPERATOR, "/pending"), "/pending", path=db)
+        assert "Perintah gagal" not in result.text
+        assert f"#{draft_id}" in result.text
+        assert "[practical_tips]" in result.text
+        assert f"/approve {draft_id}" in result.text
+
+    def test_pending_survives_a_draft_without_an_idea(self, flags_on, db):
+        """A draft with no idea_id still lists — the pillar tag is omitted."""
+        from src.orchestration.publisher import enqueue
+
+        with connect(db) as conn:
+            with transaction(conn):
+                conn.execute(
+                    "INSERT INTO content_drafts (content, status) "
+                    "VALUES ('tanpa ide', 'EVALUATED')"
+                )
+                draft_id = conn.execute(
+                    "SELECT last_insert_rowid()"
+                ).fetchone()[0]
+        enqueue(draft_id, "tanpa ide", path=db)
+
+        result, _ = _run(_msg(OPERATOR, "/pending"), "/pending", path=db)
+        assert "Perintah gagal" not in result.text
+        assert f"#{draft_id}" in result.text
+        assert "[]" not in result.text
+
 
 # ── Mutation behaviour ──────────────────────────────────────────────────────
 class TestMutationBehaviour:

@@ -185,6 +185,7 @@ class FeatureFlags:
     shadow_mode: bool = True
     v2_scheduler_enabled: bool = False
     v2_telegram_commands_enabled: bool = False
+    v2_review_required: bool = True
 
     @property
     def live_publishing_allowed(self) -> bool:
@@ -201,7 +202,8 @@ class FeatureFlags:
             f"dry_run={self.dry_run} "
             f"shadow={self.shadow_mode} "
             f"scheduler={self.v2_scheduler_enabled} "
-            f"telegram_v2={self.v2_telegram_commands_enabled}"
+            f"telegram_v2={self.v2_telegram_commands_enabled} "
+            f"review_required={self.v2_review_required}"
         )
 
 
@@ -213,6 +215,7 @@ def load_feature_flags() -> FeatureFlags:
         shadow_mode=_bool("SHADOW_MODE", True),
         v2_scheduler_enabled=_bool("V2_SCHEDULER_ENABLED", False),
         v2_telegram_commands_enabled=_bool("V2_TELEGRAM_COMMANDS_ENABLED", False),
+        v2_review_required=_bool("V2_REVIEW_REQUIRED", True),
     )
 
 

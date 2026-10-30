@@ -10,6 +10,7 @@ Acceptance criteria covered:
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -35,6 +36,18 @@ def db(tmp_path):
     path = tmp_path / "v2.db"
     migrate(path)
     return path
+
+
+def _critic_llm():
+    """A critic that passes. The scheduler runs the gate before enqueueing,
+    so a test that does not inject a critic reaches the real HTTP client."""
+    from src.core.llm import FakeLLMClient
+
+    return FakeLLMClient(default=json.dumps({
+        "persona_voice": 18, "audience_relevance": 18, "natural_writing": 18,
+        "specific_useful_content": 18, "evidential_correctness": 14,
+        "novelty": 4, "notes": "ok", "concerns": [],
+    }))
 
 
 @pytest.fixture()
@@ -365,6 +378,15 @@ class TestRecovery:
 
 
 # ── Scheduler ───────────────────────────────────────────────────────────────
+# A draft body the quality gate accepts. The scheduler now runs the gate before
+# enqueueing, so a stub like "konten draf" is rejected (too short / generic)
+# and the pass reports a rejection instead of a queue entry.
+DRAFTABLE_CONTENT = (
+    "Kabel charger yang selalu kusut di tas itu biasanya bukan soal kabelnya, "
+    "tapi soal cara bungkusnya. Gue mulai lingkar sendiri tiap abis dipakai."
+)
+
+
 class TestScheduler:
     def test_default_state_is_running(self, db):
         assert sched.is_paused(path=db) is False
@@ -530,7 +552,11 @@ class TestScheduler:
 
         class FakeDraft:
             draft_id = 42
-            content = "konten draf"
+            content = DRAFTABLE_CONTENT
+            parts = []
+            structure = "single"
+            pillar = "relatable"
+            evidence = ""
 
         enqueued = []
 
@@ -541,10 +567,11 @@ class TestScheduler:
             enqueued.append((draft_id, content))
             return (99, "op_x", True)
 
-        result = sched.run_once(writer, enqueue_fn, path=db, dry_run=True)
+        result = sched.run_once(writer, enqueue_fn, path=db, dry_run=True,
+                                client=_critic_llm())
         assert result["dry_run"] is True
         assert result["ran"] is True
-        assert enqueued == [(42, "konten draf")]
+        assert enqueued == [(42, DRAFTABLE_CONTENT)]
         assert result["job_id"] == 99
         assert "shadow" in result["reason"]
         # Nothing was published — the queue holds the job, unpublished.
@@ -576,7 +603,12 @@ class TestScheduler:
 
         class FakeDraft:
             id = 42
-            content = "konten draf"
+            draft_id = 42
+            content = DRAFTABLE_CONTENT
+            parts = []
+            structure = "single"
+            pillar = "relatable"
+            evidence = ""
 
         enqueued = []
 
@@ -585,9 +617,10 @@ class TestScheduler:
             return (99, "op_x", True)
 
         result = sched.run_once(lambda p, k: FakeDraft(), enqueue_fn,
-                                path=db, dry_run=False)
+                                path=db, dry_run=False,
+                                client=_critic_llm())
         assert result["ran"] is True
-        assert enqueued == [(42, "konten draf")]
+        assert enqueued == [(42, DRAFTABLE_CONTENT)]
         assert result["job_id"] == 99
 
 

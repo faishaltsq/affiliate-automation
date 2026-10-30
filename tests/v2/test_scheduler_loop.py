@@ -44,10 +44,40 @@ def db(tmp_path):
     return path
 
 
-def _fake_llm(content="Kabel charger yang selalu kusut di tas dan putus di ujung."):
+GOOD_CONTENT = "Kabel charger yang selalu kusut di tas dan putus di ujung."
+
+
+def _writer_llm(content=GOOD_CONTENT):
+    """Answers the writer prompt with a valid draft payload."""
     return FakeLLMClient(default=json.dumps({
         "content": content, "disclosure": "",
     }))
+
+
+def _critic_llm(score=90):
+    """Answers the critic prompt with a passing score.
+
+    The scheduler passes ONE client to both roles, so a single FakeLLMClient
+    cannot serve both prompts. Tests inject the critic separately through
+    `gate_draft`, which is the seam production reaches with a live model that
+    answers either prompt correctly.
+    """
+    return FakeLLMClient(default=json.dumps({
+        "persona_voice": 18, "audience_relevance": 18, "natural_writing": 18,
+        "specific_useful_content": 18, "evidential_correctness": 14,
+        "novelty": 4, "notes": "ok", "concerns": [],
+    }))
+
+
+@pytest.fixture()
+def critic(monkeypatch):
+    """Make the scheduler's gate use its own client, as production does."""
+    real_gate = sched.gate_draft
+
+    def _gate(draft, path=None, client=None):
+        return real_gate(draft, path=path, client=_critic_llm())
+
+    monkeypatch.setattr(sched, "gate_draft", _gate)
 
 
 @pytest.fixture()
@@ -58,48 +88,46 @@ def pinned(monkeypatch):
             "single_snappy", "observasi", "pendek", "ringan", "edukasi"
         ),
     )
-
-
 class TestShadowMode:
-    def test_shadow_generates_and_queues(self, db, pinned):
+    def test_shadow_generates_and_queues(self, db, pinned, critic):
         """The whole point of shadow mode: drafts exist for review.
 
         The day cap is 1 main post/day, so three passes produce exactly one
         draft — the second and third are correctly refused.
         """
         summary = sched.run_loop(
-            path=db, dry_run=True, client=_fake_llm(),
+            path=db, dry_run=True, client=_writer_llm(),
             sleeper=lambda s: None, max_passes=3,
         )
         assert summary["enqueued"] == 1
         assert summary["published"] == 0
         assert len(jobs_in_state(QUEUED, path=db)) == 1
 
-    def test_shadow_never_publishes(self, db, pinned):
-        sched.run_loop(path=db, dry_run=True, client=_fake_llm(),
+    def test_shadow_never_publishes(self, db, pinned, critic):
+        sched.run_loop(path=db, dry_run=True, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=3)
         assert len(jobs_in_state("PUBLISHED", path=db)) == 0
         assert queue_depth(path=db) == {"QUEUED": 1}
 
-    def test_shadow_reports_dry_run_in_each_pass(self, db, pinned):
+    def test_shadow_reports_dry_run_in_each_pass(self, db, pinned, critic):
         passes = []
-        sched.run_loop(path=db, dry_run=True, client=_fake_llm(),
+        sched.run_loop(path=db, dry_run=True, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1,
                        on_pass=lambda r: passes.append(r))
         assert passes[0]["dry_run"] is True
         assert "shadow" in passes[0]["reason"]
 
-    def test_shadow_records_the_post_against_the_day_cap(self, db, pinned):
+    def test_shadow_records_the_post_against_the_day_cap(self, db, pinned, critic):
         """Enqueued drafts must count toward the daily cap."""
-        sched.run_loop(path=db, dry_run=True, client=_fake_llm(),
+        sched.run_loop(path=db, dry_run=True, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1)
         assert sched.posts_today(path=db) == 1
 
-    def test_day_cap_stops_a_second_main_post(self, db, pinned):
-        sched.run_loop(path=db, dry_run=True, client=_fake_llm(),
+    def test_day_cap_stops_a_second_main_post(self, db, pinned, critic):
+        sched.run_loop(path=db, dry_run=True, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1)
         passes = []
-        sched.run_loop(path=db, dry_run=True, client=_fake_llm(),
+        sched.run_loop(path=db, dry_run=True, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1,
                        on_pass=lambda r: passes.append(r))
         assert passes[0]["ran"] is False
@@ -108,7 +136,7 @@ class TestShadowMode:
     def test_paused_scheduler_does_nothing(self, db, pinned):
         sched.set_paused(True, path=db)
         summary = sched.run_loop(
-            path=db, dry_run=True, client=_fake_llm(),
+            path=db, dry_run=True, client=_writer_llm(),
             sleeper=lambda s: None, max_passes=2,
         )
         assert summary["enqueued"] == 0
@@ -133,21 +161,21 @@ class TestShadowMode:
         assert summary["enqueued"] == 0
         assert queue_depth(path=db) == {}
 
-    def test_max_passes_bounds_the_loop(self, db, pinned):
+    def test_max_passes_bounds_the_loop(self, db, pinned, critic):
         summary = sched.run_loop(
-            path=db, dry_run=True, client=_fake_llm(),
+            path=db, dry_run=True, client=_writer_llm(),
             sleeper=lambda s: None, max_passes=1,
         )
         assert summary["passes"] == 1
 
 
 class TestShutdown:
-    def test_request_shutdown_stops_the_loop(self, db, pinned):
+    def test_request_shutdown_stops_the_loop(self, db, pinned, critic):
         def sleeper(seconds):
             sched.request_shutdown()
 
         summary = sched.run_loop(
-            path=db, dry_run=True, client=_fake_llm(),
+            path=db, dry_run=True, client=_writer_llm(),
             sleeper=sleeper, max_passes=None,
         )
         assert summary["passes"] >= 1
@@ -193,42 +221,78 @@ class TestDrainQueue:
         monkeypatch.setattr(sched_mod, "get_settings", lambda: settings)
         monkeypatch.setattr(threads_mod, "get_threads_adapter", lambda: adapter)
 
-    def test_drain_is_a_noop_when_live_publishing_is_off(self, db, pinned):
+    def test_drain_is_a_noop_when_live_publishing_is_off(self, db, pinned, critic):
         """A misconfigured flag must not publish by accident."""
-        sched.run_loop(path=db, dry_run=True, client=_fake_llm(),
+        sched.run_loop(path=db, dry_run=True, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1)
         published = sched._drain_queue(path=db)
         assert published == 0
         assert len(jobs_in_state(QUEUED, path=db)) == 1
 
-    def test_drain_publishes_when_live_is_allowed(self, db, monkeypatch, pinned):
+    def test_drain_publishes_when_live_is_allowed(self, db, monkeypatch, pinned, critic):
+        """Live flags alone are not enough: the draft must be APPROVED."""
         from src.adapters.threads import DryRunThreadsAdapter
+        from src.content.writer import set_draft_status
 
         self._patch_live(monkeypatch, DryRunThreadsAdapter())
-        sched.run_loop(path=db, dry_run=False, client=_fake_llm(),
+        sched.run_loop(path=db, dry_run=False, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1)
+
+        # The scheduler enqueued it, but review mode holds it.
+        assert len(jobs_in_state(QUEUED, path=db)) == 1
+        assert len(jobs_in_state("PUBLISHED", path=db)) == 0
+
+        # The operator approves; the next drain publishes.
+        job = jobs_in_state(QUEUED, path=db)[0]
+        set_draft_status(job.draft_id, "APPROVED", path=db)
+        published = sched._drain_queue(path=db)
+
+        assert published == 1
         assert len(jobs_in_state("PUBLISHED", path=db)) == 1
         assert queue_depth(path=db).get("QUEUED", 0) == 0
 
-    def test_drain_stops_at_an_unknown_outcome(self, db, monkeypatch, pinned):
+    def test_drain_holds_a_draft_nobody_approved(self, db, monkeypatch, pinned, critic):
+        """Review mode: an unapproved draft is released, not published."""
+        from src.adapters.threads import DryRunThreadsAdapter
+
+        self._patch_live(monkeypatch, DryRunThreadsAdapter())
+        sched.run_loop(path=db, dry_run=False, client=_writer_llm(),
+                       sleeper=lambda s: None, max_passes=1)
+
+        published = sched._drain_queue(path=db)
+
+        assert published == 0
+        assert len(jobs_in_state("PUBLISHED", path=db)) == 0
+        # Still queued, and the claim did not burn a retry attempt.
+        job = jobs_in_state(QUEUED, path=db)[0]
+        assert job.attempts == 0
+
+    def test_drain_stops_at_an_unknown_outcome(self, db, monkeypatch, pinned, critic):
         """Never continue past an ambiguous publish."""
         from src.adapters.threads import DryRunThreadsAdapter
+        from src.content.writer import set_draft_status
 
         class TimeoutAdapter(DryRunThreadsAdapter):
             def publish_text(self, text, image_url=""):
                 raise TimeoutError("read timed out")
 
         self._patch_live(monkeypatch, TimeoutAdapter())
-        sched.run_loop(path=db, dry_run=False, client=_fake_llm(),
+        sched.run_loop(path=db, dry_run=False, client=_writer_llm(),
                        sleeper=lambda s: None, max_passes=1)
+
+        job = jobs_in_state(QUEUED, path=db)[0]
+        set_draft_status(job.draft_id, "APPROVED", path=db)
+        sched._drain_queue(path=db)
+
         assert len(jobs_in_state("UNKNOWN_OUTCOME", path=db)) == 1
         assert len(jobs_in_state("PUBLISHED", path=db)) == 0
+
 
 
 class TestDefaults:
     def test_default_writer_returns_a_draft_or_none(self, db, pinned):
         out = sched.default_writer("relatable", "main", path=db,
-                                   client=_fake_llm())
+                                   client=_writer_llm())
         assert out is not None
         assert out.content
 

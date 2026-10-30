@@ -48,14 +48,82 @@ TARGETS = [
     ("organic", "main.py organic", VBS_ORGANIC),
 ]
 
+#!/usr/bin/env python
+"""Watchdog: jaminan listener Telegram + runtime V2 selalu hidup.
+
+Dijalankan dua lapis:
+1. Cronjob Hermes (no_agent) — scheduler cron hidup DI DALAM gateway, jadi
+   selama gateway Hermes menyala, watchdog ikut tick tiap beberapa menit.
+2. Manual / test: `python watchdog.py --once`.
+
+Idempoten: kalau proses sudah hidup, tidak melakukan apa-apa. stdout HANYA
+berisi pesan saat ada aksi (spawn sukses/gagal) — stdout kosong = tidak ada
+notifikasi (pola watchdog untuk cron no_agent). Semua kejadian tetap dicatat
+ke logs/watchdog.log.
+
+Sejak cutover V2, targetnya adalah dua proses V2:
+
+  listener  — `main.py bot`             routing perintah Telegram saja
+  runtime   — `python -m src.v2_runtime` generator + gate + antrean
+
+Proses legacy `main.py organic --daemon` TIDAK dihidupkan lagi. Kalau kamu
+menemukannya berjalan, itu sisa proses lama — hentikan manual, watchdog tidak
+akan merespawn-nya.
+
+Stdlib-only (tanpa psutil) supaya bisa dijalankan interpreter Python apa pun,
+termasuk Python bawaan Hermes.
+"""
+import datetime
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+PROJECT_DIR_FALLBACK = Path(r"C:\Users\cubeb\OneDrive\Documents\coding\projects\affiliate-automation")
+
+
+def _resolve_project_dir() -> Path:
+    candidate = Path(__file__).resolve().parents[1]
+    if (candidate / "main.py").exists():
+        return candidate
+    return PROJECT_DIR_FALLBACK
+
+
+PROJECT_DIR = _resolve_project_dir()
+VBS_BOT = PROJECT_DIR / "scripts" / "run_telegram_bot.vbs"
+VBS_RUNTIME = PROJECT_DIR / "scripts" / "run_v2_runtime.vbs"
+LOG_FILE = PROJECT_DIR / "logs" / "watchdog.log"
+
+ALIVE_WS = 30 * 1024 * 1024   # >30MB working set = proses nyata (bukan trampoline venv)
+# Trampoline venv butuh >150 dtk untuk membesar. Grace lebih pendek dari
+# interval cron (5 mnt) supaya watchdog tidak membunuh proses yang SEHARUSNYA
+# hidup tapi tick cron jatuh di tengah masa loading.
+STALE_AGE = 300               # trampoline kecil & tua = instance mati
+SPAWN_GRACE = 60              # detik tunggu setelah spawn (cold start bisa >20 dtk)
+
+# (label, needle unik pada command line, launcher)
+TARGETS = [
+    ("listener", "main.py bot", VBS_BOT),
+    ("runtime", "src.v2_runtime", VBS_RUNTIME),
+]
+
+# Proses legacy yang tidak boleh dihidupkan lagi. Kalau masih jalan, watchdog
+# melaporkannya supaya operator bisa mematikannya — tapi tidak membunuhnya
+# sendiri, karena mematikan proses secara diam-diam lebih berbahaya daripada
+# memberi tahu.
+LEGACY_NEEDLES = [
+    ("organic-daemon", "main.py organic"),
+    ("tiktok-scheduler", "src.tiktok.scheduler"),
+]
+
 PS_ENUM = (
     "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-    "Where-Object { $_.CommandLine -match 'main\\.py' } | "
+    "Where-Object { $_.CommandLine -match 'main\\.py|src\\.v2_runtime|src\\.tiktok' } | "
     "Select-Object ProcessId,CommandLine,WorkingSetSize,"
     "@{n='AgeSec';e={[int]((Get-Date) - $_.CreationDate).TotalSeconds}} | "
     "ConvertTo-Json -Compress"
 )
-
 
 def _log(msg: str, to_stdout: bool = False) -> None:
     line = f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} [watchdog] {msg}"
@@ -164,7 +232,7 @@ def _notify_telegram(text: str) -> None:
 
 
 def check_once():
-    """Heal both targets if needed. Returns list of stdout messages (empty = nothing to report)."""
+    """Heal both V2 targets if needed. Returns stdout messages (empty = nothing)."""
     messages = []
     procs = _enum_processes()
 
@@ -188,7 +256,8 @@ def check_once():
             time.sleep(2)
 
         if not vbs.exists():
-            msg = f"⚠️ Watchdog: launcher {vbs.name} tidak ditemukan — {name} tidak bisa dijalankan."
+            msg = (f"⚠️ Watchdog: launcher {vbs.name} tidak ditemukan — "
+                   f"{name} tidak bisa dijalankan.")
             _log(msg, to_stdout=True)
             messages.append(msg)
             continue
@@ -211,7 +280,19 @@ def check_once():
             _log(msg, to_stdout=True)
             messages.append(msg)
 
+    # Report legacy processes that survived the cutover. Never kill them here:
+    # an operator should see what stopped, not discover it afterwards.
+    for name, needle in LEGACY_NEEDLES:
+        lingering = _alive(_matches(procs, needle))
+        if lingering:
+            pids = [p.get("ProcessId") for p in lingering]
+            msg = (f"⚠️ Watchdog: proses legacy '{name}' masih jalan "
+                   f"(pid={pids}). Matikan manual — watchdog tidak merespawn-nya.")
+            _log(msg, to_stdout=True)
+            messages.append(msg)
+
     return messages
+
 
 
 def main():

@@ -231,6 +231,33 @@ def requeue(job_id: int, path=None) -> bool:
             return True
 
 
+def release_job(job_id: int, path=None) -> bool:
+    """Return a claimed job to QUEUED without consuming a retry attempt.
+
+    Used when a job was claimed but must not be published yet — the review
+    gate holds a draft that no operator has approved. The claim already
+    incremented `attempts`, so it is decremented back: waiting for a human is
+    not a publish failure and must not burn the retry budget.
+    """
+    with connect(path) as conn:
+        with transaction(conn):
+            row = conn.execute(
+                "SELECT state, attempts FROM publication_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            if row["state"] != PUBLISHING:
+                return False
+            conn.execute(
+                "UPDATE publication_jobs SET state = ?, claimed_at = NULL, "
+                "lease_expires_at = NULL, attempts = MAX(attempts - 1, 0), "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (QUEUED, job_id),
+            )
+            return True
+
+
 def jobs_in_state(state: str, path=None) -> list[PublicationJob]:
     with connect(path) as conn:
         rows = conn.execute(

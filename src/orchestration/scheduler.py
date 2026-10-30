@@ -281,11 +281,42 @@ def status(path=None) -> dict:
     }
 
 
+def gate_draft(draft, path=None, client=None):
+    """Run the quality gate on a scheduled draft. Returns a GateDecision.
+
+    This is the step that makes the scheduler's output reviewable rather than
+    merely generated. Without it a scheduled pass wrote a draft straight into
+    `publication_jobs`, so a draft that violates the persona contract (an
+    unsourced number, a fabricated firsthand claim, engagement bait) reached
+    the queue with zero evaluations recorded against it.
+
+    Draft history is passed in so the near-duplicate and repetition vetoes can
+    fire: the scheduled path is exactly where a template loop would show up.
+    """
+    from src.content.quality_gate import evaluate_draft
+    from src.content.writer import recent_draft_contents
+
+    history = recent_draft_contents(limit=30, path=path)
+    if getattr(draft, "content", None):
+        history = [h for h in history if h != draft.content]
+
+    return evaluate_draft(
+        draft.content,
+        evidence=getattr(draft, "evidence", "") or "",
+        pillar=getattr(draft, "pillar", "") or "",
+        history=history,
+        draft_id=getattr(draft, "draft_id", None),
+        client=client,
+        path=path,
+    )
+
+
 def run_once(
     writer_fn: Callable[[str, Optional[str]], object],
     enqueue_fn: Callable[[int, str], object],
     path=None,
     dry_run: bool = True,
+    client=None,
 ) -> dict:
     """One scheduling pass. Returns what it decided and why.
 
@@ -294,39 +325,74 @@ def run_once(
     Both are injected so the scheduler itself never touches the LLM or the
     Threads API.
 
+    Every draft passes the quality gate before it can be enqueued:
+
+      REJECTED      hard veto - never enqueued, the slot is skipped
+      REVISE_ONCE   below the review floor - parked for the operator
+      NEEDS_REVIEW  enqueued, but held until an operator approves it
+      APPROVED_AUTO enqueued
+
     `dry_run` controls PUBLISHING, not generation. Shadow mode
     (`dry_run=True`) still writes drafts and fills the queue - that is
     the whole point: an operator reviews what *would* have gone out.
     Only the publish step is suppressed. Skipping generation in dry-run
     mode left the queue permanently empty and made shadow mode useless.
     """
+    from src.content.quality_gate import APPROVED_AUTO, NEEDS_REVIEW, REJECTED
+    from src.content.writer import set_draft_status
+    from src.core.models import EVALUATED, REJECTED
+
     decision = should_post_now(path=path)
     result = {"decision": decision.describe(), "ran": decision.should_run,
               "dry_run": dry_run}
-
     if not decision.should_run:
         result["reason"] = decision.reason
         return result
-
-
     draft = writer_fn(decision.pillar, decision.slot_kind)
     if draft is None:
         result["ran"] = False
         result["reason"] = "no acceptable draft produced; slot skipped safely"
         return result
-
     draft_id = getattr(draft, "draft_id", None) or getattr(draft, "id", None)
+    gate = gate_draft(draft, path=path, client=client)
+    result["verdict"] = gate.verdict
+    result["score"] = gate.total_score
+    result["draft_id"] = draft_id
+    if gate.verdict == REJECTED:
+        if draft_id is not None:
+            set_draft_status(draft_id, REJECTED, path=path)
+        result["ran"] = False
+        result["reason"] = (
+            f"draft {draft_id} rejected by the gate: {', '.join(gate.vetoes)}"
+        )
+        result["vetoes"] = list(gate.vetoes)
+        return result
+
+    if gate.verdict not in (APPROVED_AUTO, NEEDS_REVIEW):
+        if draft_id is not None:
+            set_draft_status(draft_id, NEEDS_REVIEW, path=path)
+        result["ran"] = False
+        result["reason"] = (
+            f"draft {draft_id} scored {gate.total_score:.0f} "
+            f"({gate.verdict}); parked for revision"
+        )
+        return result
+
+    # Publishable by score. The status records that the gate ran, NOT that the
+    # draft is approved: in review mode only the operator's /approve flips it
+    # to APPROVED, and APPROVED is the only status the drain accepts.
+    if draft_id is not None:
+        set_draft_status(draft_id, EVALUATED, path=path)
+
     job = enqueue_fn(draft_id, draft.content)
     record_post(decision.slot_kind, path=path)
     result["reason"] = (
-        f"draft {draft_id} enqueued as job {job[0]}"
+        f"draft {draft_id} enqueued as job {job[0]} "
+        f"({gate.verdict}, score {gate.total_score:.0f})"
         + (" (shadow - not published)" if dry_run else "")
     )
-    result["draft_id"] = draft_id
     result["job_id"] = job[0]
     return result
-
-
 # ── The long-running loop ───────────────────────────────────────────────────
 _running = True
 
@@ -366,12 +432,18 @@ def run_loop(
     sleeper=None,
     max_passes: Optional[int] = None,
     on_pass=None,
+    review_required: Optional[bool] = None,
 ) -> dict:
     """Run the scheduler until shutdown is requested.
 
     `dry_run=True` (the default) generates drafts and enqueues them but never
     publishes — that is shadow mode. `dry_run=False` additionally runs the
     publisher, which requires AUTOPUBLISH_ENABLED and DRY_RUN=false.
+
+    `review_required` decides whether an auto-approved draft may publish
+    without an operator. It defaults to True: a fresh cutover must not put a
+    post on the account that nobody read first. Pass False only after the
+    persona has proven itself over a real review cycle.
 
     `sleeper` is injected so tests do not actually sleep. `max_passes` bounds
     the loop for tests and one-shot runs.
@@ -381,11 +453,13 @@ def run_loop(
     sleep = sleeper or _time.sleep
     passes = 0
     summary = {"passes": 0, "enqueued": 0, "skipped": 0, "errors": 0,
-               "published": 0}
+               "published": 0, "rejected": 0,
+               "review_required": review_required}
 
     log.info(
-        "Scheduler loop starting (dry_run=%s, main/day=%s, extras/week=%s).",
-        dry_run,
+        "Scheduler loop starting (dry_run=%s, review_required=%s, "
+        "main/day=%s, extras/week=%s).",
+        dry_run, review_required,
         get_settings().scheduler.main_posts_per_day,
         get_settings().scheduler.max_extra_posts_per_week,
     )
@@ -404,17 +478,22 @@ def run_loop(
                 ),
                 path=path,
                 dry_run=dry_run,
+                client=client,
             )
             summary["passes"] = passes
             if result.get("job_id"):
                 summary["enqueued"] += 1
+            elif result.get("vetoes"):
+                summary["rejected"] += 1
             elif not result.get("ran", True):
                 summary["skipped"] += 1
             if on_pass:
                 on_pass(result)
 
             if not dry_run and result.get("job_id"):
-                published = _drain_queue(path=path)
+                published = _drain_queue(
+                    path=path, review_required=review_required
+                )
                 summary["published"] += published
 
         except Exception as exc:  # noqa: BLE001 — the loop must survive
@@ -438,30 +517,51 @@ def run_loop(
     return summary
 
 
-def _drain_queue(path=None) -> int:
+def _drain_queue(path=None, review_required: Optional[bool] = None) -> int:
     """Claim and publish queued jobs. Returns how many were published.
 
     Only runs when live publishing is allowed; otherwise it is a no-op so a
     misconfigured flag cannot publish by accident.
+
+    With `review_required` on, a job is only claimable once its draft carries
+    status APPROVED. That is the operator's explicit go-ahead, so an
+    auto-approved draft still waits for a human. A job whose draft is not
+    approved is left in the queue untouched rather than claimed and dropped.
     """
     from src.adapters.threads import get_threads_adapter
     from src.content.writer import get_draft
     from src.orchestration.publisher import (
-        AdapterThreadsPublisher, claim_next_job, publish_job,
+        AdapterThreadsPublisher, claim_next_job, publish_job, release_job,
     )
 
     flags = get_settings().flags
     if not flags.live_publishing_allowed:
         return 0
 
+    if review_required is None:
+        review_required = True
+
     adapter = get_threads_adapter()
     bridge = AdapterThreadsPublisher(adapter)
     published = 0
+
     while True:
         job = claim_next_job(path=path)
         if job is None:
             break
         draft = get_draft(job.draft_id, path=path) or {}
+
+        if review_required and (draft.get("status") or "") != "APPROVED":
+            # Not approved: hand the job back to the queue and stop, so the
+            # next pass re-checks it after an operator acts. Releasing the
+            # lease is what keeps it claimable later.
+            release_job(job.id, path=path)
+            log.info(
+                "Job %s held: draft %s is not APPROVED (review required).",
+                job.id, job.draft_id,
+            )
+            break
+
         content = draft.get("content") or ""
         parts = draft.get("parts") or []
         outcome = publish_job(
@@ -471,4 +571,5 @@ def _drain_queue(path=None) -> int:
             published += 1
         if outcome.state == "UNKNOWN_OUTCOME":
             break  # never continue past an ambiguous outcome
+
     return published
