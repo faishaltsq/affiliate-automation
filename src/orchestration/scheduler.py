@@ -490,7 +490,7 @@ def run_loop(
             if on_pass:
                 on_pass(result)
 
-            if not dry_run and result.get("job_id"):
+            if not dry_run:
                 published = _drain_queue(
                     path=path, review_required=review_required
                 )
@@ -529,7 +529,7 @@ def _drain_queue(path=None, review_required: Optional[bool] = None) -> int:
     approved is left in the queue untouched rather than claimed and dropped.
     """
     from src.adapters.threads import get_threads_adapter
-    from src.content.writer import get_draft
+    from src.content.writer import get_draft, set_draft_status
     from src.orchestration.publisher import (
         AdapterThreadsPublisher, claim_next_job, publish_job, release_job,
     )
@@ -569,6 +569,7 @@ def _drain_queue(path=None, review_required: Optional[bool] = None) -> int:
         )
         if outcome.succeeded:
             published += 1
+            set_draft_status(job.draft_id, "PUBLISHED", path=path)
         if outcome.state == "UNKNOWN_OUTCOME":
             break  # never continue past an ambiguous outcome
 

@@ -71,7 +71,7 @@ class TestFeatureFlags:
         assert settings.flags.live_publishing_allowed is False
         assert settings.flags.live_affiliate_allowed is False
 
-    def test_enabling_autopublish_alone_still_blocked_by_dry_run(self, monkeypatch):
+    def test_enabling_autopublish_alone_still_blocked_by_dry_run(self, settings, monkeypatch):
         monkeypatch.setenv("AUTOPUBLISH_ENABLED", "true")
         f = cfg.load_feature_flags()
         assert f.autopublish_enabled is True

@@ -95,7 +95,7 @@ VBS_BOT = PROJECT_DIR / "scripts" / "run_telegram_bot.vbs"
 VBS_RUNTIME = PROJECT_DIR / "scripts" / "run_v2_runtime.vbs"
 LOG_FILE = PROJECT_DIR / "logs" / "watchdog.log"
 
-ALIVE_WS = 30 * 1024 * 1024   # >30MB working set = proses nyata (bukan trampoline venv)
+ALIVE_WS = 15 * 1024 * 1024   # >15MB working set = proses nyata (trampoline venv ~4MB, runtime ~28MB)
 # Trampoline venv butuh >150 dtk untuk membesar. Grace lebih pendek dari
 # interval cron (5 mnt) supaya watchdog tidak membunuh proses yang SEHARUSNYA
 # hidup tapi tick cron jatuh di tengah masa loading.

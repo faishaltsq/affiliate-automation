@@ -41,6 +41,8 @@ def flags_off(monkeypatch):
 def flags_on(monkeypatch):
     """V2 commands enabled, with OPERATOR allowlisted and INTRUDER not."""
     cfg.reset_settings_cache()
+    for key in ("AUTOPUBLISH_ENABLED", "AFFILIATE_AUTO_ENABLED", "DRY_RUN", "SHADOW_MODE"):
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("V2_TELEGRAM_COMMANDS_ENABLED", "true")
     monkeypatch.setenv("TELEGRAM_OPERATOR_IDS", "111")
     s = cfg.Settings()
