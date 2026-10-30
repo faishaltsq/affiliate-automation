@@ -1,27 +1,66 @@
 # V2 — Runbook
-
-**Version:** 1.0 · **Date:** 2026-10-29 · **Branch:** `feature/v2-persona-first`
+**Version:** 2.0 · **Date:** 2026-10-29 · **Branch:** `feature/v2-persona-first`
+**Status:** V2 is the live content path. Legacy Threads/TikTok/Clipper/affiliate
+pipelines are disabled and their data is preserved.
 
 ---
 
 ## 1. Preflight
 
 ```bash
-# Confirm flags are safe
-python -m src.v2_cli health
+python -m src.v2_runtime --status
 ```
 
-Expected: `autopublish=False`, `affiliate_auto=False`, `dry_run=True`.
+Expected for the current cutover state:
 
-If any live flag is on and you did not intend it, stop and fix `.env` first.
+```
+live publishing  : False
+review required  : True
+queue            : {}
+safe to start    : True — no in-flight publications
+```
 
-## 2. Daily Operations
+`live publishing : False` means the runtime generates and queues drafts and
+publishes nothing. That is the intended state until an operator reviews a
+batch and approves it.
+
+If `safe to start` is `False`, resolve the reported publication jobs first
+(§5). Do not start the runtime with an ambiguous job in flight.
+
+## 2. The two processes
+
+| Process | Command | Owns |
+|---|---|---|
+| Listener | `python main.py bot` | Telegram routing of the V2 command set. Publishes nothing. |
+| Runtime | `python -m src.v2_runtime` | Schedule → generate → gate → queue → publish. |
+
+Both are supervised by `scripts/watchdog.py`, which now targets these two
+processes only. The legacy `main.py organic --daemon` is **not** respawned; if
+you see it running it is a leftover and should be stopped manually.
+
+Start manually:
+
+```bash
+python main.py bot          # listener
+python main.py v2           # runtime (long-running)
+python main.py v2 --once    # one pass, then exit
+python main.py v2 --dry-run # force dry-run for this process
+```
+
+## 3. Daily Operations
 
 ### Check state
 
 ```bash
-python -m src.v2_cli health        # flags, tables, queue, metric coverage
+python -m src.v2_runtime --status    # flags, queue, safety, needs-human
+python -m src.v2_cli health          # flags, tables, row counts
 python -m src.v2_cli audit --limit 20
+```
+
+### What is waiting for you
+
+```
+/pending      # in Telegram: drafts queued but not yet approved
 ```
 
 ### Build / inspect the calendar
@@ -52,6 +91,34 @@ This never deletes a row. A `429`, `5xx`, `401`, `403`, or timeout records
 `last_sync_status` and leaves the post untouched. Only an authoritative `404`
 tombstones it.
 
+## 4. Review mode (the current operating mode)
+
+Nothing publishes without an operator decision. The flow is:
+
+```
+scheduler slot → writer → quality gate → QUEUED (status EVALUATED)
+                                              ↓
+                          /approve <id>  →  status APPROVED
+                                              ↓
+                              runtime drain → PUBLISHED
+```
+
+- `/pending` lists what is waiting, with the draft id and a preview.
+- `/approve <id>` flips the draft to `APPROVED`. It does **not** publish; the
+  runtime's drain publishes on its next pass.
+- `/reject <id> <alasan>` records the reason in editorial memory and marks the
+  draft `REJECTED`. The body is never erased.
+- `/revise <id> <alasan>` records feedback without changing the draft.
+
+A draft the gate rejected is never enqueued at all, so it never appears in
+`/pending`.
+
+**Affiliate is locked.** `AFFILIATE_AUTO_ENABLED=false` means an affiliate slot
+is downgraded to `practical_tips` at write time, so the account keeps its
+rhythm without a commercial claim. `/products` reports the lock. Turning it on
+is a separate, deliberate step — not part of this cutover.
+
+## 5. Migrations
 ## 3. Migrations
 
 ```bash

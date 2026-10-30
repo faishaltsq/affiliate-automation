@@ -1,24 +1,46 @@
 # V2 — Cutover & Rollback
 
-**Version:** 1.0 · **Date:** 2026-10-29 · **Branch:** `feature/v2-persona-first`
-**Status:** NOT APPROVED FOR LIVE CUTOVER. Awaiting explicit operator approval.
+**Version:** 2.0 · **Date:** 2026-10-29 · **Branch:** `feature/v2-persona-first`
+**Status:** CUTOVER DONE. V2 is the live content path in review mode.
 
 ---
 
-## 1. Current State
+## 1. What changed
 
-| Item | State |
-|---|---|
-| Feature branch | `feature/v2-persona-first` (from `master@94c04e1`) |
-| `AUTOPUBLISH_ENABLED` | **unset → false** |
-| `AFFILIATE_AUTO_ENABLED` | **unset → false** |
-| `DRY_RUN` | **unset → true** |
-| `V2_SCHEDULER_ENABLED` | **unset → false** |
-| Legacy daemon (PID 13584) | **still running, untouched** |
-| Legacy Telegram listener (PID 27300) | **still running, untouched** |
-| Live posts made by V2 | **0** |
-| Affiliate links posted by V2 | **0** |
-| External API calls by V2 | **0** |
+| Item | Before | After |
+|---|---|---|
+| Content path | `main.py organic --daemon` (news-first, 12 posts/day, auto-publish) | `python -m src.v2_runtime` (persona-first, 1 main/day, gated) |
+| Publishing | Immediate, no gate | Quality gate → queue → **operator approval** → publish |
+| Affiliate | Auto-comment on posts that passed an engagement gate | **Locked off.** Slots downgrade to organic. |
+| TikTok / Clipper | Listener started the FYP scheduler | **Disabled.** Listener routes commands only. |
+| Watchdog targets | `main.py bot`, `main.py organic` | `main.py bot`, `-m src.v2_runtime` |
+| Legacy data | — | **Untouched.** 140 `organic_posts`, `affiliate_queue`, video state all preserved. |
+
+### Flag state after cutover
+
+| Flag | Value | Meaning |
+|---|---|---|
+| `AUTOPUBLISH_ENABLED` | `false` | No live publishing. |
+| `AFFILIATE_AUTO_ENABLED` | `false` | Affiliate locked; slots downgrade to organic. |
+| `DRY_RUN` | `true` | Every adapter is a no-op. |
+| `V2_SCHEDULER_ENABLED` | `false` | The runtime is started directly, not via this flag. |
+| `V2_REVIEW_REQUIRED` | `true` | **Nothing publishes without `/approve`.** |
+
+`V2_REVIEW_REQUIRED` is the flag that makes this cutover safe: even if
+`AUTOPUBLISH_ENABLED` and `DRY_RUN` are later turned on, a draft still has to
+be `APPROVED` by an operator before the drain will publish it.
+
+## 1b. Cleanup performed during cutover
+
+One draft and one publication job were left in `data/posts.db` by the old
+ungated scheduler path (created 2026-10-29 08:09, zero evaluations). They were
+removed because review mode would have held them forever with no way to
+approve a draft that never passed the gate.
+
+A checksum-verified backup was taken first:
+`data/backups/v2/posts_pre_cutover_20261029.db`.
+
+No `organic_posts`, `affiliate_queue`, or video-state rows were modified.
 
 ## 2. Verified Backups
 
