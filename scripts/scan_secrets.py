@@ -57,6 +57,8 @@ ALLOWLIST = {
     # design. Flagging it on every run trains the operator to ignore the
     # report, so it is checked separately by --include-env.
     ".env",
+    # CI artifact: nodeids cache includes secrets used in test fixtures.
+    ".pytest_cache/v/cache/nodeids",
 }
 
 # Values that are obviously not secrets.

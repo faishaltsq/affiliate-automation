@@ -279,6 +279,19 @@ class _StaticClient:
         return LLMResponse(text=self._text, model="static", latency_ms=0, attempts=1)
 
 
+def _affiliate_locked() -> bool:
+    """True while affiliate content is not authorised.
+
+    `AFFILIATE_AUTO_ENABLED` is the single switch for commercial output. While
+    it is off, an affiliate slot must not produce a recommendation: the writer
+    downgrades the slot to organic content instead of generating a post the
+    gate would then reject for missing disclosure or unverified tracking.
+    """
+    from src.core.config import get_settings
+
+    return not get_settings().flags.live_affiliate_allowed
+
+
 def write_draft(
     pillar: Optional[str] = None,
     idea: Optional[IdeaCandidate] = None,
@@ -293,11 +306,22 @@ def write_draft(
 
     None is a legitimate, expected outcome. It means: skip this slot. It never
     means: publish filler instead.
+
+    An affiliate slot is downgraded to organic while affiliate output is
+    locked, so the account keeps its rhythm without a commercial claim nobody
+    authorised.
     """
     import random as _random
 
     r = rng or _random.Random()
     llm = client or get_llm_client()
+
+    if pillar == "affiliate" and _affiliate_locked():
+        log.info(
+            "Affiliate is locked (AFFILIATE_AUTO_ENABLED off); "
+            "downgrading the slot to practical_tips."
+        )
+        pillar = "practical_tips"
 
     if idea is None:
         ideas = generate_ideas(pillar=pillar, count=3, rng=r, path=path)

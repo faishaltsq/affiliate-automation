@@ -226,7 +226,9 @@ def _cmd_products(
     actor: Actor, args: str, msg_id: Optional[int], path=None
 ) -> CommandResult:
     from src.commerce.catalog import catalog_summary, list_products
+    from src.core.config import get_settings
 
+    locked = not get_settings().flags.live_affiliate_allowed
     summary = catalog_summary(path=path)
     lines = [
         "<b>Katalog produk</b>", "",
@@ -235,14 +237,83 @@ def _cmd_products(
     ]
     for state, n in sorted(summary["by_state"].items()):
         lines.append(f"• {state}: {n}")
-    verified = list_products(tracking_state="VERIFIED", path=path)
-    if verified:
-        lines += ["", "<b>Terverifikasi</b>"]
-        for p in verified[:10]:
-            lines.append(f"• {p.name} — <code>{p.tracking_status}</code>")
+    if locked:
+        lines += [
+            "",
+            "🔒 <b>Affiliate terkunci.</b> Slot komersial otomatis turun ke "
+            "konten organik sampai operator membukanya.",
+        ]
+    else:
+        verified = list_products(tracking_state="VERIFIED", path=path)
+        if verified:
+            lines += ["", "<b>Terverifikasi</b>"]
+            for p in verified[:10]:
+                lines.append(f"• {p.name} — <code>{p.tracking_status}</code>")
     lines += ["", "<i>Hanya link yang diverifikasi operator dari dashboard "
                "afiliasi resmi yang bisa dipakai.</i>"]
     return CommandResult(True, command="/products", text="\n".join(lines))
+
+def _cmd_pending(
+    actor: Actor, args: str, msg_id: Optional[int], path=None
+) -> CommandResult:
+    """List drafts waiting for an operator decision.
+
+    Review mode means nothing publishes without /approve, so the operator
+    needs to see what is waiting. A draft is listed when it is enqueued but
+    its own status is not APPROVED yet.
+    """
+    from src.core.storage import connect
+    from src.orchestration.publisher import QUEUED, jobs_in_state
+
+    jobs = jobs_in_state(QUEUED, path=path)
+    if not jobs:
+        return CommandResult(True, command="/pending", text=(
+            "📭 Tidak ada draf yang menunggu persetujuan."
+        ))
+
+    with connect(path) as conn:
+        rows = conn.execute(
+            "SELECT d.id, d.content, d.status, "
+            "COALESCE(i.pillar, '') AS pillar "
+            "FROM content_drafts d "
+            "LEFT JOIN content_ideas i ON i.id = d.idea_id "
+            "WHERE d.id IN (%s)" % ",".join("?" * len(jobs)),
+            tuple(j.draft_id for j in jobs),
+        ).fetchall()
+    drafts = {int(r["id"]): r for r in rows}
+
+    waiting = [j for j in jobs if j.draft_id in drafts]
+    approved = [
+        j for j in waiting
+        if (drafts[j.draft_id]["status"] or "") == "APPROVED"
+    ]
+    unapproved = [
+        j for j in waiting
+        if (drafts[j.draft_id]["status"] or "") != "APPROVED"
+    ]
+
+    lines_out = ["<b>Menunggu persetujuan</b>", ""]
+    if not unapproved:
+        lines_out.append("Tidak ada draf yang butuh keputusan.")
+    for job in unapproved:
+        draft = drafts[job.draft_id]
+        preview = (draft["content"] or "").strip().replace("\n", " ")
+        preview = preview[:70] + ("…" if len(preview) > 70 else "")
+        pillar = (draft["pillar"] or "").strip()
+        tag = f" [{pillar}]" if pillar else ""
+        lines_out.append(
+            f"• <b>#{draft['id']}</b>{tag} job {job.id}\n"
+            f"  <i>{preview}</i>"
+        )
+        lines_out.append(
+            f"  <code>/approve {draft['id']}</code> · "
+            f"<code>/reject {draft['id']} alasan</code>"
+        )
+    if approved:
+        lines_out += ["", f"✅ {len(approved)} draf sudah disetujui dan "
+                          "menunggu publish."]
+    return CommandResult(True, command="/pending", text="\n".join(lines_out))
+
 
 
 def _cmd_status(
@@ -283,6 +354,7 @@ READONLY_HANDLERS = {
     "/analytics": _cmd_analytics,
     "/products": _cmd_products,
     "/status": _cmd_status,
+    "/pending": _cmd_pending,
     "/help": None,  # handled specially
 }
 
@@ -511,7 +583,8 @@ def _help_text() -> str:
         "/schedule — jadwal 7 hari (WIB)\n"
         "/analytics [7d|30d] — metrik terverifikasi\n"
         "/products — katalog & status afiliasi\n"
-        "/status — kesehatan, antrean, cakupan\n\n"
+        "/status — kesehatan, antrean, cakupan\n"
+        "/pending — draf yang menunggu persetujuanmu\n"
         "<b>Operator saja</b>\n"
         "/approve &lt;id&gt; — setujui draf\n"
         "/revise &lt;id&gt; &lt;alasan&gt; — minta revisi\n"
