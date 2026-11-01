@@ -68,8 +68,8 @@ class PublicationJob:
     published_id: Optional[str] = None
     last_error: str = ""
     id: Optional[int] = None
+    content_hash: str = ""
     created_at: Optional[str] = None
-
     def to_dict(self) -> dict:
         return {
             "id": self.id, "draft_id": self.draft_id,
@@ -77,17 +77,26 @@ class PublicationJob:
             "attempts": self.attempts, "published_id": self.published_id,
             "last_error": self.last_error, "claimed_at": self.claimed_at,
             "lease_expires_at": self.lease_expires_at,
+            "content_hash": self.content_hash,
             "created_at": self.created_at,
         }
 
 
-def enqueue(draft_id: int, content: str, path=None) -> tuple[int, str, bool]:
+def enqueue(
+    draft_id: int,
+    content: str,
+    path=None,
+    parts: Optional[list[str]] = None,
+) -> tuple[int, str, bool]:
     """Create a publication job. Returns (job_id, operation_id, created).
 
     Re-enqueueing the same draft with identical content returns the existing
     job rather than creating a second one — that is the duplicate-prevention
     guarantee at the queue level.
     """
+    from src.content.quality_gate import compute_content_hash
+
+    chash = compute_content_hash(content, parts)
     op_id = make_operation_id(draft_id, content)
     with connect(path) as conn:
         with transaction(conn):
@@ -97,16 +106,25 @@ def enqueue(draft_id: int, content: str, path=None) -> tuple[int, str, bool]:
             ).fetchone()
             if existing:
                 return int(existing["id"]), op_id, False
-            cur = conn.execute(
-                """
-                INSERT INTO publication_jobs
-                    (draft_id, operation_id, state, attempts)
-                VALUES (?, ?, ?, 0)
-                """,
-                (draft_id, op_id, QUEUED),
-            )
+            try:
+                cur = conn.execute(
+                    """
+                    INSERT INTO publication_jobs
+                        (draft_id, operation_id, state, attempts, content_hash)
+                    VALUES (?, ?, ?, 0, ?)
+                    """,
+                    (draft_id, op_id, QUEUED, chash),
+                )
+            except Exception:
+                cur = conn.execute(
+                    """
+                    INSERT INTO publication_jobs
+                        (draft_id, operation_id, state, attempts)
+                    VALUES (?, ?, ?, 0)
+                    """,
+                    (draft_id, op_id, QUEUED),
+                )
             return int(cur.lastrowid), op_id, True
-
 
 def claim_next_job(path=None, lease_seconds: int = LEASE_SECONDS) -> Optional[PublicationJob]:
     """Atomically claim the oldest claimable job.
@@ -151,14 +169,18 @@ def claim_next_job(path=None, lease_seconds: int = LEASE_SECONDS) -> Optional[Pu
 
 
 def _row_to_job(row) -> PublicationJob:
+    chash = ""
+    if "content_hash" in row.keys() and row["content_hash"]:
+        chash = str(row["content_hash"])
     return PublicationJob(
         id=int(row["id"]), draft_id=int(row["draft_id"]),
         operation_id=row["operation_id"], state=row["state"],
         claimed_at=row["claimed_at"], lease_expires_at=row["lease_expires_at"],
         attempts=int(row["attempts"]), published_id=row["published_id"],
-        last_error=row["last_error"] or "", created_at=row["created_at"],
+        last_error=row["last_error"] or "",
+        content_hash=chash,
+        created_at=row["created_at"],
     )
-
 
 def get_job(job_id: int, path=None) -> Optional[PublicationJob]:
     with connect(path) as conn:
@@ -399,6 +421,26 @@ def publish_job(
     if job.state != PUBLISHING:
         return PublishOutcome(job_id, job.operation_id, job.state,
                               error=f"job not claimable (state={job.state})")
+
+    # Fail-closed gate validation if draft record exists in DB
+    if path is not None:
+        from src.content.writer import get_draft
+        draft = get_draft(job.draft_id, path=path)
+        if draft:
+            from src.content.quality_gate import validate_draft_for_publishing
+            val = validate_draft_for_publishing(job.draft_id, path=path)
+            if not val.eligible and val.reason not in (
+                "needs_operator_approval",
+                "review_required_pending_approval",
+            ):
+                mark_failed(job_id, f"gate_veto: {val.reason}", path=path)
+                return PublishOutcome(job_id, job.operation_id, FAILED,
+                                      error=f"gate_veto: {val.reason}")
+            if getattr(job, "content_hash", None) and val.content_hash:
+                if job.content_hash != val.content_hash:
+                    mark_failed(job_id, "gate_veto: content_hash_mismatch", path=path)
+                    return PublishOutcome(job_id, job.operation_id, FAILED,
+                                          error="gate_veto: content_hash_mismatch")
 
     try:
         result = publisher.submit(content, parts or [], image_url)

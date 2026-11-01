@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import json
 from typing import Optional
 
 from src.core.storage import connect, table_exists, transaction
@@ -23,9 +24,10 @@ log = get_logger("editorial_memory")
 CATEGORIES = (
     "voice_off", "too_long", "too_short", "no_substance", "unsourced_claim",
     "wrong_pillar", "repetitive", "clickbait", "engagement_bait",
-    "off_brand", "other",
+    "off_brand", "forced_metaphor", "generic_ai_voice",
+    "artificial_thread_padding", "unsafe_practical_advice", "redundant_parts",
+    "other",
 )
-
 # How many recent events feed the next selection context.
 DEFAULT_WINDOW = 12
 
@@ -134,9 +136,81 @@ _CATEGORY_GUIDANCE = {
     "clickbait": "Hapus hook misteri dan janji palsu.",
     "engagement_bait": "Jangan tutup dengan pertanyaan klise.",
     "off_brand": "Jangan promosi berlebihan; jaga janji akun.",
+    "forced_metaphor": "DILARANG personifikasi benda mati ('nakal', 'ngambek', 'lelah'). Benda mati tidak punya niat.",
+    "generic_ai_voice": "Hindari klise AI ('niatnya... kenyataannya...', 'di era serba digital', 'saksi bisu').",
+    "artificial_thread_padding": "Gunakan single post, jangan paksakan observasi sederhana menjadi thread.",
+    "unsafe_practical_advice": "DILARANG saran berbahaya; kabel terbuka harus diganti/diisolasi, bukan dibiarkan.",
+    "redundant_parts": "Tiap bagian thread harus memiliki poin/langkah baru yang berbeda.",
     "other": "Perhatikan penolakan terakhir operator.",
 }
 
+
+def get_recent_editorial_metadata(limit: int = 5, path=None) -> list[dict]:
+    """Retrieve recent drafts' editorial metadata (opening, format, pillar, premise, payoff)."""
+    with connect(path) as conn:
+        if not table_exists(conn, "content_drafts"):
+            return []
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(content_drafts)").fetchall()]
+        has_meta = "editorial_metadata_json" in cols
+        sql = (
+            "SELECT id, editorial_metadata_json, content, parts_json, status, created_at "
+            "FROM content_drafts ORDER BY id DESC LIMIT ?"
+            if has_meta else
+            "SELECT id, content, parts_json, status, created_at "
+            "FROM content_drafts ORDER BY id DESC LIMIT ?"
+        )
+        rows = conn.execute(sql, (limit,)).fetchall()
+
+    results = []
+    for r in rows:
+        meta_raw = r["editorial_metadata_json"] if has_meta and r["editorial_metadata_json"] else "{}"
+        try:
+            meta = json.loads(meta_raw)
+        except Exception:
+            meta = {}
+        meta["draft_id"] = r["id"]
+        meta["content"] = r["content"]
+        results.append(meta)
+    return results
+
+
+def record_draft_editorial_metadata(draft_id: int, metadata: dict, path=None) -> None:
+    """Store editorial metadata on a draft."""
+    with connect(path) as conn:
+        with transaction(conn):
+            conn.execute(
+                "UPDATE content_drafts SET editorial_metadata_json = ? WHERE id = ?",
+                (json.dumps(metadata, ensure_ascii=False), draft_id),
+            )
+
+
+def can_use_opening(opening: str, limit: int = 2, path=None) -> bool:
+    """Check if the given opening style violates consecutive opening restrictions.
+
+    Rule: Never allow the same opening style more than 2 times consecutively.
+    """
+    recent = get_recent_editorial_metadata(limit=limit, path=path)
+    if len(recent) < limit:
+        return True
+    openings = [m.get("opening") for m in recent if m.get("opening")]
+    if len(openings) >= limit and all(o == opening for o in openings[:limit]):
+        return False
+    return True
+
+
+def recent_categories_5(path=None) -> list[str]:
+    """Return the pillars/categories of the last 5 drafts."""
+    recent = get_recent_editorial_metadata(limit=5, path=path)
+    return [m.get("pillar") for m in recent if m.get("pillar")]
+
+
+def can_use_category_in_window(category: str, max_in_window: int = 2, path=None) -> bool:
+    """Check category rotation within the last 5 posts.
+
+    Ensures no single pillar dominates the recent 5-post window (max 2 per 5 posts).
+    """
+    recent_cats = recent_categories_5(path=path)
+    return recent_cats.count(category) < max_in_window
 
 def prune(keep: int = 200, path=None) -> int:
     """Trim the oldest events beyond the rolling window. Never touches recent."""

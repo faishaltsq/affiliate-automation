@@ -85,6 +85,7 @@ class Evaluation:
     total_score: float = 0.0
     evaluator_version: str = "v1"
     notes: str = ""
+    content_hash: str = ""
     id: Optional[int] = None
     created_at: Optional[str] = None
 
@@ -103,6 +104,7 @@ class PublicationJob:
     attempts: int = 0
     published_id: Optional[str] = None
     last_error: str = ""
+    content_hash: str = ""
     id: Optional[int] = None
     created_at: Optional[str] = None
 

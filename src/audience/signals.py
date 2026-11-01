@@ -27,88 +27,104 @@ CATEGORIES = [
     "discoveries",
     "affiliate",
 ]
+# 8 Provenance categories for grounded, authentic tech observations.
+PROVENANCE_CATEGORIES = [
+    "workflow_friction",
+    "buying_mistake",
+    "hidden_setting",
+    "hardware_tradeoff",
+    "counterintuitive_lesson",
+    "budget_alternative",
+    "spec_vs_reality",
+    "wear_and_tear",
+]
 
 
 @dataclass
 class AudienceSignal:
     category: str
     problem: str
+    provenance: str = ""
     source_url: str = ""
     confidence: float = 0.6
     status: str = "active"
     verified_at: Optional[str] = None
     id: Optional[int] = None
 
-
 # ── Seed catalog ────────────────────────────────────────────────────────────
 # These are observational, widely-recognised everyday problems. They carry no
 # statistics, no prices, and no product claims, so they need no external
 # verification to be written about honestly.
 SEED_SIGNALS: list[AudienceSignal] = [
-    AudienceSignal("relatable", "Kabel charger yang selalu kusut di tas dan putus di ujung",
-                   confidence=0.9),
+    # ── Relatable (10) ──
+    AudienceSignal("relatable", "Kabel charger yang selalu kusut di tas dan leher konektornya gampang getas",
+                   provenance="wear_and_tear", confidence=0.9),
     AudienceSignal("relatable", "Meja kerja penuh kabel sampai mouse nggak muat gerak",
-                   confidence=0.85),
+                   provenance="workflow_friction", confidence=0.85),
     AudienceSignal("relatable", "Niat bangun pagi buat rapikan kamar, akhirnya scroll HP di kasur",
-                   confidence=0.8),
+                   provenance="workflow_friction", confidence=0.8),
     AudienceSignal("relatable", "Beli gadget baru karena diskon, dipakai dua minggu lalu disimpan",
-                   confidence=0.85),
-    AudienceSignal("relatable", "Tab browser kebuka puluhan, laptop makin lempar",
-                   confidence=0.75),
-    AudienceSignal("relatable", "Power bank dibawa 'buat jaga-jaga' tapi jarganya sendiri yang habis",
-                   confidence=0.8),
+                   provenance="buying_mistake", confidence=0.85),
+    AudienceSignal("relatable", "Tab browser kebuka puluhan, laptop makin lemot",
+                   provenance="workflow_friction", confidence=0.75),
+    AudienceSignal("relatable", "Power bank dibawa 'buat jaga-jaga' tapi dayanya sendiri yang habis",
+                   provenance="hardware_tradeoff", confidence=0.8),
     AudienceSignal("relatable", "Niat cari produk murah, malah habis dua jam bandingin spesifikasi",
-                   confidence=0.85),
+                   provenance="buying_mistake", confidence=0.85),
     AudienceSignal("relatable", "Notifikasi grup bikin fokus buyar tiap lima menit",
-                   confidence=0.8),
+                   provenance="workflow_friction", confidence=0.8),
     AudienceSignal("relatable", "Kulkas penuh tapi akhirnya pesan antar",
-                   confidence=0.7),
+                   provenance="workflow_friction", confidence=0.7),
     AudienceSignal("relatable", "File penting cuma ada di HP yang memorinya selalu penuh",
-                   confidence=0.75),
+                   provenance="workflow_friction", confidence=0.75),
 
+    # ── Practical Tips (8) ──
     AudienceSignal("practical_tips", "Nggak tahu cara cek apakah charger benar-benar support fast charging",
-                   confidence=0.9),
+                   provenance="spec_vs_reality", confidence=0.9),
     AudienceSignal("practical_tips", "Bingung pilih power bank: capacity nyata vs angka di kemasan",
-                   confidence=0.9),
+                   provenance="hardware_tradeoff", confidence=0.9),
     AudienceSignal("practical_tips", "Kabel USB-C murah sering nggak bisa transfer data, cuma charging",
-                   confidence=0.85),
+                   provenance="counterintuitive_lesson", confidence=0.85),
     AudienceSignal("practical_tips", "Nggak sadar aplikasi background yang bikin baterai boros",
-                   confidence=0.8),
+                   provenance="hidden_setting", confidence=0.8),
     AudienceSignal("practical_tips", "Susah bedain mana harga wajar dan mana harga yang kena markup",
-                   confidence=0.85),
+                   provenance="buying_mistake", confidence=0.85),
     AudienceSignal("practical_tips", "Nggak tahu cara backup otomatis sebelum HP rusak",
-                   confidence=0.9),
+                   provenance="workflow_friction", confidence=0.9),
     AudienceSignal("practical_tips", "Nggak paham bedanya adaptor 30W, 65W, dan 100W untuk kebutuhan sendiri",
-                   confidence=0.85),
+                   provenance="counterintuitive_lesson", confidence=0.85),
     AudienceSignal("practical_tips", "Bingung cara cek garansi resmi sebelum beli gadget bekas",
-                   confidence=0.85),
+                   provenance="buying_mistake", confidence=0.85),
 
+    # ── Opinions (6) ──
     AudienceSignal("opinions", "Spesifikasi tinggi di atas kertas sering nggak terasa di pemakaian harian",
-                   confidence=0.85),
+                   provenance="spec_vs_reality", confidence=0.85),
     AudienceSignal("opinions", "Diskon besar kadang cuma mengembalikan harga normal",
-                   confidence=0.9),
+                   provenance="buying_mistake", confidence=0.9),
     AudienceSignal("opinions", "Review yang terlalu rapi dan positif itu tanda bahaya, bukan jaminan",
-                   confidence=0.8),
+                   provenance="counterintuitive_lesson", confidence=0.8),
     AudienceSignal("opinions", "Nggak semua orang butuh flagship; banyak yang butuh baterai awet",
-                   confidence=0.85),
+                   provenance="hardware_tradeoff", confidence=0.85),
     AudienceSignal("opinions", "Iklan 'harga spesial 3 hari' lebih sering trik tekanan waktu",
-                   confidence=0.8),
+                   provenance="buying_mistake", confidence=0.8),
     AudienceSignal("opinions", "Gadget murah yang awet sering lebih masuk akal daripada mahal yang sekali drop rusak",
-                   confidence=0.8),
+                   provenance="wear_and_tear", confidence=0.8),
 
+    # ── Discoveries (3) ──
     AudienceSignal("discoveries", "Kategori kecil yang sering terlupakan: organizer kabel, stand HP, lampu meja",
-                   confidence=0.75),
-    AudienceSignal("discoveries", "Fitur HP yang jarang dipakai padahal berguna: mode fokus, batas pengisian",
-                   confidence=0.8),
+                   provenance="budget_alternative", confidence=0.75),
+    AudienceSignal("discoveries", "Fitur HP yang jarang dipakai padahal berguna: mode fokus, batas pengisian daya",
+                   provenance="hidden_setting", confidence=0.8),
     AudienceSignal("discoveries", "Aksesori yang bikin setup rapi tanpa beli meja baru",
-                   confidence=0.8),
+                   provenance="budget_alternative", confidence=0.8),
 
+    # ── Affiliate (3) ──
     AudienceSignal("affiliate", "Butuh rekomendasi power bank yang benar-benar sesuai kebutuhan harian",
-                   confidence=0.7),
+                   provenance="hardware_tradeoff", confidence=0.7),
     AudienceSignal("affiliate", "Butuh panduan memilih kabel yang awet, bukan cuma murah",
-                   confidence=0.7),
+                   provenance="wear_and_tear", confidence=0.7),
     AudienceSignal("affiliate", "Butuh saran adaptor untuk laptop dan HP sekaligus",
-                   confidence=0.7),
+                   provenance="budget_alternative", confidence=0.7),
 ]
 
 
@@ -118,6 +134,7 @@ def _ensure_table(conn) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT NOT NULL,
             problem TEXT NOT NULL,
+            provenance TEXT DEFAULT '',
             source_url TEXT DEFAULT '',
             verified_at TIMESTAMP,
             confidence REAL NOT NULL DEFAULT 0.5,
@@ -125,6 +142,13 @@ def _ensure_table(conn) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Backward compatibility: ensure provenance column exists if table existed previously
+    try:
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(audience_signals)").fetchall()]
+        if "provenance" not in cols:
+            conn.execute("ALTER TABLE audience_signals ADD COLUMN provenance TEXT DEFAULT ''")
+    except Exception:
+        pass
 
 
 def seed_if_empty(path=None) -> int:
@@ -140,9 +164,9 @@ def seed_if_empty(path=None) -> int:
             for s in SEED_SIGNALS:
                 conn.execute(
                     "INSERT INTO audience_signals "
-                    "(category, problem, source_url, confidence, status) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (s.category, s.problem, s.source_url, s.confidence, s.status),
+                    "(category, problem, provenance, source_url, confidence, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (s.category, s.problem, s.provenance, s.source_url, s.confidence, s.status),
                 )
             return len(SEED_SIGNALS)
 
@@ -153,9 +177,9 @@ def add_signal(signal: AudienceSignal, path=None) -> int:
             _ensure_table(conn)
             cur = conn.execute(
                 "INSERT INTO audience_signals "
-                "(category, problem, source_url, confidence, status, verified_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (signal.category, signal.problem, signal.source_url,
+                "(category, problem, provenance, source_url, confidence, status, verified_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (signal.category, signal.problem, signal.provenance, signal.source_url,
                  signal.confidence, signal.status, signal.verified_at),
             )
             return int(cur.lastrowid)
@@ -177,9 +201,11 @@ def get_signals(
     with connect(path) as conn:
         _ensure_table(conn)
         rows = conn.execute(sql, params).fetchall()
+    cols = set()
     return [
         AudienceSignal(
             category=r["category"], problem=r["problem"],
+            provenance=r["provenance"] if "provenance" in r.keys() else "",
             source_url=r["source_url"], confidence=r["confidence"],
             status=r["status"], verified_at=r["verified_at"], id=r["id"],
         )

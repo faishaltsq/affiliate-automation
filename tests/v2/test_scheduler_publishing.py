@@ -568,7 +568,7 @@ class TestScheduler:
             return (99, "op_x", True)
 
         result = sched.run_once(writer, enqueue_fn, path=db, dry_run=True,
-                                client=_critic_llm())
+                                client=_critic_llm(), now=_wib(14))
         assert result["dry_run"] is True
         assert result["ran"] is True
         assert enqueued == [(42, DRAFTABLE_CONTENT)]
@@ -581,7 +581,7 @@ class TestScheduler:
     def test_run_once_skips_when_paused(self, db):
         sched.set_paused(True, path=db)
         result = sched.run_once(lambda *a: None, lambda *a: None, path=db,
-                                dry_run=False)
+                                dry_run=False, now=_wib(14))
         assert result["ran"] is False
         assert "paused" in result["reason"]
 
@@ -591,7 +591,7 @@ class TestScheduler:
 
         build_calendar(days=3, rng=random.Random(7), path=db)
         result = sched.run_once(lambda p, k: None, lambda *a: None,
-                                path=db, dry_run=False)
+                                path=db, dry_run=False, now=_wib(14))
         assert result["ran"] is False
         assert "no acceptable draft" in result["reason"]
 
@@ -618,7 +618,7 @@ class TestScheduler:
 
         result = sched.run_once(lambda p, k: FakeDraft(), enqueue_fn,
                                 path=db, dry_run=False,
-                                client=_critic_llm())
+                                client=_critic_llm(), now=_wib(14))
         assert result["ran"] is True
         assert enqueued == [(42, DRAFTABLE_CONTENT)]
         assert result["job_id"] == 99

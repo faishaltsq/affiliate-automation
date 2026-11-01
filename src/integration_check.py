@@ -24,10 +24,12 @@ import argparse
 import json
 import random
 import sys
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from src.core.clock import WIB, to_utc
 from src.adapters.threads import DryRunThreadsAdapter
 from src.content.quality_gate import (
     APPROVED_AUTO, NEEDS_REVIEW, REJECTED, evaluate_draft,
@@ -128,7 +130,8 @@ def run(path: Optional[Path] = None, verbose: bool = False) -> Report:
     )
 
     # ── 2. Scheduler decides ───────────────────────────────────────────────
-    decision = sched.should_post_now(path=path)
+    daytime = to_utc(datetime.now(WIB).replace(hour=14, minute=0, second=0, microsecond=0))
+    decision = sched.should_post_now(now=daytime, path=path)
     report.add(
         "scheduler allows a main post",
         decision.should_run is True and decision.slot_kind == "main",
@@ -193,14 +196,32 @@ def run(path: Optional[Path] = None, verbose: bool = False) -> Report:
     assert draft is not None and draft.draft_id is not None, (
         "writer produced no draft; the rehearsal cannot continue"
     )
-    job_id, op_id, created = pub.enqueue(draft.draft_id, draft.content, path=path)
-    _, _, created_again = pub.enqueue(draft.draft_id, draft.content, path=path)
+    # Evaluate the drafted content with persist=True so publishing validation passes
+    eval_result = evaluate_draft(
+        draft.content,
+        pillar=draft.pillar,
+        draft_id=draft.draft_id,
+        path=path,
+        persist=True,
+        client=FakeLLMClient(default=json.dumps({
+            "persona_voice": 18, "audience_relevance": 18, "natural_writing": 18,
+            "specific_useful_content": 18, "evidential_correctness": 14,
+            "novelty": 4, "notes": "ok", "concerns": [],
+        })),
+    )
+    from src.content.writer import set_draft_status
+    set_draft_status(draft.draft_id, "APPROVED", path=path)
+    job_id, op_id, created = pub.enqueue(
+        draft.draft_id, draft.content, path=path, parts=draft.parts
+    )
+    _, _, created_again = pub.enqueue(
+        draft.draft_id, draft.content, path=path, parts=draft.parts
+    )
     report.add(
         "queue accepts a draft once and dedupes re-enqueue",
         created is True and created_again is False,
         f"job={job_id} op={op_id[:16]}",
     )
-
     # ── 7. Publish succeeds via the dry-run adapter ────────────────────────
     claimed = pub.claim_next_job(path=path)
     report.add(
@@ -303,9 +324,6 @@ def run(path: Optional[Path] = None, verbose: bool = False) -> Report:
     sched.set_paused(False, path=path)
 
     # ── 13. Quiet hours block posting ──────────────────────────────────────
-    from src.core.clock import to_utc, WIB
-    from datetime import datetime
-
     night = to_utc(datetime.now(WIB).replace(hour=2, minute=0, second=0,
                                              microsecond=0))
     night_decision = sched.should_post_now(now=night, path=path)

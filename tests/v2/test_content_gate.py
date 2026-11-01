@@ -779,3 +779,63 @@ class TestGateBlocksUnpublishable:
             )
             assert d.verdict == REVISE_ONCE
             assert d.passed is False
+    def test_write_draft_with_rewrite_loop_success(self, db, monkeypatch):
+        import json
+        from src.content.writer import write_draft_with_rewrite_loop
+        from src.content.quality_gate import APPROVED_AUTO
+        from src.persona.voice import VoiceVariation
+        import src.content.writer as writer_mod
+        monkeypatch.setattr(
+            writer_mod, "varied_variation",
+            lambda history, rng=None, **kwargs: VoiceVariation(
+                "single_snappy", "observasi", "pendek", "ringan", "edukasi"
+            ),
+        )
+
+        writer_client = FakeLLMClient(default=json.dumps({"content": GOOD_DRAFT}))
+        # Critic first returns low score (REVISE_ONCE), then high score (APPROVED_AUTO)
+        critic_client = FakeLLMClient(replies=[
+            _critic_json(45),
+            _critic_json(90),
+        ])
+
+        draft, eval_res = write_draft_with_rewrite_loop(
+            pillar="relatable",
+            client=writer_client,
+            critic_client=critic_client,
+            path=db,
+            persist=False,
+        )
+        assert draft is not None
+        assert eval_res.verdict == APPROVED_AUTO
+        # Writer was called twice: initial + 1 revision
+        assert len(writer_client.calls) == 2
+        assert "REVISI DIMINTA OPERATOR" in writer_client.calls[1]["messages"][0]["content"]
+
+    def test_write_draft_with_rewrite_loop_fails_twice(self, db, monkeypatch):
+        import json
+        from src.content.writer import write_draft_with_rewrite_loop
+        from src.content.quality_gate import REVISE_ONCE
+        from src.persona.voice import VoiceVariation
+        import src.content.writer as writer_mod
+        monkeypatch.setattr(
+            writer_mod, "varied_variation",
+            lambda history, rng=None, **kwargs: VoiceVariation(
+                "single_snappy", "observasi", "pendek", "ringan", "edukasi"
+            ),
+        )
+
+        writer_client = FakeLLMClient(default=json.dumps({"content": GOOD_DRAFT}))
+        critic_client = FakeLLMClient(default=_critic_json(45))
+
+        draft, eval_res = write_draft_with_rewrite_loop(
+            pillar="relatable",
+            client=writer_client,
+            critic_client=critic_client,
+            path=db,
+            persist=False,
+        )
+        assert draft is not None
+        # Strictly bounded to 2 attempts
+        assert len(writer_client.calls) == 2
+        assert eval_res.verdict == REVISE_ONCE

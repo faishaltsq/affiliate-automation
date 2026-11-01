@@ -14,13 +14,16 @@ import random
 from dataclasses import dataclass, field
 from typing import Iterable, Optional
 
-FORMATS = [
+SINGLE_FORMATS = [
     "single_snappy",       # one or two punchy sentences
     "short_paragraph",     # one tight paragraph, one idea
     "multi_paragraph",     # 2-3 short paragraphs when the idea earns it
     "comparison",          # A vs B trade-off
+]
+THREAD_FORMATS = [
     "mini_thread",         # 2-4 connected parts, only when justified
 ]
+FORMATS = SINGLE_FORMATS + THREAD_FORMATS
 
 OPENINGS = [
     "observasi",           # "kok ya tiap…"
@@ -67,10 +70,14 @@ class VoiceVariation:
         }
 
 
-def random_variation(rng: Optional[random.Random] = None) -> VoiceVariation:
+def random_variation(
+    rng: Optional[random.Random] = None,
+    allow_threads: bool = False,
+) -> VoiceVariation:
     r = rng or random
+    fmt_pool = FORMATS if allow_threads else SINGLE_FORMATS
     return VoiceVariation(
-        format=r.choice(FORMATS),
+        format=r.choice(fmt_pool),
         opening=r.choice(OPENINGS),
         length=r.choice(LENGTHS),
         mood=r.choice(MOODS),
@@ -87,21 +94,92 @@ def varied_variation(
     history: Iterable[tuple],
     rng: Optional[random.Random] = None,
     attempts: int = 12,
+    allow_threads: bool = False,
 ) -> VoiceVariation:
     """Pick a variation that has not been used recently.
 
+    Single post by default. Threads are only considered if allow_threads=True.
     Falls back to a random one only when the recent window covers every
-    combination (impossible in practice with 5*6*3*5*5 = 2250 combos, but the
-    guard keeps the function total).
+    combination.
     """
     r = rng or random
     seen = recent_keys(history)
     for _ in range(attempts):
-        candidate = random_variation(r)
+        candidate = random_variation(r, allow_threads=allow_threads)
         if candidate.key() not in seen:
             return candidate
-    return random_variation(r)
+    return random_variation(r, allow_threads=allow_threads)
 
+
+def should_allow_thread(
+    idea: Optional[object] = None,
+    evidence: str = "",
+    pillar: str = "",
+) -> bool:
+    """Determine whether an idea has verified information density justifying a multi-part thread.
+
+    Strict rules:
+    - Never allow threads for relatable or opinions pillars (mundane observations/feelings must never become threads).
+    - Only practical_tips or discoveries with >= 2 distinct, substantive points can earn a thread.
+    """
+    import re
+
+    p = (pillar or getattr(idea, "pillar", "") or "").lower()
+    if p in ("relatable", "opinions", "opinion"):
+        return False
+
+    text_blocks = []
+    if idea:
+        for attr in ("premise", "angle", "title", "description", "why_it_matters", "hook"):
+            val = getattr(idea, attr, None)
+            if val and isinstance(val, str):
+                text_blocks.append(val)
+    if evidence:
+        text_blocks.append(evidence)
+
+    combined = " ".join(text_blocks).lower()
+    if not combined:
+        return False
+
+    # Mundane observations / simple daily annoyances must never become threads
+    trivial_keywords = ["kabel", "tas", "baterai", "ngambek", "kusut", "nyelip", "curhat", "perasaan"]
+    if any(k in combined for k in trivial_keywords) and not ("langkah" in combined or "perbandingan" in combined):
+        return False
+
+    # Count distinct substantive steps or structured comparisons
+    step_matches = re.findall(
+        r"(?:^|\s)(?:\d+[\.\)]|langkah\s+\d+|tahap\s+\d+|pertama|kedua|ketiga|opsi\s+[ab12])",
+        combined,
+    )
+    if len(step_matches) >= 2:
+        return True
+
+    bullets = re.findall(r"(?:^|\n)\s*[-*•]\s+([^\n]+)", combined)
+    if len(bullets) >= 2:
+        return True
+
+    return False
+
+
+def decide_format(
+    idea: Optional[object] = None,
+    evidence: str = "",
+    pillar: str = "",
+    history: Optional[Iterable[tuple]] = None,
+    rng: Optional[random.Random] = None,
+) -> VoiceVariation:
+    """Contextual format selection: single post by default.
+
+    Multi-part thread is only chosen when verified information density
+    justifies sequential reading (>= 2 substantial takeaways).
+    """
+    allow_thread = should_allow_thread(idea, evidence=evidence, pillar=pillar)
+    if allow_thread and history:
+        recent = list(history)[-3:]
+        if any(len(h) > 0 and h[0] == "mini_thread" for h in recent):
+            allow_thread = False
+
+    return varied_variation(history or [], rng=rng, allow_threads=allow_thread)
 
 def word_budget(length: str) -> tuple[int, int]:
     """(min, max) words for a length label."""
@@ -155,7 +233,12 @@ def goal_guide(goal: str) -> str:
 
 def length_guide(length: str) -> str:
     lo, hi = word_budget(length)
-    return f"{lo}-{hi} kata."
+    return (
+        f"Panjang mengikuti substansi (orientasi {lo}-{hi} kata). "
+        "Prinsip utama: jika observasi sudah utuh dan kuat dalam 15-20 kata, jangan dipanjangkan. "
+        "Jika butuh membedah trade-off nyata atau langkah teknis, 60-75 kata diperbolehkan. "
+        "Setiap kalimat harus membawa substansi; hilangkan kalimat pengisi."
+    )
 
 
 def variation_prompt(v: VoiceVariation) -> str:

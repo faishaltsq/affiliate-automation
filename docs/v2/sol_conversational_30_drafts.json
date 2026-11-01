@@ -1,0 +1,2440 @@
+[
+  {
+    "index": 1,
+    "category": "relatable",
+    "pillar": "relatable",
+    "audience_problem": "Kabel charger selalu kusut di dalam tas",
+    "angle": "cara menggulung kabel yang bikin leher konektor cepat getas",
+    "observation": "Gulungan kencang terlihat rapi, tapi tarikannya yang bikin kabel rusak.",
+    "delivery_hint": "satu pengamatan, tanpa nasihat panjang",
+    "format_hint": "single_snappy",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Lebih baik kabel charger digulung rapat melilit adaptor atau dilipat longgar? Melilit rapat memang bikin tas rapi, tapi leher konektor ketarik tegang terus sampai kabel cepat getas. Gulung longgar bentuk angka delapan jauh lebih aman karena pangkal konektor bebas dari tekukan tajam.",
+    "cleaned_draft": "Lebih baik kabel charger digulung rapat melilit adaptor atau dilipat longgar? Melilit rapat memang bikin tas rapi, tapi leher konektor ketarik tegang terus sampai kabel cepat getas. Gulung longgar bentuk angka delapan jauh lebih aman karena pangkal konektor bebas dari tekukan tajam.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Lebih baik kabel charger digulung rapat melilit adaptor atau dilipat longgar?",
+          "suggested_fix": "Hapus pertanyaan retoris pembuka. Langsung masuk ke perbandingan: 'Melilit kabel charger rapat ke adaptor memang bikin tas rapi, tapi leher konektor ketarik terus...'"
+        }
+      ],
+      "concerns": [
+        "Pertanyaan retoris di awal menunda poin utama dan melanggar panduan gaya percakapan langsung."
+      ],
+      "notes": "Critic identified MAJOR defects (1): awkward_phrasing. Substansi solusi konkret dan relevan, tetapi pembuka masih mengandalkan pertanyaan retoris yang menunda inti bahasan dan mengurangi keluwesan percakapan alami."
+    },
+    "rewritten_draft": {
+      "raw_content": "Melilit kabel charger rapat ke adaptor memang bikin tas rapi, tapi leher konektor ketarik terus dari sudut tajam. Bagian itu yang paling sering getas atau robek duluan karena kawat di dalemnya ketekuk paksa. Gulung melingkar longgar seukuran telapak tangan jauh lebih aman buat umur kabel, meski makan sedikit lebih banyak ruang.",
+      "cleaned_content": "Melilit kabel charger rapat ke adaptor memang bikin tas rapi, tapi leher konektor ketarik terus dari sudut tajam. Bagian itu yang paling sering getas atau robek duluan karena kawat di dalemnya ketekuk paksa. Gulung melingkar longgar seukuran telapak tangan jauh lebih aman buat umur kabel, meski makan sedikit lebih banyak ruang.",
+      "applied_edits": [],
+      "actual_format": "single_snappy"
+    },
+    "final_evaluation": {
+      "content": "Melilit kabel charger rapat ke adaptor memang bikin tas rapi, tapi leher konektor ketarik terus dari sudut tajam. Bagian itu yang paling sering getas atau robek duluan karena kawat di dalemnya ketekuk paksa. Gulung melingkar longgar seukuran telapak tangan jauh lebih aman buat umur kabel, meski makan sedikit lebih banyak ruang.",
+      "score": 95.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid, ringkas, dan mengalir natural tanpa basa-basi klise. Observasi kebiasaan harian dieksekusi lugas dengan trade-off yang masuk akal serta aman dari pelanggaran persona."
+    },
+    "metrics_original": {
+      "word_count": 42,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 14.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 51,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 17.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 78.22
+  },
+  {
+    "index": 2,
+    "category": "relatable",
+    "pillar": "relatable",
+    "audience_problem": "Meja kerja penuh kabel sampai mouse tidak muat bergerak",
+    "angle": "meja kerja rapi di foto vs meja kerja yang benar-benar dipakai",
+    "observation": "Foto meja rapi itu diambil sebelum kabel-kabelnya hidup lagi.",
+    "delivery_hint": "ringan, satu sindiran pendek",
+    "format_hint": "single_snappy",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Meja rapi tanpa kabel cuma bertahan pas difoto. Begitu semua colokan kepasang, ruang gerak mouse langsung habis terhalang kabel.",
+    "cleaned_draft": "Meja rapi tanpa kabel cuma bertahan pas difoto. Begitu semua colokan kepasang, ruang gerak mouse langsung habis terhalang kabel.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 86.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "trivial_observation",
+          "severity": "MINOR",
+          "evidence": "Meja rapi tanpa kabel cuma bertahan pas difoto.",
+          "suggested_fix": "Tambahkan kontras atau kompromi realistis, misalnya kabel mouse bungee atau manajemen jalur kabel minimalis, agar tidak berhenti di lelucon setup meja yang klise."
+        }
+      ],
+      "concerns": [
+        "Topik setup meja minim kabel sudah terlalu sering dibahas tanpa ada nilai tambah teknis baru."
+      ],
+      "notes": "Draf sangat alami, ringkas, dan mengena untuk format snappy. Kelemahannya ada pada kebaruan gagasan; tropes meja estetik vs kabel berantakan sudah klise dan belum membawa sudut pandang teknis atau solusi praktis khas Teman Tongkrongan."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Meja rapi tanpa kabel cuma bertahan pas difoto. Begitu semua colokan kepasang, ruang gerak mouse langsung habis terhalang kabel.",
+      "score": 86.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "trivial_observation",
+          "severity": "MINOR",
+          "evidence": "Meja rapi tanpa kabel cuma bertahan pas difoto.",
+          "suggested_fix": "Tambahkan kontras atau kompromi realistis, misalnya kabel mouse bungee atau manajemen jalur kabel minimalis, agar tidak berhenti di lelucon setup meja yang klise."
+        }
+      ],
+      "concerns": [
+        "Topik setup meja minim kabel sudah terlalu sering dibahas tanpa ada nilai tambah teknis baru."
+      ],
+      "notes": "Draf sangat alami, ringkas, dan mengena untuk format snappy. Kelemahannya ada pada kebaruan gagasan; tropes meja estetik vs kabel berantakan sudah klise dan belum membawa sudut pandang teknis atau solusi praktis khas Teman Tongkrongan."
+    },
+    "metrics_original": {
+      "word_count": 19,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 9.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 19,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 9.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 36.33
+  },
+  {
+    "index": 3,
+    "category": "relatable",
+    "pillar": "relatable",
+    "audience_problem": "Beli gadget diskonan lalu disimpan di laci",
+    "angle": "euforia belanja yang surut lebih cepat daripada paketnya datang",
+    "observation": "Yang dibeli bukan barangnya, tapi rasa penasaran selama menunggu paket.",
+    "delivery_hint": "jujur sedikit menohok, tanpa moralisasi",
+    "format_hint": "single_snappy",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Sensasi menang pas berhasil checkout gadget diskon sering kali jauh lebih seru dibanding barangnya sendiri. Pas paketnya sampai beberapa hari kemudian, euforianya sebenarnya sudah habis. Kotaknya tetap dibuka, tapi ujung-ujungnya cuma disimpan rapi di laci meja karena fungsi aslinya memang cuma selesai pas bayar.",
+    "cleaned_draft": "Sensasi menang pas berhasil checkout gadget diskon sering kali jauh lebih seru dibanding barangnya sendiri. Pas paketnya sampai beberapa hari kemudian, euforianya sebenarnya sudah habis. Kotaknya tetap dibuka, tapi ujung-ujungnya cuma disimpan rapi di laci meja karena fungsi aslinya memang cuma selesai pas bayar.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 88.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "redundant_parts",
+          "severity": "MINOR",
+          "evidence": "euforianya sebenarnya sudah habis",
+          "suggested_fix": "Hapus kata 'sebenarnya' agar tempo kalimat kedua lebih lugas dan padat."
+        }
+      ],
+      "concerns": [
+        "Sudut pandang dopamin checkout diskon tergolong topik umum di media sosial."
+      ],
+      "notes": "Draf mengalir alami, membumi, dan berhasil menangkap paradoks belanja gadget secara tepat tanpa nada menggurui. Punchline penutup tajam merefleksikan dorongan dopamin saat checkout, kendati tema belanja impulsif sudah sering dibahas."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Sensasi menang pas berhasil checkout gadget diskon sering kali jauh lebih seru dibanding barangnya sendiri. Pas paketnya sampai beberapa hari kemudian, euforianya sebenarnya sudah habis. Kotaknya tetap dibuka, tapi ujung-ujungnya cuma disimpan rapi di laci meja karena fungsi aslinya memang cuma selesai pas bayar.",
+      "score": 88.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "redundant_parts",
+          "severity": "MINOR",
+          "evidence": "euforianya sebenarnya sudah habis",
+          "suggested_fix": "Hapus kata 'sebenarnya' agar tempo kalimat kedua lebih lugas dan padat."
+        }
+      ],
+      "concerns": [
+        "Sudut pandang dopamin checkout diskon tergolong topik umum di media sosial."
+      ],
+      "notes": "Draf mengalir alami, membumi, dan berhasil menangkap paradoks belanja gadget secara tepat tanpa nada menggurui. Punchline penutup tajam merefleksikan dorongan dopamin saat checkout, kendati tema belanja impulsif sudah sering dibahas."
+    },
+    "metrics_original": {
+      "word_count": 44,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 14.7,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 44,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 14.7,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 46.26
+  },
+  {
+    "index": 4,
+    "category": "relatable",
+    "pillar": "relatable",
+    "audience_problem": "Notifikasi grup chat bikin fokus buyar",
+    "angle": "kelelahan digital yang dianggap wajar",
+    "observation": "Yang melelahkan bukan chat-nya, tapi kewajiban membaca semuanya.",
+    "delivery_hint": "tenang, tidak menyalahkan siapa pun",
+    "format_hint": "single_paragraph",
+    "actual_format": "multi_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Grup chat dibuat dengan harapan koordinasi lebih cepat selesai. Praktiknya, sebagian besar hari justru habis buat memantau obrolan yang jarang sekali butuh respons seketika.\n\nKelelahan digital semacam ini pelan-pelan dianggap hal wajar, seolah ada kewajiban tak tertulis untuk selalu siaga. Menyalakan fitur bisu di grup besar bukan berarti menutup diri, tapi sekadar memilah mana hal mendesak dan mana yang bisa menunggu.",
+    "cleaned_draft": "Grup chat dibuat dengan harapan koordinasi lebih cepat selesai. Praktiknya, sebagian besar hari justru habis buat memantau obrolan yang jarang sekali butuh respons seketika.\n\nKelelahan digital semacam ini pelan-pelan dianggap hal wajar, seolah ada kewajiban tak tertulis untuk selalu siaga. Menyalakan fitur bisu di grup besar bukan berarti menutup diri, tapi sekadar memilah mana hal mendesak dan mana yang bisa menunggu.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "formal_language",
+          "severity": "MAJOR",
+          "evidence": "Kelelahan digital semacam ini pelan-pelan dianggap hal wajar, seolah ada kewajiban tak tertulis untuk selalu siaga.",
+          "suggested_fix": "Ganti istilah kaku/akademis dengan bahasa percakapan yang lebih membumi, misalnya: 'Capek yang kayak gini sering dianggap wajar, padahal nggak ada aturan kita kudu selalu stand by.'"
+        },
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Grup chat dibuat dengan harapan koordinasi lebih cepat selesai. Praktiknya, sebagian besar hari justru habis buat memantau obrolan...",
+          "suggested_fix": "Hindari pembuka pasif gaya laporan. Buat lebih aktif dan langsung: 'Bikin grup chat maunya biar koordinasi lekas beres. Nyatanya, seharian malah habis mantengin obrolan...'"
+        },
+        {
+          "code": "trivial_observation",
+          "severity": "MINOR",
+          "evidence": "Menyalakan fitur bisu di grup besar bukan berarti menutup diri, tapi sekadar memilah mana hal mendesak dan mana yang bisa menunggu.",
+          "suggested_fix": "Saran 'mute grup' terlalu umum. Tambahkan sudut pandang praktis yang lebih segar atau trade-off nyata agar tidak terdengar seperti tips klise."
+        },
+        {
+          "code": "ai_writing_assignment",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'esai'",
+          "suggested_fix": "Address ai_writing_assignment"
+        }
+      ],
+      "concerns": [
+        "Gaya bahasa terlalu formal dan mirip esai LinkedIn, kurang luwes sebagai kawan tongkrongan",
+        "Struktur kalimat pasif di awal melemahkan dinamika percakapan",
+        "Gagasan dan solusi terlalu umum tanpa sudut pandang baru yang tajam"
+      ],
+      "notes": "Critic identified MAJOR defects (2): formal_language, ai_writing_assignment. Draf mengangkat masalah nyata yang sangat relatable, tetapi eksekusi kalimat terasa seperti esai opini formal atau postingan LinkedIn alih-alih obrolan kawan tongkrongan. Frasa seperti 'kelelahan digital' dan struktur kalimat pasif di awal membuat nadanya kaku dan sedikit menjauhkan pembaca dari rasa santai yang dijanjikan persona."
+    },
+    "rewritten_draft": {
+      "raw_content": "Beda jauh rasanya antara sekadar mute grup sama ngatur notifikasi cuma bunyi pas nama kita di-tag. Mute biasa bikin waswas ketinggalan info, tapi dibiarin bunyi malah bikin seharian habis cuma mantau layar. Coba cek setelan notifikasi khusus sebutan di obrolan grup.",
+      "cleaned_content": "Beda jauh rasanya antara sekadar mute grup sama ngatur notifikasi cuma bunyi pas nama kita di-tag. Mute biasa bikin waswas ketinggalan info, tapi dibiarin bunyi malah bikin seharian habis cuma mantau layar. Coba cek setelan notifikasi khusus sebutan di obrolan grup.",
+      "applied_edits": [],
+      "actual_format": "comparison"
+    },
+    "final_evaluation": {
+      "content": "Beda jauh rasanya antara sekadar mute grup sama ngatur notifikasi cuma bunyi pas nama kita di-tag. Mute biasa bikin waswas ketinggalan info, tapi dibiarin bunyi malah bikin seharian habis cuma mantau layar. Coba cek setelan notifikasi khusus sebutan di obrolan grup.",
+      "score": 81.0,
+      "verdict": "NEEDS_REVIEW",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "setelan notifikasi khusus sebutan di obrolan grup",
+          "suggested_fix": "Ubah jadi 'notifikasi pas di-tag doang' agar selaras dengan bahasa santai kalimat pertama dan tidak terdengar seperti menu terjemahan kaku."
+        }
+      ],
+      "concerns": [
+        "Inkonsistensi diksi antara 'di-tag' santai dan 'sebutan' yang formal/terjemahan mesin.",
+        "Kurang spesifik menyebut aplikasi, padahal perilaku mute/mention berbeda antara WhatsApp, Telegram, dan Discord."
+      ],
+      "notes": "Draf menangkap dilema obrolan grup dengan natural dan ringkas, tetapi penggunaan istilah 'sebutan' di akhir terdengar kaku seperti terjemahan harfiah UI dibanding istilah 'di-tag' di awal."
+    },
+    "metrics_original": {
+      "word_count": 61,
+      "sentence_count": 4,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 15.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 41,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.7,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 88.41
+  },
+  {
+    "index": 5,
+    "category": "relatable",
+    "pillar": "relatable",
+    "audience_problem": "HP di-charge semalam lalu pagi harinya tetap penuh karena lupa dicolok",
+    "angle": "kebiasaan mengecek baterai sebagai ritual kecil",
+    "observation": "Cemas baterai tinggal 40% padahal belum meninggalkan rumah.",
+    "delivery_hint": "pengamatan singkat, sedikit menggelitik",
+    "format_hint": "single_snappy",
+    "actual_format": "short_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Kabel sudah menancap rapi ke bodi HP sebelum tidur, tapi paginya daya baterai tidak bertambah sama sekali karena saklar colokan belum ditekan. Membiasakan diri menunggu sejenak sampai getaran atau animasi pengisian daya benar-benar muncul sebelum meninggalkan meja jauh lebih berguna daripada sekadar percaya kabel sudah terhubung. Kepastian kecil yang menyelamatkan rutinitas pagi.",
+    "cleaned_draft": "Kabel sudah menancap rapi ke bodi HP sebelum tidur, tapi paginya daya baterai tidak bertambah sama sekali karena saklar colokan belum ditekan. Membiasakan diri menunggu sejenak sampai getaran atau animasi pengisian daya benar-benar muncul sebelum meninggalkan meja jauh lebih berguna daripada sekadar percaya kabel sudah terhubung. Kepastian kecil yang menyelamatkan rutinitas pagi.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Kepastian kecil yang menyelamatkan rutinitas pagi.",
+          "suggested_fix": "Hapus kalimat kesimpulan normatif ini. Biarkan substansi praktisnya menutup draf secara natural."
+        },
+        {
+          "code": "formal_language",
+          "severity": "MAJOR",
+          "evidence": "Kabel sudah menancap rapi ke bodi HP sebelum tidur, tapi paginya daya baterai tidak bertambah sama sekali karena saklar colokan belum ditekan.",
+          "suggested_fix": "Ganti dengan diksi percakapan santai: 'Kabel udah nancep rapi semalaman, pas bangun baterai nggak nambah sama sekali gara-gara saklar colokan lupa diceklek.'"
+        },
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Membiasakan diri menunggu sejenak sampai getaran atau animasi pengisian daya benar-benar muncul sebelum meninggalkan meja jauh lebih berguna daripada sekadar percaya kabel sudah terhubung.",
+          "suggested_fix": "Pangkas struktur berbelit: 'Tunggu dua detik sampai getar atau animasinya nongol sebelum ditinggal. Jauh lebih aman daripada cuma modal percaya kabel udah nempel.'"
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Struktur kalimat terlalu baku dan kaku untuk arketipe Teman Tongkrongan",
+        "Kalimat penutup bergaya esai motivasi / rangkuman AI",
+        "Observasi sangat mendasar tanpa sudut pandang segar"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Topik sangat dekat dengan keseharian, tetapi eksekusi kalimat kaku seperti terjemahan atau esai tertulis. Penutup mengandung klise kesimpulan khas AI yang merusak nada percakapan santai tongkrongan."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Kabel sudah menancap rapi ke bodi HP sebelum tidur, tapi paginya daya baterai tidak bertambah sama sekali karena saklar colokan belum ditekan. Membiasakan diri menunggu sejenak sampai getaran atau animasi pengisian daya benar-benar muncul sebelum meninggalkan meja jauh lebih berguna daripada sekadar percaya kabel sudah terhubung. Kepastian kecil yang menyelamatkan rutinitas pagi.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Kepastian kecil yang menyelamatkan rutinitas pagi.",
+          "suggested_fix": "Hapus kalimat kesimpulan normatif ini. Biarkan substansi praktisnya menutup draf secara natural."
+        },
+        {
+          "code": "formal_language",
+          "severity": "MAJOR",
+          "evidence": "Kabel sudah menancap rapi ke bodi HP sebelum tidur, tapi paginya daya baterai tidak bertambah sama sekali karena saklar colokan belum ditekan.",
+          "suggested_fix": "Ganti dengan diksi percakapan santai: 'Kabel udah nancep rapi semalaman, pas bangun baterai nggak nambah sama sekali gara-gara saklar colokan lupa diceklek.'"
+        },
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Membiasakan diri menunggu sejenak sampai getaran atau animasi pengisian daya benar-benar muncul sebelum meninggalkan meja jauh lebih berguna daripada sekadar percaya kabel sudah terhubung.",
+          "suggested_fix": "Pangkas struktur berbelit: 'Tunggu dua detik sampai getar atau animasinya nongol sebelum ditinggal. Jauh lebih aman daripada cuma modal percaya kabel udah nempel.'"
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Struktur kalimat terlalu baku dan kaku untuk arketipe Teman Tongkrongan",
+        "Kalimat penutup bergaya esai motivasi / rangkuman AI",
+        "Observasi sangat mendasar tanpa sudut pandang segar"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Topik sangat dekat dengan keseharian, tetapi eksekusi kalimat kaku seperti terjemahan atau esai tertulis. Penutup mengandung klise kesimpulan khas AI yang merusak nada percakapan santai tongkrongan."
+    },
+    "metrics_original": {
+      "word_count": 52,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 17.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 52,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 17.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 50.86
+  },
+  {
+    "index": 6,
+    "category": "opinions",
+    "pillar": "opinions",
+    "audience_problem": "Klaim RAM besar di HP murah sering cuma trik swap virtual",
+    "angle": "angka spesifikasi vs pengalaman harian",
+    "observation": "RAM yang ditulis di kotak tidak selalu sama dengan yang terasa di tangan.",
+    "delivery_hint": "tegas tapi tidak menuduh merek tertentu",
+    "format_hint": "single_paragraph",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Label RAM melimpah di HP terjangkau sering memberi harapan multitasking enteng. Kenyataannya, porsi tambahan itu cuma memori internal yang dipinjam buat swap. Karena kecepatan media simpan jauh di bawah RAM fisik, aplikasi tetap bakal sering muat ulang pas dipakai harian.",
+    "cleaned_draft": "Label RAM melimpah di HP terjangkau sering memberi harapan multitasking enteng. Kenyataannya, porsi tambahan itu cuma memori internal yang dipinjam buat swap. Karena kecepatan media simpan jauh di bawah RAM fisik, aplikasi tetap bakal sering muat ulang pas dipakai harian.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Kenyataannya, porsi tambahan itu cuma memori internal yang dipinjam buat swap.",
+          "suggested_fix": "Hapus kata transisi klise 'Kenyataannya,'. Langsung sambung: 'Padahal porsi tambahan itu cuma memori internal yang dipinjam buat swap.'"
+        },
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "kecepatan media simpan jauh di bawah RAM fisik",
+          "suggested_fix": "Ganti 'media simpan' dengan istilah percakapan yang lebih natural seperti 'storage' atau 'memori internal'."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Penggunaan transisi klise khas AI ('Kenyataannya,')",
+        "Diksi kaku ('media simpan', 'memberi harapan multitasking enteng')"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Poin teknis tepat dan relevan untuk konsumen ponsel murah, namun gaya tutur masih kaku dengan transisi klise AI dan istilah buku teks yang mengurangi kesan obrolan santai."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Label RAM melimpah di HP terjangkau sering memberi harapan multitasking enteng. Kenyataannya, porsi tambahan itu cuma memori internal yang dipinjam buat swap. Karena kecepatan media simpan jauh di bawah RAM fisik, aplikasi tetap bakal sering muat ulang pas dipakai harian.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Kenyataannya, porsi tambahan itu cuma memori internal yang dipinjam buat swap.",
+          "suggested_fix": "Hapus kata transisi klise 'Kenyataannya,'. Langsung sambung: 'Padahal porsi tambahan itu cuma memori internal yang dipinjam buat swap.'"
+        },
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "kecepatan media simpan jauh di bawah RAM fisik",
+          "suggested_fix": "Ganti 'media simpan' dengan istilah percakapan yang lebih natural seperti 'storage' atau 'memori internal'."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Penggunaan transisi klise khas AI ('Kenyataannya,')",
+        "Diksi kaku ('media simpan', 'memberi harapan multitasking enteng')"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Poin teknis tepat dan relevan untuk konsumen ponsel murah, namun gaya tutur masih kaku dengan transisi klise AI dan istilah buku teks yang mengurangi kesan obrolan santai."
+    },
+    "metrics_original": {
+      "word_count": 40,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 40,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 33.97
+  },
+  {
+    "index": 7,
+    "category": "opinions",
+    "pillar": "opinions",
+    "audience_problem": "Diskon besar dengan harga coret yang sudah dinaikkan duluan",
+    "angle": "harga coret sebagai alat, bukan informasi",
+    "observation": "Diskon jadi tidak bisa dibaca kalau harga awalnya karangan.",
+    "delivery_hint": "praktis, beri cara membaca harga",
+    "format_hint": "single_paragraph",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Beli barang berasa menang banyak pas lihat harga coret, padahal aslinya cuma jangkar biar nominal biasanya kelihatan murah. Waktu angkanya dinaikkan duluan, garis merah itu murni alat, bukan informasi.",
+    "cleaned_draft": "Beli barang berasa menang banyak pas lihat harga coret, padahal aslinya cuma jangkar biar nominal biasanya kelihatan murah. Waktu angkanya dinaikkan duluan, garis merah itu murni alat, bukan informasi.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "padahal aslinya cuma jangkar biar nominal biasanya kelihatan murah",
+          "suggested_fix": "Ubah menjadi lebih luwes: 'padahal aslinya cuma trik psikologis biar harga normal kelihatan murah' atau 'padahal cuma patokan palsu biar harga aslinya kerasa murah'."
+        },
+        {
+          "code": "unnatural_indonesian",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'kaku'",
+          "suggested_fix": "Address unnatural_indonesian"
+        }
+      ],
+      "concerns": [
+        "Kata 'jangkar' terjemahan harfiah kaku dari price anchor",
+        "Frasa 'nominal biasanya' canggung di telinga penutur asli"
+      ],
+      "notes": "Critic identified MAJOR defects (2): awkward_phrasing, unnatural_indonesian. Poin kuat dan relevan. Kalimat kedua tajam. Kalimat pertama terganjal terjemahan harfiah istilah anchoring dan frasa kaku yang kurang natural untuk percakapan santai."
+    },
+    "rewritten_draft": {
+      "raw_content": "Refleks jempol gampang banget kepancing tiap kali lihat angka tercoret tebal di toko online. Padahal coretan itu seringnya bukan informasi, cuma patokan palsu biar harga aslinya kerasa murah. Nominalnya dinaikkan dulu diam-diam, baru dipotong lagi ke harga standar. Yang bikin hemat itu jumlah uang yang beneran keluar, bukan ilusi selisih harga di layar.",
+      "cleaned_content": "Refleks jempol gampang banget kepancing tiap kali lihat angka tercoret tebal di toko online. Padahal coretan itu seringnya bukan informasi, cuma patokan palsu biar harga aslinya kerasa murah. Nominalnya dinaikkan dulu diam-diam, baru dipotong lagi ke harga standar. Yang bikin hemat itu jumlah uang yang beneran keluar, bukan ilusi selisih harga di layar.",
+      "applied_edits": [],
+      "actual_format": "short_paragraph"
+    },
+    "final_evaluation": {
+      "content": "Refleks jempol gampang banget kepancing tiap kali lihat angka tercoret tebal di toko online. Padahal coretan itu seringnya bukan informasi, cuma patokan palsu biar harga aslinya kerasa murah. Nominalnya dinaikkan dulu diam-diam, baru dipotong lagi ke harga standar. Yang bikin hemat itu jumlah uang yang beneran keluar, bukan ilusi selisih harga di layar.",
+      "score": 88.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "redundant_parts",
+          "severity": "MINOR",
+          "evidence": "Nominalnya dinaikkan dulu diam-diam, baru dipotong lagi ke harga standar.",
+          "suggested_fix": "Hapus kalimat ini untuk menjaga kepadatan laju baca."
+        }
+      ],
+      "concerns": [
+        "Topik trik harga coret e-commerce sudah umum.",
+        "Kalimat penjelas mekanisme diskon memperlambat ritme tanpa menambah insight baru."
+      ],
+      "notes": "Alur natural, nada santai membumi, persona kawan cerdas konsisten tanpa kata ganti mekanis atau klise AI. Penggunaan kata 'seringnya' tepat meredam klaim absolut. Substansi topik harga coret tergolong usang dan kalimat ketiga sedikit redundan menjelaskan hal yang sudah tersirat di kalimat kedua."
+    },
+    "metrics_original": {
+      "word_count": 29,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 14.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 53,
+      "sentence_count": 4,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 96.16
+  },
+  {
+    "index": 8,
+    "category": "opinions",
+    "pillar": "opinions",
+    "audience_problem": "Review gadget bersponsor yang tidak menyebut satu kekurangan pun",
+    "angle": "review yang tidak punya batas antara data dan iklan",
+    "observation": "Review tanpa kekurangan bukan review, itu daftar fitur.",
+    "delivery_hint": "dingin, tanpa emosi",
+    "format_hint": "single_snappy",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Review gadget yang isinya cuma pujian tanpa satu pun catatan minus itu bukan ulasan, tapi brosur yang dibacakan. Setiap perangkat pasti punya kompromi. Begitu batas antara evaluasi dan iklan hilang, yang tersisa cuma materi promosi berkedok opini.",
+    "cleaned_draft": "Review gadget yang isinya cuma pujian tanpa satu pun catatan minus itu bukan ulasan, tapi brosur yang dibacakan. Setiap perangkat pasti punya kompromi. Begitu batas antara evaluasi dan iklan hilang, yang tersisa cuma materi promosi berkedok opini.",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "repetitive_structure",
+          "severity": "MAJOR",
+          "evidence": "Begitu batas antara evaluasi dan iklan hilang, yang tersisa cuma materi promosi berkedok opini.",
+          "suggested_fix": "Hapus kalimat terakhir atau ganti dengan observasi penutup yang bergerak maju, bukan mengulang perbandingan 'brosur' di kalimat pertama."
+        },
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "evaluasi dan iklan hilang, yang tersisa cuma materi promosi berkedok opini",
+          "suggested_fix": "Gunakan padanan kasual seperti 'iklan berkedok review' agar ritme tongkrongan tetap terjaga."
+        },
+        {
+          "code": "ai_writing_assignment",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'esai'",
+          "suggested_fix": "Address ai_writing_assignment"
+        }
+      ],
+      "concerns": [
+        "Kalimat penutup redundan, sekadar memparafrase kalimat pertama",
+        "Diksi di akhir teks terlalu formal dan menyerupai esai tertulis"
+      ],
+      "notes": "Critic identified MAJOR defects (2): repetitive_structure, ai_writing_assignment. Premis awal tajam dan mengena, tetapi kalimat penutup mengulang inti kalimat pembuka dengan bahasa yang terlalu kaku dan formal untuk obrolan santai."
+    },
+    "rewritten_draft": {
+      "raw_content": "Nonton review gadget harapannya dapat gambaran utuh sebelum beli, tapi isinya malah deretan pujian tanpa celah sedikit pun. Padahal perangkat paling jempolan pun pasti bawa kompromi—entah bodinya lebih tebal atau waktu isi dayanya lambat. Begitu semua sudut dibilang sempurna, itu iklan berkedok review. Ulasan yang beneran ngebantu justru yang berani buka kekurangannya, biar tahu kompromi apa yang siap diterima.",
+      "cleaned_content": "Nonton review gadget harapannya dapat gambaran utuh sebelum beli, tapi isinya malah deretan pujian tanpa celah sedikit pun. Padahal perangkat paling jempolan pun pasti bawa kompromi—entah bodinya lebih tebal atau waktu isi dayanya lambat. Begitu semua sudut dibilang sempurna, itu iklan berkedok review. Ulasan yang beneran ngebantu justru yang berani buka kekurangannya, biar tahu kompromi apa yang siap diterima.",
+      "applied_edits": [],
+      "actual_format": "single_snappy"
+    },
+    "final_evaluation": {
+      "content": "Nonton review gadget harapannya dapat gambaran utuh sebelum beli, tapi isinya malah deretan pujian tanpa celah sedikit pun. Padahal perangkat paling jempolan pun pasti bawa kompromi—entah bodinya lebih tebal atau waktu isi dayanya lambat. Begitu semua sudut dibilang sempurna, itu iklan berkedok review. Ulasan yang beneran ngebantu justru yang berani buka kekurangannya, biar tahu kompromi apa yang siap diterima.",
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Nonton review gadget harapannya dapat gambaran utuh sebelum beli",
+          "suggested_fix": "Ubah menjadi frasa percakapan yang lebih luwes: 'Niat nonton review gadget biar dapet gambaran utuh sebelum beli'"
+        },
+        {
+          "code": "repetitive_structure",
+          "severity": "MAJOR",
+          "evidence": "Padahal perangkat paling jempolan pun pasti bawa kompromi—entah bodinya lebih tebal atau waktu isi dayanya lambat. Begitu semua sudut dibilang sempurna, itu iklan berkedok review. Ulasan yang beneran ngebantu justru yang berani buka kekurangannya, biar tahu kompromi apa yang siap diterima.",
+          "suggested_fix": "Pangkas repetisi gagasan kompromi di akhir. Cukup tutup tegas setelah kalimat iklan berkedok review atau satukan poin ulasan yang jujur tanpa mengulang kata 'kompromi'."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Critic noted format/paragraph issue in concerns",
+          "suggested_fix": "Sesuaikan format dan pembagian paragraf"
+        },
+        {
+          "code": "unnatural_indonesian",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'kaku'",
+          "suggested_fix": "Address unnatural_indonesian"
+        }
+      ],
+      "concerns": [
+        "Pembuka kalimat terasa kaku dan kurang mencerminkan obrolan santai spontan",
+        "Poin gagasan kompromi diulang dua kali dalam satu paragraf pendek",
+        "Sudut pandang sangat umum tanpa wawasan baru yang segar"
+      ],
+      "notes": "Critic identified MAJOR defects (4): awkward_phrasing, repetitive_structure, format_mismatch, unnatural_indonesian. Draf mengangkat keresahan yang relevan bagi calon pembeli gadget, namun idenya sangat klise dan eksekusinya repetitif. Pembuka terasa agak kaku, sementara bagian penutup mengulang kembali gagasan kompromi yang sudah dijelaskan di kalimat sebelumnya sehingga ritme single_snappy menjadi kendur."
+    },
+    "metrics_original": {
+      "word_count": 37,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 12.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 59,
+      "sentence_count": 4,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 14.8,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 83.14
+  },
+  {
+    "index": 9,
+    "category": "opinions",
+    "pillar": "opinions",
+    "audience_problem": "Upgrade HP tiap tahun padahal perubahannya tipis",
+    "angle": "inovasi yang bergerak di kamera dan warna, bukan di pengalaman",
+    "observation": "Yang berubah tiap tahun lebih sering angka di brosur daripada cara pakai.",
+    "delivery_hint": "reflektif, bukan menyuruh menahan diri",
+    "format_hint": "single_paragraph",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "HP baru keluar dari kotak dan ditaruh sebelah HP lama: bedanya cuma kelir bodi dan tonjolan kamera. Buka aplikasi, gulir linimasa, dan navigasi harian terasa persis sama. Siklus rilis tahunan sekarang cuma jual perubahan kosmetik, bukan lompatan pengalaman.",
+    "cleaned_draft": "HP baru keluar dari kotak dan ditaruh sebelah HP lama: bedanya cuma kelir bodi dan tonjolan kamera. Buka aplikasi, gulir linimasa, dan navigasi harian terasa persis sama. Siklus rilis tahunan sekarang cuma jual perubahan kosmetik, bukan lompatan pengalaman.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 85.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "gulir linimasa",
+          "suggested_fix": "Ganti dengan 'scroll medsos' agar mengalir lebih santai."
+        }
+      ],
+      "concerns": [
+        "Diksi 'gulir linimasa' terlalu baku untuk percakapan santai",
+        "Sudut pandang rilis kosmetik minim kebaruan"
+      ],
+      "notes": "Draf padat, tajam, langsung ke inti komparasi. Nada tepat, tanpa basa-basi. Diksi 'gulir linimasa' agak kaku untuk tongkrongan; topik kelelahan rilis tahunan cukup umum."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "HP baru keluar dari kotak dan ditaruh sebelah HP lama: bedanya cuma kelir bodi dan tonjolan kamera. Buka aplikasi, gulir linimasa, dan navigasi harian terasa persis sama. Siklus rilis tahunan sekarang cuma jual perubahan kosmetik, bukan lompatan pengalaman.",
+      "score": 85.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "gulir linimasa",
+          "suggested_fix": "Ganti dengan 'scroll medsos' agar mengalir lebih santai."
+        }
+      ],
+      "concerns": [
+        "Diksi 'gulir linimasa' terlalu baku untuk percakapan santai",
+        "Sudut pandang rilis kosmetik minim kebaruan"
+      ],
+      "notes": "Draf padat, tajam, langsung ke inti komparasi. Nada tepat, tanpa basa-basi. Diksi 'gulir linimasa' agak kaku untuk tongkrongan; topik kelelahan rilis tahunan cukup umum."
+    },
+    "metrics_original": {
+      "word_count": 38,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 12.7,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 38,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 12.7,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 40.66
+  },
+  {
+    "index": 10,
+    "category": "opinions",
+    "pillar": "opinions",
+    "audience_problem": "Charger cepat 200W dipasarkan seolah semua HP butuh",
+    "angle": "kebutuhan vs kemampuan perangkat yang dipakai",
+    "observation": "Charger cepat hanya cepat kalau HP-nya memang menerima.",
+    "delivery_hint": "jelas, satu poin",
+    "format_hint": "single_snappy",
+    "actual_format": "multi_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Colokan dinding penuh sama kepala charger segede batu bata. Masalahnya, begitu kabel dipasang, arus yang masuk tetap dibatasi sama kemampuan perangkat itu sendiri.\n\nBawa charger paling ngebut nggak otomatis bikin pengisian jadi kilat kalau HP memang belum dirancang buat nerima daya sebesar itu. Yang bertambah cuma beban di tas demi fitur yang tidur.",
+    "cleaned_draft": "Colokan dinding penuh sama kepala charger segede batu bata. Masalahnya, begitu kabel dipasang, arus yang masuk tetap dibatasi sama kemampuan perangkat itu sendiri.\n\nBawa charger paling ngebut nggak otomatis bikin pengisian jadi kilat kalau HP memang belum dirancang buat nerima daya sebesar itu. Yang bertambah cuma beban di tas demi fitur yang tidur.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "repetitive_structure",
+          "severity": "MINOR",
+          "evidence": "kalau HP memang belum dirancang buat nerima daya sebesar itu",
+          "suggested_fix": "Hapus repetisi syarat teknis perangkat, langsung sorot trade-off bobot charger dengan daya yang terbuang."
+        },
+        {
+          "code": "forced_metaphor",
+          "severity": "MINOR",
+          "evidence": "fitur yang tidur",
+          "suggested_fix": "Ganti dengan 'daya yang nggak kepakai' atau 'kapasitas nganggur' agar lebih presisi."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Critic noted format/paragraph issue in concerns",
+          "suggested_fix": "Sesuaikan format dan pembagian paragraf"
+        },
+        {
+          "code": "forced_metaphor",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Paragraf kedua mengulang poin batasan daya perangkat dari paragraf pertama",
+        "Frasa 'fitur yang tidur' kurang presisi menggambarkan kelebihan watt charger"
+      ],
+      "notes": "Critic identified BLOCKING issues: forced_metaphor. Draf mengalir wajar, membumi, dan relevan dengan kebiasaan harian pengguna gadget. Terdapat redundansi minor penjelasan batas daya antara paragraf satu dan dua, serta frasa penutup yang bisa dibuat lebih lugas."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Colokan dinding penuh sama kepala charger segede batu bata. Masalahnya, begitu kabel dipasang, arus yang masuk tetap dibatasi sama kemampuan perangkat itu sendiri.\n\nBawa charger paling ngebut nggak otomatis bikin pengisian jadi kilat kalau HP memang belum dirancang buat nerima daya sebesar itu. Yang bertambah cuma beban di tas demi fitur yang tidur.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "repetitive_structure",
+          "severity": "MINOR",
+          "evidence": "kalau HP memang belum dirancang buat nerima daya sebesar itu",
+          "suggested_fix": "Hapus repetisi syarat teknis perangkat, langsung sorot trade-off bobot charger dengan daya yang terbuang."
+        },
+        {
+          "code": "forced_metaphor",
+          "severity": "MINOR",
+          "evidence": "fitur yang tidur",
+          "suggested_fix": "Ganti dengan 'daya yang nggak kepakai' atau 'kapasitas nganggur' agar lebih presisi."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Critic noted format/paragraph issue in concerns",
+          "suggested_fix": "Sesuaikan format dan pembagian paragraf"
+        },
+        {
+          "code": "forced_metaphor",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Paragraf kedua mengulang poin batasan daya perangkat dari paragraf pertama",
+        "Frasa 'fitur yang tidur' kurang presisi menggambarkan kelebihan watt charger"
+      ],
+      "notes": "Critic identified BLOCKING issues: forced_metaphor. Draf mengalir wajar, membumi, dan relevan dengan kebiasaan harian pengguna gadget. Terdapat redundansi minor penjelasan batas daya antara paragraf satu dan dua, serta frasa penutup yang bisa dibuat lebih lugas."
+    },
+    "metrics_original": {
+      "word_count": 53,
+      "sentence_count": 4,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 13.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 53,
+      "sentence_count": 4,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 13.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 40.29
+  },
+  {
+    "index": 11,
+    "category": "practical_tips",
+    "pillar": "practical_tips",
+    "audience_problem": "Kabel charger cepat rusak di dekat konektor",
+    "angle": "titik tekuk sebagai penyebab utama, bukan kualitas kabel",
+    "observation": "Kabel rusak di titik yang paling sering ditekuk, bukan di tengahnya.",
+    "delivery_hint": "satu tindakan yang bisa dilakukan hari ini",
+    "format_hint": "single_paragraph",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Main HP miring di kasur dengan kabel tertekuk nahan beban tangan. Mau pakai kabel bawaan tipis atau kabel mahal berlapis nilon, ujung sambungan tetap bakal jebol. Masalah utamanya bukan kualitas kabel, tapi sudut tekuk tajam di titik yang sama terus-menerus.",
+    "cleaned_draft": "Main HP miring di kasur dengan kabel tertekuk nahan beban tangan. Mau pakai kabel bawaan tipis atau kabel mahal berlapis nilon, ujung sambungan tetap bakal jebol. Masalah utamanya bukan kualitas kabel, tapi sudut tekuk tajam di titik yang sama terus-menerus.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "absolute_claim",
+          "severity": "MAJOR",
+          "evidence": "ujung sambungan tetap bakal jebol",
+          "suggested_fix": "Ubah menjadi 'tetap rawan jebol' atau 'tetap gampang aus' agar tidak menjadi klaim kepastian tanpa data uji."
+        }
+      ],
+      "concerns": [
+        "Klaim mutlak kepastian kerusakan kabel melanggar aturan evidential correctness.",
+        "Kurang langkah solusi praktis untuk kategori practical_tips."
+      ],
+      "notes": "Critic identified MAJOR defects (1): absolute_claim. Observasi relatable dan nada obrolan santai sudah tepat, tetapi klaim kerusakan disajikan terlalu mutlak dan pilar practical tips belum memuat solusi aksi konkret."
+    },
+    "rewritten_draft": {
+      "raw_content": "Main HP sambil rebahan pas lagi dicas bikin kabel sering tertekuk menahan beban tangan. Sebagus apa pun bahan luarnya, tekanan konstan di titik lipatan yang sama bikin serat di dalamnya tetap rawan jebol.\n\nPilihannya cuma tukar sedikit kenyamanan: cabut kabel pas mau santai, atau atur posisi tangan supaya ujung konektor tetap lurus bebas tarikan. Sedikit kurang leluasa sekarang jauh lebih praktis daripada bolak-balik beli kabel pengganti.",
+      "cleaned_content": "Main HP sambil rebahan pas lagi dicas bikin kabel sering tertekuk menahan beban tangan. Sebagus apa pun bahan luarnya, tekanan konstan di titik lipatan yang sama bikin serat di dalamnya tetap rawan jebol.\n\nPilihannya cuma tukar sedikit kenyamanan: cabut kabel pas mau santai, atau atur posisi tangan supaya ujung konektor tetap lurus bebas tarikan. Sedikit kurang leluasa sekarang jauh lebih praktis daripada bolak-balik beli kabel pengganti.",
+      "applied_edits": [],
+      "actual_format": "multi_paragraph"
+    },
+    "final_evaluation": {
+      "content": "Main HP sambil rebahan pas lagi dicas bikin kabel sering tertekuk menahan beban tangan. Sebagus apa pun bahan luarnya, tekanan konstan di titik lipatan yang sama bikin serat di dalamnya tetap rawan jebol.\n\nPilihannya cuma tukar sedikit kenyamanan: cabut kabel pas mau santai, atau atur posisi tangan supaya ujung konektor tetap lurus bebas tarikan. Sedikit kurang leluasa sekarang jauh lebih praktis daripada bolak-balik beli kabel pengganti.",
+      "score": 93.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid, mengalir santai tanpa nada menggurui, dan langsung menyasar kebiasaan harian yang relevan. Solusi dan trade-off disajikan lugas, tanpa klise AI maupun personifikasi benda mati."
+    },
+    "metrics_original": {
+      "word_count": 40,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 66,
+      "sentence_count": 4,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 16.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 86.28
+  },
+  {
+    "index": 12,
+    "category": "practical_tips",
+    "pillar": "practical_tips",
+    "audience_problem": "Laptop panas saat dipakai di kasur atau bantal",
+    "angle": "jalur pembuangan udara yang tertutup",
+    "observation": "Kipas bekerja, tapi udara panasnya tidak punya tempat keluar.",
+    "delivery_hint": "praktis, sebut satu perbaikan",
+    "format_hint": "single_paragraph",
+    "actual_format": "short_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Kerja di kasur bayangannya santai, tapi permukaan empuk langsung menutup rapat jalur udara laptop. Cek kisi ventilasi di bawah bodi sebelum menaruhnya di kasur.",
+    "cleaned_draft": "Kerja di kasur bayangannya santai, tapi permukaan empuk langsung menutup rapat jalur udara laptop. Cek kisi ventilasi di bawah bodi sebelum menaruhnya di kasur.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 76.0,
+      "verdict": "NEEDS_REVIEW",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Cek kisi ventilasi di bawah bodi sebelum menaruhnya di kasur.",
+          "suggested_fix": "Beri tindakan konkret: sarankan alas datar seperti buku tebal atau nampan jika kisi udara ada di bawah bodi."
+        },
+        {
+          "code": "trivial_observation",
+          "severity": "MINOR",
+          "evidence": "Kerja di kasur bayangannya santai, tapi permukaan empuk langsung menutup rapat jalur udara laptop.",
+          "suggested_fix": "Fokus pada trade-off atau trik praktis cepat agar tidak sekadar mengulang fakta umum."
+        }
+      ],
+      "concerns": [
+        "Solusi tidak tuntas; sekadar mengecek tanpa panduan tindakan lanjutan.",
+        "Observasi sangat mendasar dan minim kebaruan."
+      ],
+      "notes": "Draf ringkas dan bebas klise AI, tetapi tips menggantung. Instruksi memeriksa kisi ventilasi tidak memberi solusi konkret jika lubang udara memang di bawah bodi. Topik laptop di kasur juga sangat umum tanpa observasi baru."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Kerja di kasur bayangannya santai, tapi permukaan empuk langsung menutup rapat jalur udara laptop. Cek kisi ventilasi di bawah bodi sebelum menaruhnya di kasur.",
+      "score": 76.0,
+      "verdict": "NEEDS_REVIEW",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Cek kisi ventilasi di bawah bodi sebelum menaruhnya di kasur.",
+          "suggested_fix": "Beri tindakan konkret: sarankan alas datar seperti buku tebal atau nampan jika kisi udara ada di bawah bodi."
+        },
+        {
+          "code": "trivial_observation",
+          "severity": "MINOR",
+          "evidence": "Kerja di kasur bayangannya santai, tapi permukaan empuk langsung menutup rapat jalur udara laptop.",
+          "suggested_fix": "Fokus pada trade-off atau trik praktis cepat agar tidak sekadar mengulang fakta umum."
+        }
+      ],
+      "concerns": [
+        "Solusi tidak tuntas; sekadar mengecek tanpa panduan tindakan lanjutan.",
+        "Observasi sangat mendasar dan minim kebaruan."
+      ],
+      "notes": "Draf ringkas dan bebas klise AI, tetapi tips menggantung. Instruksi memeriksa kisi ventilasi tidak memberi solusi konkret jika lubang udara memang di bawah bodi. Topik laptop di kasur juga sangat umum tanpa observasi baru."
+    },
+    "metrics_original": {
+      "word_count": 24,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 12.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 24,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 12.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 45.18
+  },
+  {
+    "index": 13,
+    "category": "practical_tips",
+    "pillar": "practical_tips",
+    "audience_problem": "Power bank lama terasa mati padahal mungkin hanya tidur",
+    "angle": "proteksi tegangan rendah yang mengunci sel",
+    "observation": "Sebagian power bank butuh dicolok dulu sebelum mau menyala lagi.",
+    "delivery_hint": "langkah singkat, tanpa janji berlebihan",
+    "format_hint": "single_paragraph",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Power bank lama mendadak nggak merespons saat dicolok? Jangan buru-buru dibuang. Proteksi tegangan rendah sering kali cuma mengunci sirkuit demi keamanan. Cukup biarkan tercolok ke charger agak lama sampai alirannya terbuka lagi.",
+    "cleaned_draft": "Power bank lama mendadak nggak merespons saat dicolok? Jangan buru-buru dibuang. Proteksi tegangan rendah sering kali cuma mengunci sirkuit demi keamanan. Cukup biarkan tercolok ke charger agak lama sampai alirannya terbuka lagi.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Power bank lama mendadak nggak merespons saat dicolok? Jangan buru-buru dibuang.",
+          "suggested_fix": "Hapus pertanyaan retoris pembuka. Langsung ke inti observasi: 'Power bank lama yang mendadak mati total pas dicolok belum tentu rusak selamanya.'"
+        },
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "sampai alirannya terbuka lagi.",
+          "suggested_fix": "Ubah menjadi 'sampai sistem proteksinya reset dan baterai mulai nerima daya lagi' agar akurat secara teknis (sirkuit terbuka justru memutus arus)."
+        }
+      ],
+      "concerns": [
+        "Pembuka pertanyaan retoris bergaya iklan/klise AI menunda substansi.",
+        "Rancu istilah teknis: alirannya terbuka vs sirkuit tertutup."
+      ],
+      "notes": "Critic identified MAJOR defects (1): awkward_phrasing. Substansi tips praktis dan relevan, tetapi eksekusi pembuka masih memakai format tanya retoris klise yang menunda inti pesan. Istilah teknis di akhir kalimat juga rancu secara logika sirkuit."
+    },
+    "rewritten_draft": {
+      "raw_content": "Power bank lama yang mendadak mati total pas dicolok belum tentu rusak selamanya. Waktu dibiarin kosong terlalu lama, proteksi tegangan rendah bakal otomatis ngunci sirkuit demi keamanan.\n\nCukup colok ke charger dan biarin terhubung agak lama, sampai sistem proteksinya reset dan baterai mulai nerima daya lagi. Menyenangkan rasanya waktu barang yang dikira jadi rongsokan ternyata masih berfungsi normal.",
+      "cleaned_content": "Power bank lama yang mendadak mati total pas dicolok belum tentu rusak selamanya. Waktu dibiarin kosong terlalu lama, proteksi tegangan rendah bakal otomatis ngunci sirkuit demi keamanan.\n\nCukup colok ke charger dan biarin terhubung agak lama, sampai sistem proteksinya reset dan baterai mulai nerima daya lagi. Menyenangkan rasanya waktu barang yang dikira jadi rongsokan ternyata masih berfungsi normal.",
+      "applied_edits": [],
+      "actual_format": "multi_paragraph"
+    },
+    "final_evaluation": {
+      "content": "Power bank lama yang mendadak mati total pas dicolok belum tentu rusak selamanya. Waktu dibiarin kosong terlalu lama, proteksi tegangan rendah bakal otomatis ngunci sirkuit demi keamanan.\n\nCukup colok ke charger dan biarin terhubung agak lama, sampai sistem proteksinya reset dan baterai mulai nerima daya lagi. Menyenangkan rasanya waktu barang yang dikira jadi rongsokan ternyata masih berfungsi normal.",
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Power bank lama yang mendadak mati total pas dicolok",
+          "suggested_fix": "Perjelas konteks colok ke charger atau ke beban. Gunakan: 'Power bank lama yang nggak merespons pas dicolok ke charger'."
+        },
+        {
+          "code": "redundant_parts",
+          "severity": "MAJOR",
+          "evidence": "Menyenangkan rasanya waktu barang yang dikira jadi rongsokan ternyata masih berfungsi normal.",
+          "suggested_fix": "Hapus kalimat reflektif klise. Ganti patokan durasi praktis reset BMS, misal 'Beri waktu 30-60 menit'."
+        },
+        {
+          "code": "removable_filler",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'filler'",
+          "suggested_fix": "Address removable_filler"
+        }
+      ],
+      "concerns": [
+        "Frasa pembuka ambigu terkait tindakan mencolok charger atau HP",
+        "Kalimat penutup berupa filler emosional tanpa nilai praktis",
+        "Solusi 'agak lama' terlalu abstrak tanpa rentang waktu minimal"
+      ],
+      "notes": "Critic identified MAJOR defects (3): awkward_phrasing, redundant_parts, removable_filler. Draf menyampaikan tips praktis dasar dengan bahasa cukup mengalir, namun frasa pembuka ambigu dan kalimat penutup berisi sentimen klise yang mubazir."
+    },
+    "metrics_original": {
+      "word_count": 32,
+      "sentence_count": 4,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 8.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 58,
+      "sentence_count": 4,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 14.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 89.12
+  },
+  {
+    "index": 14,
+    "category": "practical_tips",
+    "pillar": "practical_tips",
+    "audience_problem": "Kipas laptop berdebu dan suara makin keras",
+    "angle": "debu menumpuk di sirip heatsink",
+    "observation": "Suara kipas yang naik biasanya masalah aliran udara, bukan kipasnya.",
+    "delivery_hint": "satu langkah perawatan, aman dilakukan sendiri",
+    "format_hint": "single_paragraph",
+    "actual_format": "short_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Suara kipas laptop yang mendadak sering berisik biasanya bukan tanda mesinnya mulai rusak. Masalahnya sering kali cuma debu halus yang memadat tepat di sela sirip heatsink, menyumbat jalur pembuangan hawa panas. Kipas otomatis berputar maksimal terus-menerus karena panasnya terjebak di dalam. Coba sorot kisi-kisi ventilasi laptop pakai senter HP. Kalau kisi logamnya sudah tertutup lapisan debu tebal, bersihkan dulu jalurnya sebelum buru-buru beli alas pendingin tambahan.",
+    "cleaned_draft": "Suara kipas laptop yang mendadak sering berisik biasanya bukan tanda mesinnya mulai rusak. Masalahnya sering kali cuma debu halus yang memadat tepat di sela sirip heatsink, menyumbat jalur pembuangan hawa panas. Kipas otomatis berputar maksimal terus-menerus karena panasnya terjebak di dalam. Coba sorot kisi-kisi ventilasi laptop pakai senter HP. Kalau kisi logamnya sudah tertutup lapisan debu tebal, bersihkan dulu jalurnya sebelum buru-buru beli alas pendingin tambahan.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 93.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "redundant_parts",
+          "severity": "MINOR",
+          "evidence": "berputar maksimal terus-menerus",
+          "suggested_fix": "Cukup gunakan salah satu penekanan, misalnya 'berputar kencang terus' atau 'berputar maksimal', agar ritme kalimat lebih luwes."
+        }
+      ],
+      "concerns": [
+        "Frasa 'berputar maksimal terus-menerus' sedikit pleonastis dalam konteks percakapan santai."
+      ],
+      "notes": "Draf sangat solid, praktis, dan membumi. Alur penjelasan kausalitas teknis runtut tanpa menggurui atau memakai personifikasi murahan. Saran pengecekan visual dengan senter HP realistis dan hemat biaya."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Suara kipas laptop yang mendadak sering berisik biasanya bukan tanda mesinnya mulai rusak. Masalahnya sering kali cuma debu halus yang memadat tepat di sela sirip heatsink, menyumbat jalur pembuangan hawa panas. Kipas otomatis berputar maksimal terus-menerus karena panasnya terjebak di dalam. Coba sorot kisi-kisi ventilasi laptop pakai senter HP. Kalau kisi logamnya sudah tertutup lapisan debu tebal, bersihkan dulu jalurnya sebelum buru-buru beli alas pendingin tambahan.",
+      "score": 93.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "redundant_parts",
+          "severity": "MINOR",
+          "evidence": "berputar maksimal terus-menerus",
+          "suggested_fix": "Cukup gunakan salah satu penekanan, misalnya 'berputar kencang terus' atau 'berputar maksimal', agar ritme kalimat lebih luwes."
+        }
+      ],
+      "concerns": [
+        "Frasa 'berputar maksimal terus-menerus' sedikit pleonastis dalam konteks percakapan santai."
+      ],
+      "notes": "Draf sangat solid, praktis, dan membumi. Alur penjelasan kausalitas teknis runtut tanpa menggurui atau memakai personifikasi murahan. Saran pengecekan visual dengan senter HP realistis dan hemat biaya."
+    },
+    "metrics_original": {
+      "word_count": 66,
+      "sentence_count": 5,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 66,
+      "sentence_count": 5,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 43.6
+  },
+  {
+    "index": 15,
+    "category": "practical_tips",
+    "pillar": "practical_tips",
+    "audience_problem": "Kabel data dan kabel charger tertukar di laci",
+    "angle": "menandai kabel berdasarkan kemampuan, bukan warna",
+    "observation": "Yang membedakan kabel sering bukan tampilannya, tapi apakah ia bisa memindahkan data.",
+    "delivery_hint": "tips kecil yang bisa langsung dipakai",
+    "format_hint": "single_snappy",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Narik kabel dari laci buat pindah file ke laptop, ternyata cuma ngisi baterai tanpa kebaca sama sekali. Warna atau tebal kabel nggak jamin isi jalur di dalemnya. Kabel yang beneran bisa transfer data mending langsung dililit selotip kertas dekat konektornya.",
+    "cleaned_draft": "Narik kabel dari laci buat pindah file ke laptop, ternyata cuma ngisi baterai tanpa kebaca sama sekali. Warna atau tebal kabel nggak jamin isi jalur di dalemnya. Kabel yang beneran bisa transfer data mending langsung dililit selotip kertas dekat konektornya.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 95.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid. Alur percakapan natural, masalah konkret dan relevan, tips selotip kertas aplikatif tanpa nada menggurui."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Narik kabel dari laci buat pindah file ke laptop, ternyata cuma ngisi baterai tanpa kebaca sama sekali. Warna atau tebal kabel nggak jamin isi jalur di dalemnya. Kabel yang beneran bisa transfer data mending langsung dililit selotip kertas dekat konektornya.",
+      "score": 95.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid. Alur percakapan natural, masalah konkret dan relevan, tips selotip kertas aplikatif tanpa nada menggurui."
+    },
+    "metrics_original": {
+      "word_count": 40,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 40,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 32.17
+  },
+  {
+    "index": 16,
+    "category": "thoughtful_observations",
+    "pillar": "relatable",
+    "audience_problem": "Kebiasaan membuka HP tanpa tujuan jelas",
+    "angle": "gerakan tangan yang sudah hafal sebelum niatnya ada",
+    "observation": "Kadang HP dibuka bukan karena ada yang dicari, tapi karena tangan sudah bergerak.",
+    "delivery_hint": "pelan, satu pengamatan",
+    "format_hint": "single_snappy",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Jari sering otomatis buka aplikasi sebelum pikiran sempat nentuin mau cari apa. Mindahin ikon yang paling sering dibuka keluar dari layar utama bikin tampilan kerasa kosong, tapi jeda singkat buat nyari aplikasinya cukup buat menghentikan refleks kosong itu.",
+    "cleaned_draft": "Jari sering otomatis buka aplikasi sebelum pikiran sempat nentuin mau cari apa. Mindahin ikon yang paling sering dibuka keluar dari layar utama bikin tampilan kerasa kosong, tapi jeda singkat buat nyari aplikasinya cukup buat menghentikan refleks kosong itu.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 89.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "refleks kosong itu",
+          "suggested_fix": "Ganti dengan 'refleks itu' atau 'kebiasaan itu' untuk menghindari repetisi kata 'kosong' dari klausa sebelumnya."
+        }
+      ],
+      "concerns": [
+        "Repetisi kata 'kosong' dalam satu tarikan kalimat."
+      ],
+      "notes": "Draf mengalir alami, membumi, dan relevan dengan kebiasaan digital harian. Observasi tajam tanpa kesan menggurui. Ada sedikit redundansi kata 'kosong' di akhir kalimat."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Jari sering otomatis buka aplikasi sebelum pikiran sempat nentuin mau cari apa. Mindahin ikon yang paling sering dibuka keluar dari layar utama bikin tampilan kerasa kosong, tapi jeda singkat buat nyari aplikasinya cukup buat menghentikan refleks kosong itu.",
+      "score": 89.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "refleks kosong itu",
+          "suggested_fix": "Ganti dengan 'refleks itu' atau 'kebiasaan itu' untuk menghindari repetisi kata 'kosong' dari klausa sebelumnya."
+        }
+      ],
+      "concerns": [
+        "Repetisi kata 'kosong' dalam satu tarikan kalimat."
+      ],
+      "notes": "Draf mengalir alami, membumi, dan relevan dengan kebiasaan digital harian. Observasi tajam tanpa kesan menggurui. Ada sedikit redundansi kata 'kosong' di akhir kalimat."
+    },
+    "metrics_original": {
+      "word_count": 38,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 19.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 38,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 19.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 36.89
+  },
+  {
+    "index": 17,
+    "category": "thoughtful_observations",
+    "pillar": "relatable",
+    "audience_problem": "Menunda tidur karena masih menggulir layar",
+    "angle": "waktu tidur yang digeser sedikit demi sedikit",
+    "observation": "Yang ditunda bukan tidurnya, tapi keputusan untuk berhenti melihat.",
+    "delivery_hint": "tenang, tanpa nasihat",
+    "format_hint": "single_snappy",
+    "actual_format": "short_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Rencana buka layar sebentar buat santai, berhentinya baru pas sadar waktu tidur tergeser jauh. Cek riwayat durasi layar di pengaturan sebelum tidur malam ini.",
+    "cleaned_draft": "Rencana buka layar sebentar buat santai, berhentinya baru pas sadar waktu tidur tergeser jauh. Cek riwayat durasi layar di pengaturan sebelum tidur malam ini.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 62.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Rencana buka layar sebentar buat santai, berhentinya baru pas sadar waktu tidur tergeser jauh.",
+          "suggested_fix": "Ganti kalimat mengalir alami: 'Niatnya cuma scroll lima menit di kasur, tiba-tiba udah lewat satu jam.'"
+        },
+        {
+          "code": "trivial_observation",
+          "severity": "MAJOR",
+          "evidence": "Cek riwayat durasi layar di pengaturan sebelum tidur malam ini.",
+          "suggested_fix": "Beri tindakan atau trade-off teknis konkret (misal: aktifkan grayscale atau mode tidur otomatis) alih-alih anjuran generik."
+        },
+        {
+          "code": "read_aloud_unnatural",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'baca bersuara'",
+          "suggested_fix": "Address read_aloud_unnatural"
+        },
+        {
+          "code": "bland_writing",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'hambar'",
+          "suggested_fix": "Address bland_writing"
+        }
+      ],
+      "concerns": [
+        "Susunan kalimat pertama canggung saat dibaca bersuara",
+        "Pesan penutup terasa klise dan tidak memberi nilai baru",
+        "Gaya bahasa hambar, kehilangan identitas teman tongkrongan"
+      ],
+      "notes": "Critic identified MAJOR defects (4): awkward_phrasing, trivial_observation, read_aloud_unnatural, bland_writing. Draf kaku dan klise. Observasi basi soal screen time larut malam tanpa perspektif segar. Nada tulisan mirip pengingat bot kesehatan digital, bukan kawan tongkrongan cerdas."
+    },
+    "rewritten_draft": {
+      "raw_content": "Niatnya cuma scroll sebentar sebelum tidur, tahu-tahu waktu istirahat kegeser jauh.\n\nDaripada adu kuat sama niat sendiri, pasang jadwal mode hitam-putih otomatis di pengaturan layar. Tampilan medsos mendadak jauh lebih membosankan tanpa warna, bikin naruh HP jauh lebih gampang dibanding maksain disiplin.",
+      "cleaned_content": "Niatnya cuma scroll sebentar sebelum tidur, tahu-tahu waktu istirahat kegeser jauh.\n\nDaripada adu kuat sama niat sendiri, pasang jadwal mode hitam-putih otomatis di pengaturan layar. Tampilan medsos mendadak jauh lebih membosankan tanpa warna, bikin naruh HP jauh lebih gampang dibanding maksain disiplin.",
+      "applied_edits": [],
+      "actual_format": "comparison"
+    },
+    "final_evaluation": {
+      "content": "Niatnya cuma scroll sebentar sebelum tidur, tahu-tahu waktu istirahat kegeser jauh.\n\nDaripada adu kuat sama niat sendiri, pasang jadwal mode hitam-putih otomatis di pengaturan layar. Tampilan medsos mendadak jauh lebih membosankan tanpa warna, bikin naruh HP jauh lebih gampang dibanding maksain disiplin.",
+      "score": 85.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "redundant_parts",
+          "severity": "MINOR",
+          "evidence": "dibanding maksain disiplin",
+          "suggested_fix": "Hapus frasa penutup; premis komparasi sudah dinyatakan di awal kalimat ('Daripada adu kuat sama niat sendiri')."
+        },
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "jauh lebih membosankan tanpa warna, bikin naruh HP jauh lebih gampang",
+          "suggested_fix": "Hapus 'jauh' kedua agar tidak berulang rapat: 'bikin naruh HP lebih gampang'."
+        }
+      ],
+      "concerns": [
+        "Redundansi premis komparasi di awal dan akhir kalimat penutup.",
+        "Pengulangan kata 'jauh lebih' dua kali dalam satu kalimat."
+      ],
+      "notes": "Draf santai, membumi, dan solutif tanpa menggurui. Komparasi friksi visual versus disiplin tersampaikan konkret. Perlu perapian minor pada repetisi penutup komparasi dan pengulangan frasa 'jauh lebih'."
+    },
+    "metrics_original": {
+      "word_count": 24,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 12.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 42,
+      "sentence_count": 3,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 14.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 109.09
+  },
+  {
+    "index": 18,
+    "category": "thoughtful_observations",
+    "pillar": "relatable",
+    "audience_problem": "Menyimpan banyak tautan yang tidak pernah dibuka",
+    "angle": "menyimpan sebagai cara merasa sudah membaca",
+    "observation": "Menyimpan terasa seperti sudah memahami, padahal belum dibaca sama sekali.",
+    "delivery_hint": "reflektif, tidak menyalahkan",
+    "format_hint": "single_paragraph",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Tombol simpan tautan sering dikira tabungan ilmu untuk dibaca nanti. Nyatanya, tindakan menyimpan cuma trik pikiran biar merasa sudah belajar tanpa perlu repot membaca.\n\nBiar daftarnya nggak makin menumpuk, coba baca bagian awalnya langsung. Kalau isinya berguna, tuntaskan saat itu juga. Kalau tidak, tutup dan relakan. Hal yang benar-benar penting biasanya bakal dicari lagi pas memang dibutuhkan.",
+    "cleaned_draft": "Tombol simpan tautan sering dikira tabungan ilmu untuk dibaca nanti. Nyatanya, tindakan menyimpan cuma trik pikiran biar merasa sudah belajar tanpa perlu repot membaca.\n\nBiar daftarnya nggak makin menumpuk, coba baca bagian awalnya langsung. Kalau isinya berguna, tuntaskan saat itu juga. Kalau tidak, tutup dan relakan. Hal yang benar-benar penting biasanya bakal dicari lagi pas memang dibutuhkan.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Tombol simpan tautan sering dikira tabungan ilmu untuk dibaca nanti. Nyatanya, tindakan menyimpan cuma trik pikiran...",
+          "suggested_fix": "Hapus pola kontras klise 'dikira... nyatanya...'. Langsung masuk observasi lugas tanpa formula AI."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Teks terbagi 2 paragraf sepanjang 58 kata dengan gaya tips swadaya.",
+          "suggested_fix": "Padatkan jadi 1 paragraf ringkas (single_snappy), pangkas khotbah produktivitas di paragraf kedua."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Pola kalimat kontras klise AI (dikira... nyatanya)",
+        "Format multi-paragraf melanggar single_snappy",
+        "Nada menggurui pada solusi teknis membaca"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Draf angkat topik relevan soal tabungan tautan, tapi eksekusi klise menyerupai format bot produktivitas. Pola pembuka 'sering dikira... nyatanya...' masuk varian klise AI, nada paragraf kedua menggurui, dan format dua paragraf melanggar target single_snappy."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Tombol simpan tautan sering dikira tabungan ilmu untuk dibaca nanti. Nyatanya, tindakan menyimpan cuma trik pikiran biar merasa sudah belajar tanpa perlu repot membaca.\n\nBiar daftarnya nggak makin menumpuk, coba baca bagian awalnya langsung. Kalau isinya berguna, tuntaskan saat itu juga. Kalau tidak, tutup dan relakan. Hal yang benar-benar penting biasanya bakal dicari lagi pas memang dibutuhkan.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Tombol simpan tautan sering dikira tabungan ilmu untuk dibaca nanti. Nyatanya, tindakan menyimpan cuma trik pikiran...",
+          "suggested_fix": "Hapus pola kontras klise 'dikira... nyatanya...'. Langsung masuk observasi lugas tanpa formula AI."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Teks terbagi 2 paragraf sepanjang 58 kata dengan gaya tips swadaya.",
+          "suggested_fix": "Padatkan jadi 1 paragraf ringkas (single_snappy), pangkas khotbah produktivitas di paragraf kedua."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Pola kalimat kontras klise AI (dikira... nyatanya)",
+        "Format multi-paragraf melanggar single_snappy",
+        "Nada menggurui pada solusi teknis membaca"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Draf angkat topik relevan soal tabungan tautan, tapi eksekusi klise menyerupai format bot produktivitas. Pola pembuka 'sering dikira... nyatanya...' masuk varian klise AI, nada paragraf kedua menggurui, dan format dua paragraf melanggar target single_snappy."
+    },
+    "metrics_original": {
+      "word_count": 57,
+      "sentence_count": 6,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 9.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 57,
+      "sentence_count": 6,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 9.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 45.25
+  },
+  {
+    "index": 19,
+    "category": "thoughtful_observations",
+    "pillar": "relatable",
+    "audience_problem": "Foto produk yang diambil berkali-kali sebelum diunggah",
+    "angle": "selisih antara barang di tangan dan barang di layar",
+    "observation": "Barang yang sama bisa terlihat jauh lebih baik di layar daripada di meja.",
+    "delivery_hint": "kering, sedikit jenaka",
+    "format_hint": "single_snappy",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Di tangan barangnya sudah pas, tapi di layar kamera selalu kelihatan kurang. Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+    "cleaned_draft": "Di tangan barangnya sudah pas, tapi di layar kamera selalu kelihatan kurang. Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Di tangan barangnya sudah pas, tapi di layar kamera selalu kelihatan kurang. Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+          "suggested_fix": "Tulis perbandingan konkret dua hal (contoh: tangkapan lensa HP vs persepsi mata) minimal 50-70 kata, bukan aforisme dua kalimat."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+          "suggested_fix": "Hapus kalimat puitis semu. Berikan alasan teknis praktis mengapa barang terlihat beda di kamera (contoh: distorsi fokal atau pencahayaan)."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Format komparasi tidak terpenuhi; hanya berisi observasi mikro 20 kata.",
+        "Kurang substansi teknis praktis; terdengar seperti kutipan media sosial generik.",
+        "Objek bahasan tidak spesifik (kata 'barangnya' terlalu kabur)."
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Draf terlalu abstrak dan bergaya kutipan motivasi klise. Target format komparasi tidak tercapai karena tidak ada objek banding yang konkret maupun penjelasan teknis praktis."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Di tangan barangnya sudah pas, tapi di layar kamera selalu kelihatan kurang. Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Di tangan barangnya sudah pas, tapi di layar kamera selalu kelihatan kurang. Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+          "suggested_fix": "Tulis perbandingan konkret dua hal (contoh: tangkapan lensa HP vs persepsi mata) minimal 50-70 kata, bukan aforisme dua kalimat."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Jebakannya: kita sibuk memotret ekspektasi, bukan barang aslinya.",
+          "suggested_fix": "Hapus kalimat puitis semu. Berikan alasan teknis praktis mengapa barang terlihat beda di kamera (contoh: distorsi fokal atau pencahayaan)."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Format komparasi tidak terpenuhi; hanya berisi observasi mikro 20 kata.",
+        "Kurang substansi teknis praktis; terdengar seperti kutipan media sosial generik.",
+        "Objek bahasan tidak spesifik (kata 'barangnya' terlalu kabur)."
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Draf terlalu abstrak dan bergaya kutipan motivasi klise. Target format komparasi tidak tercapai karena tidak ada objek banding yang konkret maupun penjelasan teknis praktis."
+    },
+    "metrics_original": {
+      "word_count": 20,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 10.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 20,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 10.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 37.37
+  },
+  {
+    "index": 20,
+    "category": "thoughtful_observations",
+    "pillar": "relatable",
+    "audience_problem": "Menunda membalas pesan karena ingin menjawab dengan lengkap",
+    "angle": "niat menjawab baik berubah jadi diam",
+    "observation": "Menunggu waktu yang tepat sering berakhir dengan tidak menjawab sama sekali.",
+    "delivery_hint": "singkat, tanpa penutup motivasi",
+    "format_hint": "single_snappy",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Pesan dibiarin belum dibaca karena nunggu waktu buat ngetik panjang. Padahal balasan satu kalimat sekarang jauh lebih beres daripada rencana jawaban lengkap yang akhirnya nggak pernah kekirim.",
+    "cleaned_draft": "Pesan dibiarin belum dibaca karena nunggu waktu buat ngetik panjang. Padahal balasan satu kalimat sekarang jauh lebih beres daripada rencana jawaban lengkap yang akhirnya nggak pernah kekirim.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 90.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat ringkas, wajar, dan tepat sasaran membidik kebiasaan digital harian tanpa pembuka retoris atau klise AI. Kontras antara balasan pendek sekarang dan rencana balasan panjang tersampaikan efektif tanpa kata mubazir. Sudut pandang cukup umum tetapi eksekusi sangat bersih."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Pesan dibiarin belum dibaca karena nunggu waktu buat ngetik panjang. Padahal balasan satu kalimat sekarang jauh lebih beres daripada rencana jawaban lengkap yang akhirnya nggak pernah kekirim.",
+      "score": 90.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat ringkas, wajar, dan tepat sasaran membidik kebiasaan digital harian tanpa pembuka retoris atau klise AI. Kontras antara balasan pendek sekarang dan rencana balasan panjang tersampaikan efektif tanpa kata mubazir. Sudut pandang cukup umum tetapi eksekusi sangat bersih."
+    },
+    "metrics_original": {
+      "word_count": 27,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 27,
+      "sentence_count": 2,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 47.08
+  },
+  {
+    "index": 21,
+    "category": "discoveries",
+    "pillar": "discoveries",
+    "audience_problem": "Fitur berbagi jaringan dari HP yang jarang dipakai",
+    "angle": "HP bisa jadi titik akses tanpa aplikasi tambahan",
+    "observation": "Sebagian HP sudah bisa membagikan jaringan tanpa memasang apa pun.",
+    "delivery_hint": "informatif, tanpa angka",
+    "format_hint": "single_paragraph",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Pasang aplikasi tambahan buat tethering seringnya cuma nambah beban memori dan izin akses yang berisiko. Menu bawaan di pengaturan HP sebetulnya sudah lebih dari cukup buat berbagi koneksi, baik lewat Wi-Fi, kabel USB, atau Bluetooth.\n\nAplikasi luar sering menawarkan antarmuka ramai yang menjanjikan sinyal lebih stabil. Padahal, fitur langsung dari sistem operasi justru ngasih jalur paling bersih tanpa perantara iklan atau proses latar belakang yang bikin baterai cepat habis.",
+    "cleaned_draft": "Pasang aplikasi tambahan buat tethering seringnya cuma nambah beban memori dan izin akses yang berisiko. Menu bawaan di pengaturan HP sebetulnya sudah lebih dari cukup buat berbagi koneksi, baik lewat Wi-Fi, kabel USB, atau Bluetooth.\n\nAplikasi luar sering menawarkan antarmuka ramai yang menjanjikan sinyal lebih stabil. Padahal, fitur langsung dari sistem operasi justru ngasih jalur paling bersih tanpa perantara iklan atau proses latar belakang yang bikin baterai cepat habis.",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Aplikasi luar sering menawarkan antarmuka ramai yang menjanjikan sinyal lebih stabil.",
+          "suggested_fix": "Ubah menjadi lebih membumi: 'Aplikasi pihak ketiga biasanya penuh tombol dan iklan, sambil ngaku-ngaku bisa bikin sinyal lebih stabil.'"
+        },
+        {
+          "code": "repetitive_structure",
+          "severity": "MINOR",
+          "evidence": "Paragraf 1 (Aplikasi tambahan beban -> Menu bawaan cukup) dan Paragraf 2 (Aplikasi luar ramai -> Fitur OS bersih)",
+          "suggested_fix": "Variasikan ritme paragraf kedua agar tidak sekadar mengulang pola antitesis yang persis sama dengan paragraf pertama."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Critic noted format/paragraph issue in concerns",
+          "suggested_fix": "Sesuaikan format dan pembagian paragraf"
+        }
+      ],
+      "concerns": [
+        "Diksi 'antarmuka ramai' kurang natural untuk gaya percakapan santai",
+        "Pola kalimat kedua paragraf identik (aplikasi luar vs fitur bawaan)"
+      ],
+      "notes": "Critic identified MAJOR defects (1): format_mismatch. Draf menyampaikan saran teknis yang benar dan aman tanpa klaim palsu, tetapi formulasinya agak kaku dan berulang di paragraf kedua. Istilah seperti 'antarmuka ramai' terasa seperti terjemahan harfiah yang kurang luwes untuk obrolan tongkrongan."
+    },
+    "rewritten_draft": {
+      "raw_content": "Gimana cara paling bersih buat bagi internet dari HP ke laptop? Cukup aktifkan hotspot bawaan di pengaturan jaringan. Aplikasi pihak ketiga biasanya penuh tombol dan iklan, padahal toggle di panel cepat sudah siap pakai langsung. Cek menu Hotspot Pribadi di pengaturan ponsel.",
+      "cleaned_content": "Gimana cara paling bersih buat bagi internet dari HP ke laptop? Cukup aktifkan hotspot bawaan di pengaturan jaringan. Aplikasi pihak ketiga biasanya penuh tombol dan iklan, padahal toggle di panel cepat sudah siap pakai langsung. Cek menu Hotspot Pribadi di pengaturan ponsel.",
+      "applied_edits": [],
+      "actual_format": "short_paragraph"
+    },
+    "final_evaluation": {
+      "content": "Gimana cara paling bersih buat bagi internet dari HP ke laptop? Cukup aktifkan hotspot bawaan di pengaturan jaringan. Aplikasi pihak ketiga biasanya penuh tombol dan iklan, padahal toggle di panel cepat sudah siap pakai langsung. Cek menu Hotspot Pribadi di pengaturan ponsel.",
+      "score": 59.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Gimana cara paling bersih buat bagi internet dari HP ke laptop?",
+          "suggested_fix": "Hapus pertanyaan retoris pembuka. Langsung mulai dengan observasi nyata atau inti pernyataan."
+        },
+        {
+          "code": "trivial_observation",
+          "severity": "MAJOR",
+          "evidence": "Aplikasi pihak ketiga biasanya penuh tombol dan iklan, padahal toggle di panel cepat sudah siap pakai langsung.",
+          "suggested_fix": "Ganti premis usang aplikasi hotspot pihak ketiga dengan trade-off nyata yang relevan untuk audiens dewasa, misalnya perbandingan konsumsi daya/latensi tethering USB vs hotspot Wi-Fi."
+        },
+        {
+          "code": "repetitive_structure",
+          "severity": "MAJOR",
+          "evidence": "Cek menu Hotspot Pribadi di pengaturan ponsel.",
+          "suggested_fix": "Hapus kalimat penutup ini karena hanya mengulang instruksi pengaturan jaringan di kalimat sebelumnya."
+        },
+        {
+          "code": "ai_writing_assignment",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'esai'",
+          "suggested_fix": "Address ai_writing_assignment"
+        }
+      ],
+      "concerns": [
+        "Pembuka pertanyaan retoris menunda poin utama",
+        "Substansi terlalu dangkal dan membahas masalah yang sudah selesai belasan tahun lalu",
+        "Penutup mengulang informasi awal tanpa memberi sudut pandang segar"
+      ],
+      "notes": "Critic identified MAJOR defects (4): awkward_phrasing, trivial_observation, repetitive_structure, ai_writing_assignment. Draf terasa kaku seperti bot tutorial usang. Pembuka memakai pertanyaan retoris terlarang, topik memakai aplikasi tethering pihak ketiga sudah tidak relevan di era smartphone modern, dan kalimat terakhir repetitif tanpa bobot observasi."
+    },
+    "metrics_original": {
+      "word_count": 69,
+      "sentence_count": 4,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 17.2,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 42,
+      "sentence_count": 4,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 10.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 93.02
+  },
+  {
+    "index": 22,
+    "category": "discoveries",
+    "pillar": "discoveries",
+    "audience_problem": "Adaptor USB-C kecil yang ternyata bisa mengisi daya laptop",
+    "angle": "satu adaptor untuk dua perangkat",
+    "observation": "Adaptor yang dulu hanya untuk HP sekarang cukup untuk laptop ringan.",
+    "delivery_hint": "faktual, tanpa klaim performa berlebih",
+    "format_hint": "single_paragraph",
+    "actual_format": "single_snappy",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Bawa adaptor ringkas buat ponsel sekaligus laptop bikin isi tas jauh lebih praktis. Tapi jangan langsung percaya semua charger kecil bisa ngangkat beban kerja laptop cuma gara-gara bentuk colokannya sama. Adaptor yang profil dayanya terlalu rendah bakal bikin daya laptop tetap tekor pas dipakai, meski indikator baterai aktif. Cek cetakan teks kecil di bodi adaptor untuk memastikan ada dukungan pengisian laptop sebelum dibawa bepergian.",
+    "cleaned_draft": "Bawa adaptor ringkas buat ponsel sekaligus laptop bikin isi tas jauh lebih praktis. Tapi jangan langsung percaya semua charger kecil bisa ngangkat beban kerja laptop cuma gara-gara bentuk colokannya sama. Adaptor yang profil dayanya terlalu rendah bakal bikin daya laptop tetap tekor pas dipakai, meski indikator baterai aktif. Cek cetakan teks kecil di bodi adaptor untuk memastikan ada dukungan pengisian laptop sebelum dibawa bepergian.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 85.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "Adaptor yang profil dayanya terlalu rendah bakal bikin daya laptop tetap tekor pas dipakai, meski indikator baterai aktif. Cek cetakan teks kecil di bodi adaptor untuk memastikan ada dukungan pengisian laptop sebelum dibawa bepergian.",
+          "suggested_fix": "Sederhanakan dengan istilah santai: 'Kalau watt-nya kekecilan, persentase baterai bakal tetap turun pas laptop dipakai. Intip tulisan kecil di bodi adaptor biar yakin dayanya cukup sebelum masuk tas.'"
+        }
+      ],
+      "concerns": [
+        "Diksi di dua kalimat terakhir masih bernuansa manual teknis bukan kawan tongkrongan"
+      ],
+      "notes": "Draf padat dan solutif membahas trade-off charger Type-C ringkas tanpa klaim palsu. Pembahasan relevan dengan audiens. Kalimat akhir agak kaku mirip buku manual teknis, namun alur gagasan tetap membumi dan langsung ke inti."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Bawa adaptor ringkas buat ponsel sekaligus laptop bikin isi tas jauh lebih praktis. Tapi jangan langsung percaya semua charger kecil bisa ngangkat beban kerja laptop cuma gara-gara bentuk colokannya sama. Adaptor yang profil dayanya terlalu rendah bakal bikin daya laptop tetap tekor pas dipakai, meski indikator baterai aktif. Cek cetakan teks kecil di bodi adaptor untuk memastikan ada dukungan pengisian laptop sebelum dibawa bepergian.",
+      "score": 85.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "formal_language",
+          "severity": "MINOR",
+          "evidence": "Adaptor yang profil dayanya terlalu rendah bakal bikin daya laptop tetap tekor pas dipakai, meski indikator baterai aktif. Cek cetakan teks kecil di bodi adaptor untuk memastikan ada dukungan pengisian laptop sebelum dibawa bepergian.",
+          "suggested_fix": "Sederhanakan dengan istilah santai: 'Kalau watt-nya kekecilan, persentase baterai bakal tetap turun pas laptop dipakai. Intip tulisan kecil di bodi adaptor biar yakin dayanya cukup sebelum masuk tas.'"
+        }
+      ],
+      "concerns": [
+        "Diksi di dua kalimat terakhir masih bernuansa manual teknis bukan kawan tongkrongan"
+      ],
+      "notes": "Draf padat dan solutif membahas trade-off charger Type-C ringkas tanpa klaim palsu. Pembahasan relevan dengan audiens. Kalimat akhir agak kaku mirip buku manual teknis, namun alur gagasan tetap membumi dan langsung ke inti."
+    },
+    "metrics_original": {
+      "word_count": 64,
+      "sentence_count": 4,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 16.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 64,
+      "sentence_count": 4,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 16.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 42.24
+  },
+  {
+    "index": 23,
+    "category": "discoveries",
+    "pillar": "discoveries",
+    "audience_problem": "Fitur mode gelap yang tidak menghemat daya di semua layar",
+    "angle": "mode gelap bergantung pada jenis panel",
+    "observation": "Mode gelap hanya menghemat daya pada layar tertentu.",
+    "delivery_hint": "koreksi kecil yang berguna",
+    "format_hint": "single_snappy",
+    "actual_format": "comparison",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Apakah mode gelap otomatis bikin baterai lebih awet? Jawabannya tergantung jenis panel layar.\n\nDi layar OLED atau AMOLED, warna hitam berarti piksel padam total, jadi daya memang lebih hemat. Sementara di layar LCD, lampu latar tetap menyala penuh dari belakang meski tema berubah gelap gulita.\n\nCek dulu tipe layar sebelum berharap banyak. Kalau layarnya LCD, pasang mode gelap murni demi kenyamanan mata saat kurang cahaya, bukan buat menghemat baterai.",
+    "cleaned_draft": "Apakah mode gelap otomatis bikin baterai lebih awet? Jawabannya tergantung jenis panel layar.\n\nDi layar OLED atau AMOLED, warna hitam berarti piksel padam total, jadi daya memang lebih hemat. Sementara di layar LCD, lampu latar tetap menyala penuh dari belakang meski tema berubah gelap gulita.\n\nCek dulu tipe layar sebelum berharap banyak. Kalau layarnya LCD, pasang mode gelap murni demi kenyamanan mata saat kurang cahaya, bukan buat menghemat baterai.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Apakah mode gelap otomatis bikin baterai lebih awet? Jawabannya tergantung jenis panel layar.",
+          "suggested_fix": "Hapus format tanya-jawab retoris. Langsung masuk ke observasi: 'Mode gelap nggak otomatis bikin baterai awet kalau layarnya masih LCD.'"
+        },
+        {
+          "code": "repetitive_structure",
+          "severity": "MINOR",
+          "evidence": "bukan buat menghemat baterai.",
+          "suggested_fix": "Hapus frasa penutup yang mengulang premis sebelumnya; cukup akhiri pada manfaat kenyamanan mata."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Critic noted format/paragraph issue in concerns",
+          "suggested_fix": "Sesuaikan format dan pembagian paragraf"
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Pembuka memakai pola tanya-jawab retoris yang klise dan menunda inti pembahasan.",
+        "Gaya penulisan paragraf pertama terasa seperti teks edukasi formal/FAQ ketimbang percakapan santai."
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Penjelasan teknis perbedaan OLED dan LCD akurat serta praktis, tetapi pembukaannya memakai format tanya-jawab retoris yang kaku seperti template artikel SEO atau bot AI, bukan obrolan kawan tongkrongan yang mengalir alami."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Apakah mode gelap otomatis bikin baterai lebih awet? Jawabannya tergantung jenis panel layar.\n\nDi layar OLED atau AMOLED, warna hitam berarti piksel padam total, jadi daya memang lebih hemat. Sementara di layar LCD, lampu latar tetap menyala penuh dari belakang meski tema berubah gelap gulita.\n\nCek dulu tipe layar sebelum berharap banyak. Kalau layarnya LCD, pasang mode gelap murni demi kenyamanan mata saat kurang cahaya, bukan buat menghemat baterai.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Apakah mode gelap otomatis bikin baterai lebih awet? Jawabannya tergantung jenis panel layar.",
+          "suggested_fix": "Hapus format tanya-jawab retoris. Langsung masuk ke observasi: 'Mode gelap nggak otomatis bikin baterai awet kalau layarnya masih LCD.'"
+        },
+        {
+          "code": "repetitive_structure",
+          "severity": "MINOR",
+          "evidence": "bukan buat menghemat baterai.",
+          "suggested_fix": "Hapus frasa penutup yang mengulang premis sebelumnya; cukup akhiri pada manfaat kenyamanan mata."
+        },
+        {
+          "code": "format_mismatch",
+          "severity": "MAJOR",
+          "evidence": "Critic noted format/paragraph issue in concerns",
+          "suggested_fix": "Sesuaikan format dan pembagian paragraf"
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Pembuka memakai pola tanya-jawab retoris yang klise dan menunda inti pembahasan.",
+        "Gaya penulisan paragraf pertama terasa seperti teks edukasi formal/FAQ ketimbang percakapan santai."
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Penjelasan teknis perbedaan OLED dan LCD akurat serta praktis, tetapi pembukaannya memakai format tanya-jawab retoris yang kaku seperti template artikel SEO atau bot AI, bukan obrolan kawan tongkrongan yang mengalir alami."
+    },
+    "metrics_original": {
+      "word_count": 69,
+      "sentence_count": 6,
+      "paragraph_count": 3,
+      "avg_words_per_sentence": 11.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 69,
+      "sentence_count": 6,
+      "paragraph_count": 3,
+      "avg_words_per_sentence": 11.5,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 35.27
+  },
+  {
+    "index": 24,
+    "category": "discoveries",
+    "pillar": "discoveries",
+    "audience_problem": "Stand laptop murah yang mengubah posisi leher",
+    "angle": "aksesori sederhana yang jarang dianggap penting",
+    "observation": "Yang paling terasa dari stand laptop bukan pendinginannya, tapi posisi mata.",
+    "delivery_hint": "pengalaman umum, tanpa mengaku menguji",
+    "format_hint": "single_paragraph",
+    "actual_format": "multi_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Kepala berhenti menunduk begitu layar laptop terangkat sejajar pandangan mata. Potongan besi atau plastik lipat sering dianggap sepele, padahal dampaknya langsung terasa ke punggung atas setelah berjam-jam duduk.\n\nTrade-off-nya langsung kelihatan di pergelangan tangan. Mengetik di posisi miring bikin tangan gampang pegal, jadi keyboard dan mouse terpisah mau tak mau harus ikut turun ke meja. Mengurangi beban di leher berarti merelakan sedikit ruang kerja jadi lebih padat.",
+    "cleaned_draft": "Kepala berhenti menunduk begitu layar laptop terangkat sejajar pandangan mata. Potongan besi atau plastik lipat sering dianggap sepele, padahal dampaknya langsung terasa ke punggung atas setelah berjam-jam duduk.\n\nTrade-off-nya langsung kelihatan di pergelangan tangan. Mengetik di posisi miring bikin tangan gampang pegal, jadi keyboard dan mouse terpisah mau tak mau harus ikut turun ke meja. Mengurangi beban di leher berarti merelakan sedikit ruang kerja jadi lebih padat.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 94.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid. Alur percakapan mengalir santai tanpa pancingan interaksi murahan atau klise motivasi. Observasi ergonomi dan trade-off meja kerja disajikan konkret, membumi, dan sesuai suara akun."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Kepala berhenti menunduk begitu layar laptop terangkat sejajar pandangan mata. Potongan besi atau plastik lipat sering dianggap sepele, padahal dampaknya langsung terasa ke punggung atas setelah berjam-jam duduk.\n\nTrade-off-nya langsung kelihatan di pergelangan tangan. Mengetik di posisi miring bikin tangan gampang pegal, jadi keyboard dan mouse terpisah mau tak mau harus ikut turun ke meja. Mengurangi beban di leher berarti merelakan sedikit ruang kerja jadi lebih padat.",
+      "score": 94.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid. Alur percakapan mengalir santai tanpa pancingan interaksi murahan atau klise motivasi. Observasi ergonomi dan trade-off meja kerja disajikan konkret, membumi, dan sesuai suara akun."
+    },
+    "metrics_original": {
+      "word_count": 67,
+      "sentence_count": 5,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 13.4,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 67,
+      "sentence_count": 5,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 13.4,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 36.58
+  },
+  {
+    "index": 25,
+    "category": "discoveries",
+    "pillar": "discoveries",
+    "audience_problem": "Kabel USB-C yang mendukung data dan yang hanya mengisi daya terlihat sama",
+    "angle": "tampilan luar tidak menunjukkan kemampuan",
+    "observation": "Dua kabel dengan ujung identik bisa punya kemampuan yang sangat berbeda.",
+    "delivery_hint": "praktis, satu peringatan",
+    "format_hint": "single_snappy",
+    "actual_format": "short_paragraph",
+    "is_affiliate": false,
+    "evidence": "",
+    "original_draft": "Colok HP ke laptop buat pindah foto, tapi baterai cuma nambah tanpa ada folder muncul. Bentuk colokan sama persis belum tentu kemampuannya sama. Enak sedia kabel agak kaku tapi serba bisa, dibanding kabel lemas bawaan yang cuma sanggup ngisi daya.",
+    "cleaned_draft": "Colok HP ke laptop buat pindah foto, tapi baterai cuma nambah tanpa ada folder muncul. Bentuk colokan sama persis belum tentu kemampuannya sama. Enak sedia kabel agak kaku tapi serba bisa, dibanding kabel lemas bawaan yang cuma sanggup ngisi daya.",
+    "disclosure_was_present": false,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 68.0,
+      "verdict": "REVISE_ONCE",
+      "findings": [
+        {
+          "code": "absolute_claim",
+          "severity": "MINOR",
+          "evidence": "kabel lemas bawaan yang cuma sanggup ngisi daya",
+          "suggested_fix": "Spesifikasikan ke 'kabel bawaan powerbank/aksesori murah' atau fokus pada kabel charge-only tanpa menyamaratakan tekstur lemas sebagai indikator pasti ketiadaan jalur data."
+        },
+        {
+          "code": "unnatural_indonesian",
+          "severity": "MAJOR",
+          "evidence": "Identified in critic concerns: 'kaku'",
+          "suggested_fix": "Address unnatural_indonesian"
+        }
+      ],
+      "concerns": [
+        "Generalisasi bahwa kabel lemas atau kabel bawaan pasti charge-only kurang akurat secara teknis",
+        "Fisik kaku atau lemas bukan indikator mutlak kapabilitas pin data kabel USB"
+      ],
+      "notes": "Critic identified MAJOR defects (1): unnatural_indonesian. Draf mengalir alami, ringkas, dan menangkap keresahan teknologi sehari-hari tanpa filler klise AI. Nada bicara santai dan tepat sasaran. Catatan evaluasi ada pada generalisasi fisik kabel: tekstur lemas atau status kabel bawaan tidak otomatis berarti charge-only, karena kabel bawaan HP resmi umumnya mendukung transfer data."
+    },
+    "rewritten_draft": {
+      "raw_content": "Bentuk colokan USB-C memang seragam, tapi jeroannya sering kali beda jauh. Kejadian colok HP ke laptop dengan niat mindahin foto tapi cuma baterai yang nambah itu wajar banget. Banyak kabel bawaan powerbank atau aksesori murah sengaja dipangkas jalur datanya demi nekan ongkos produksi.\n\nKabel khusus isi daya begini tetap berguna buat colokan santai di jalan. Cuma karena fisik luarnya menipu, kabel yang beneran punya jalur data mending dikasih tanda khusus biar nggak panik ngira port laptop bermasalah pas butuh kirim file buru-buru.",
+      "cleaned_content": "Bentuk colokan USB-C memang seragam, tapi jeroannya sering kali beda jauh. Kejadian colok HP ke laptop dengan niat mindahin foto tapi cuma baterai yang nambah itu wajar banget. Banyak kabel bawaan powerbank atau aksesori murah sengaja dipangkas jalur datanya demi nekan ongkos produksi.\n\nKabel khusus isi daya begini tetap berguna buat colokan santai di jalan. Cuma karena fisik luarnya menipu, kabel yang beneran punya jalur data mending dikasih tanda khusus biar nggak panik ngira port laptop bermasalah pas butuh kirim file buru-buru.",
+      "applied_edits": [],
+      "actual_format": "multi_paragraph"
+    },
+    "final_evaluation": {
+      "content": "Bentuk colokan USB-C memang seragam, tapi jeroannya sering kali beda jauh. Kejadian colok HP ke laptop dengan niat mindahin foto tapi cuma baterai yang nambah itu wajar banget. Banyak kabel bawaan powerbank atau aksesori murah sengaja dipangkas jalur datanya demi nekan ongkos produksi.\n\nKabel khusus isi daya begini tetap berguna buat colokan santai di jalan. Cuma karena fisik luarnya menipu, kabel yang beneran punya jalur data mending dikasih tanda khusus biar nggak panik ngira port laptop bermasalah pas butuh kirim file buru-buru.",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "forced_metaphor",
+          "severity": "MINOR",
+          "evidence": "fisik luarnya menipu",
+          "suggested_fix": "Ganti dengan 'bentuk fisiknya identik' atau 'tampilannya sama persis' agar terhindar dari atribusi sifat manusiawi ke benda mati."
+        },
+        {
+          "code": "forced_metaphor",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Atribusi personifikasi minor pada frasa 'fisik luarnya menipu'"
+      ],
+      "notes": "Critic identified BLOCKING issues: forced_metaphor. Draf mengalir alami, membumi, dan relevan dengan problem harian pengguna. Penjelasan teknis kabel daya vs data disampaikan ringkas tanpa menggurui atau memakai jargon rumit. Solusi praktis memberi label kabel tepat sasaran."
+    },
+    "metrics_original": {
+      "word_count": 40,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 13.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 82,
+      "sentence_count": 5,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 16.4,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 96.41
+  },
+  {
+    "index": 26,
+    "category": "affiliate",
+    "pillar": "affiliate",
+    "audience_problem": "Membawa charger laptop dan HP terpisah saat bepergian",
+    "angle": "satu adaptor untuk dua perangkat",
+    "observation": "Dua charger jadi satu kalau dayanya cukup untuk keduanya.",
+    "delivery_hint": "rekomendasi terukur, sebut angka dari bukti",
+    "format_hint": "single_paragraph",
+    "actual_format": "multi_paragraph",
+    "is_affiliate": true,
+    "evidence": "Produk: Anker Nano II 65W (A2663).\nDaya keluaran: 65W. Port: 2 (1 USB-C, 1 USB-A).\nBerat: 112 g. Dimensi: 60 x 41 x 42 mm.\nHarga terverifikasi: Rp449.000.\nLink afiliasi terverifikasi (bukan URL pencarian): https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "original_draft": "Buka ransel, isinya charger bawaan laptop yang tebal ditambah adaptor HP terpisah. Ruang tas sering habis hanya untuk dua colokan berbeda.\n\nAnker Nano II 65W (A2663) seharga Rp449.000 meringkasnya jadi satu adaptor dengan 2 port (1 USB-C, 1 USB-A). Cek tulisan watt di adaptor laptop bawaan sebelum ganti: https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "cleaned_draft": "Buka ransel, isinya charger bawaan laptop yang tebal ditambah adaptor HP terpisah. Ruang tas sering habis hanya untuk dua colokan berbeda.\n\nAnker Nano II 65W (A2663) seharga Rp449.000 meringkasnya jadi satu adaptor dengan 2 port (1 USB-C, 1 USB-A). Cek tulisan watt di adaptor laptop bawaan sebelum ganti: https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 89.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Ruang tas sering habis hanya untuk dua colokan berbeda.",
+          "suggested_fix": "Ganti 'dua colokan berbeda' jadi 'dua kepala charger' atau 'dua adaptor tebal'."
+        }
+      ],
+      "concerns": [
+        "Diksi 'colokan' kurang presisi untuk merujuk adaptor/charger di ransel."
+      ],
+      "notes": "Draf lugas, relevan, langsung ke solusi tanpa pembuka berbelit. Saran cek watt laptop praktis dan aman. Diksi colokan sedikit rancu untuk menyebut adaptor."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Buka ransel, isinya charger bawaan laptop yang tebal ditambah adaptor HP terpisah. Ruang tas sering habis hanya untuk dua colokan berbeda.\n\nAnker Nano II 65W (A2663) seharga Rp449.000 meringkasnya jadi satu adaptor dengan 2 port (1 USB-C, 1 USB-A). Cek tulisan watt di adaptor laptop bawaan sebelum ganti: https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+      "score": 89.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Ruang tas sering habis hanya untuk dua colokan berbeda.",
+          "suggested_fix": "Ganti 'dua colokan berbeda' jadi 'dua kepala charger' atau 'dua adaptor tebal'."
+        }
+      ],
+      "concerns": [
+        "Diksi 'colokan' kurang presisi untuk merujuk adaptor/charger di ransel."
+      ],
+      "notes": "Draf lugas, relevan, langsung ke solusi tanpa pembuka berbelit. Saran cek watt laptop praktis dan aman. Diksi colokan sedikit rancu untuk menyebut adaptor."
+    },
+    "metrics_original": {
+      "word_count": 49,
+      "sentence_count": 3,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 16.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 49,
+      "sentence_count": 3,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 16.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 47.26
+  },
+  {
+    "index": 27,
+    "category": "affiliate",
+    "pillar": "affiliate",
+    "audience_problem": "Colokan meja kerja penuh adaptor",
+    "angle": "mengurangi jumlah adaptor yang harus dibawa",
+    "observation": "Yang menghemat colokan bukan jumlah port, tapi daya totalnya.",
+    "delivery_hint": "faktual, tanpa klaim berlebih",
+    "format_hint": "single_paragraph",
+    "actual_format": "short_paragraph",
+    "is_affiliate": true,
+    "evidence": "Produk: Anker Nano II 65W (A2663).\nDaya keluaran: 65W. Port: 2 (1 USB-C, 1 USB-A).\nBerat: 112 g. Dimensi: 60 x 41 x 42 mm.\nHarga terverifikasi: Rp449.000.\nLink afiliasi terverifikasi (bukan URL pencarian): https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "original_draft": "Berapa adaptor yang sebenarnya perlu menancap di meja atau masuk ke tas kerja? Anker Nano II 65W (A2663) seberat 112 g memangkas tumpukan colokan lewat 2 port (1 USB-C, 1 USB-A). Pilihannya sederhana: bayar Rp449.000 untuk satu charger ringkas, atau tetap bertahan membawa adaptor terpisah untuk tiap perangkat. https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "cleaned_draft": "Berapa adaptor yang sebenarnya perlu menancap di meja atau masuk ke tas kerja? Anker Nano II 65W (A2663) seberat 112 g memangkas tumpukan colokan lewat 2 port (1 USB-C, 1 USB-A). Pilihannya sederhana: bayar Rp449.000 untuk satu charger ringkas, atau tetap bertahan membawa adaptor terpisah untuk tiap perangkat. https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Berapa adaptor yang sebenarnya perlu menancap di meja atau masuk ke tas kerja?",
+          "suggested_fix": "Hapus pertanyaan retoris pembuka. Langsung masuk ke observasi nyata tumpukan charger di tas atau meja."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Pilihannya sederhana: bayar Rp449.000 untuk satu charger ringkas, atau tetap bertahan membawa adaptor terpisah untuk tiap perangkat.",
+          "suggested_fix": "Ubah dikotomi salesy menjadi trade-off natural. Fokus pada bobot 112 g dan kenyamanan membawa satu charger tanpa desakan membeli."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Pembuka pertanyaan retoris gaya iklan basi",
+        "Gaya penutup hard-selling melanggar janji akun tanpa maksa beli",
+        "Irama kaku seperti brosur produk bukan percakapan teman"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Draf mengorbankan nada santai kawan tongkrongan demi gaya copywriting iklan agresif. Pembuka pertanyaan retoris menunda poin utama, sementara kalimat penutup memaksakan dikotomi palsu yang melanggar janji akun 'tanpa maksa beli'. Data teknis akurat namun penyampaian terlalu transaksional."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Berapa adaptor yang sebenarnya perlu menancap di meja atau masuk ke tas kerja? Anker Nano II 65W (A2663) seberat 112 g memangkas tumpukan colokan lewat 2 port (1 USB-C, 1 USB-A). Pilihannya sederhana: bayar Rp449.000 untuk satu charger ringkas, atau tetap bertahan membawa adaptor terpisah untuk tiap perangkat. https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+      "score": 0.0,
+      "verdict": "REJECTED",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MAJOR",
+          "evidence": "Berapa adaptor yang sebenarnya perlu menancap di meja atau masuk ke tas kerja?",
+          "suggested_fix": "Hapus pertanyaan retoris pembuka. Langsung masuk ke observasi nyata tumpukan charger di tas atau meja."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "MAJOR",
+          "evidence": "Pilihannya sederhana: bayar Rp449.000 untuk satu charger ringkas, atau tetap bertahan membawa adaptor terpisah untuk tiap perangkat.",
+          "suggested_fix": "Ubah dikotomi salesy menjadi trade-off natural. Fokus pada bobot 112 g dan kenyamanan membawa satu charger tanpa desakan membeli."
+        },
+        {
+          "code": "generic_ai_voice",
+          "severity": "BLOCKING",
+          "evidence": "Detected by critic reason codes",
+          "suggested_fix": "Fix critical safety, metaphor, or padding failure"
+        }
+      ],
+      "concerns": [
+        "Pembuka pertanyaan retoris gaya iklan basi",
+        "Gaya penutup hard-selling melanggar janji akun tanpa maksa beli",
+        "Irama kaku seperti brosur produk bukan percakapan teman"
+      ],
+      "notes": "Critic identified BLOCKING issues: generic_ai_voice. Draf mengorbankan nada santai kawan tongkrongan demi gaya copywriting iklan agresif. Pembuka pertanyaan retoris menunda poin utama, sementara kalimat penutup memaksakan dikotomi palsu yang melanggar janji akun 'tanpa maksa beli'. Data teknis akurat namun penyampaian terlalu transaksional."
+    },
+    "metrics_original": {
+      "word_count": 49,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 16.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 49,
+      "sentence_count": 3,
+      "paragraph_count": 1,
+      "avg_words_per_sentence": 16.3,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 47.91
+  },
+  {
+    "index": 28,
+    "category": "affiliate",
+    "pillar": "affiliate",
+    "audience_problem": "Charger lama berat dan makan tempat di tas",
+    "angle": "ukuran dan bobot sebagai pertimbangan utama",
+    "observation": "Charger besar sering ditinggal di rumah karena berat.",
+    "delivery_hint": "sebut bobot dari bukti, tanpa mengaku menimbang sendiri",
+    "format_hint": "single_snappy",
+    "actual_format": "multi_paragraph",
+    "is_affiliate": true,
+    "evidence": "Produk: Anker Nano II 65W (A2663).\nDaya keluaran: 65W. Port: 2 (1 USB-C, 1 USB-A).\nBerat: 112 g. Dimensi: 60 x 41 x 42 mm.\nHarga terverifikasi: Rp449.000.\nLink afiliasi terverifikasi (bukan URL pencarian): https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "original_draft": "Bawa kepala charger bawaan yang besarnya mirip batu bata cuma bikin tas sesak tanpa alasan. Charger 65W sekarang ukurannya sudah bisa dipangkas drastis tanpa membuang fungsi utama.\n\nAnker Nano II 65W (A2663) dimensinya cuma 60 x 41 x 42 mm dengan berat 112 g. Sudah dapat 2 port (1 USB-C, 1 USB-A) di harga Rp449.000. Cek detail ukurannya di https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234 buat perbandingan sama charger yang ada di tas sekarang.",
+    "cleaned_draft": "Bawa kepala charger bawaan yang besarnya mirip batu bata cuma bikin tas sesak tanpa alasan. Charger 65W sekarang ukurannya sudah bisa dipangkas drastis tanpa membuang fungsi utama.\n\nAnker Nano II 65W (A2663) dimensinya cuma 60 x 41 x 42 mm dengan berat 112 g. Sudah dapat 2 port (1 USB-C, 1 USB-A) di harga Rp449.000. Cek detail ukurannya di https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234 buat perbandingan sama charger yang ada di tas sekarang.",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 91.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf padat, membumi, dan taat data bukti. Nada santai khas teman tanpa basa-basi artifisial atau personifikasi berlebihan. Integrasi tautan kontekstual dan alur dua paragraf pas."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Bawa kepala charger bawaan yang besarnya mirip batu bata cuma bikin tas sesak tanpa alasan. Charger 65W sekarang ukurannya sudah bisa dipangkas drastis tanpa membuang fungsi utama.\n\nAnker Nano II 65W (A2663) dimensinya cuma 60 x 41 x 42 mm dengan berat 112 g. Sudah dapat 2 port (1 USB-C, 1 USB-A) di harga Rp449.000. Cek detail ukurannya di https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234 buat perbandingan sama charger yang ada di tas sekarang.",
+      "score": 91.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf padat, membumi, dan taat data bukti. Nada santai khas teman tanpa basa-basi artifisial atau personifikasi berlebihan. Integrasi tautan kontekstual dan alur dua paragraf pas."
+    },
+    "metrics_original": {
+      "word_count": 69,
+      "sentence_count": 5,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 13.8,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 69,
+      "sentence_count": 5,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 13.8,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 52.37
+  },
+  {
+    "index": 29,
+    "category": "affiliate",
+    "pillar": "affiliate",
+    "audience_problem": "Bingung memilih charger cepat yang benar-benar cocok untuk perangkat",
+    "angle": "kecocokan standar pengisian lebih penting daripada angka besar",
+    "observation": "Charger cepat hanya berguna kalau perangkatnya menerima.",
+    "delivery_hint": "jelas, sebut harga dari bukti",
+    "format_hint": "single_paragraph",
+    "actual_format": "single_snappy",
+    "is_affiliate": true,
+    "evidence": "Produk: Anker Nano II 65W (A2663).\nDaya keluaran: 65W. Port: 2 (1 USB-C, 1 USB-A).\nBerat: 112 g. Dimensi: 60 x 41 x 42 mm.\nHarga terverifikasi: Rp449.000.\nLink afiliasi terverifikasi (bukan URL pencarian): https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "original_draft": "Beli charger watt besar dikira bakal langsung ngebut, padahal daya masuk tetap tertahan kalau standarnya beda. Bukan chargernya yang salah, cuma protokolnya yang nggak pas.\n\nUntuk 65W dengan 1 port USB-C dan 1 USB-A, Anker Nano II 65W (A2663) di Rp449.000: https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "cleaned_draft": "Beli charger watt besar dikira bakal langsung ngebut, padahal daya masuk tetap tertahan kalau standarnya beda. Bukan chargernya yang salah, cuma protokolnya yang nggak pas.\n\nUntuk 65W dengan 1 port USB-C dan 1 USB-A, Anker Nano II 65W (A2663) di Rp449.000: https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 81.0,
+      "verdict": "NEEDS_REVIEW",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Untuk 65W dengan 1 port USB-C dan 1 USB-A, Anker Nano II 65W (A2663) di Rp449.000:",
+          "suggested_fix": "Rangkaikan spesifikasi sebagai solusi langsung atas masalah negosiasi protokol agar transisi menuju tautan terasa organik, bukan sekadar tempelan spesifikasi."
+        }
+      ],
+      "concerns": [
+        "Peralihan dari observasi edukatif ke rekomendasi produk terasa patah",
+        "Belum menjelaskan relevansi produk terhadap masalah protokol yang diangkat"
+      ],
+      "notes": "Premis protokol pengisian daya tepat sasaran dan mengalir wajar, tetapi peralihan ke tautan afiliasi terputus mendadak menyerupai gaya katalog tanpa menghubungkan solusi protokol ke produk."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Beli charger watt besar dikira bakal langsung ngebut, padahal daya masuk tetap tertahan kalau standarnya beda. Bukan chargernya yang salah, cuma protokolnya yang nggak pas.\n\nUntuk 65W dengan 1 port USB-C dan 1 USB-A, Anker Nano II 65W (A2663) di Rp449.000: https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+      "score": 81.0,
+      "verdict": "NEEDS_REVIEW",
+      "findings": [
+        {
+          "code": "awkward_phrasing",
+          "severity": "MINOR",
+          "evidence": "Untuk 65W dengan 1 port USB-C dan 1 USB-A, Anker Nano II 65W (A2663) di Rp449.000:",
+          "suggested_fix": "Rangkaikan spesifikasi sebagai solusi langsung atas masalah negosiasi protokol agar transisi menuju tautan terasa organik, bukan sekadar tempelan spesifikasi."
+        }
+      ],
+      "concerns": [
+        "Peralihan dari observasi edukatif ke rekomendasi produk terasa patah",
+        "Belum menjelaskan relevansi produk terhadap masalah protokol yang diangkat"
+      ],
+      "notes": "Premis protokol pengisian daya tepat sasaran dan mengalir wajar, tetapi peralihan ke tautan afiliasi terputus mendadak menyerupai gaya katalog tanpa menghubungkan solusi protokol ke produk."
+    },
+    "metrics_original": {
+      "word_count": 42,
+      "sentence_count": 2,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 21.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 42,
+      "sentence_count": 2,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 21.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 48.67
+  },
+  {
+    "index": 30,
+    "category": "affiliate",
+    "pillar": "affiliate",
+    "audience_problem": "Butuh pengisi daya kecil yang tetap kuat untuk laptop ringan",
+    "angle": "ukuran kecil dengan daya yang cukup",
+    "observation": "Ukuran adaptor sekarang tidak lagi menunjukkan dayanya.",
+    "delivery_hint": "rekomendasi dengan data bukti, tanpa pengalaman pribadi",
+    "format_hint": "single_paragraph",
+    "actual_format": "short_paragraph",
+    "is_affiliate": true,
+    "evidence": "Produk: Anker Nano II 65W (A2663).\nDaya keluaran: 65W. Port: 2 (1 USB-C, 1 USB-A).\nBerat: 112 g. Dimensi: 60 x 41 x 42 mm.\nHarga terverifikasi: Rp449.000.\nLink afiliasi terverifikasi (bukan URL pencarian): https://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "original_draft": "Charger laptop 65W bawaan seringnya terlalu makan tempat buat mobilitas harian. Anker Nano II 65W (A2663) punya dimensi 60 x 41 x 42 mm dan bobot 112 g, tapi komprominya ada di jumlah port yang cuma dua: 1 USB-C dan 1 USB-A. Di harga Rp449.000, ini bukan opsi termurah, tapi masuk akal kalau prioritasnya tas lebih ringkas tanpa motong kebutuhan daya laptop.\n\nhttps://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "cleaned_draft": "Charger laptop 65W bawaan seringnya terlalu makan tempat buat mobilitas harian. Anker Nano II 65W (A2663) punya dimensi 60 x 41 x 42 mm dan bobot 112 g, tapi komprominya ada di jumlah port yang cuma dua: 1 USB-C dan 1 USB-A. Di harga Rp449.000, ini bukan opsi termurah, tapi masuk akal kalau prioritasnya tas lebih ringkas tanpa motong kebutuhan daya laptop.\n\nhttps://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+    "disclosure_was_present": true,
+    "disclosure_appended": false,
+    "editorial_edits": [],
+    "had_editorial_changes": false,
+    "stage1_evaluation": {
+      "score": 95.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid, ringkas, dan mengalir natural sesuai persona Teman Tongkrongan. Ulasan trade-off ukuran fisik, jumlah port, dan harga disajikan objektif berbasis bukti terverifikasi tanpa filler klise atau bait interaksi."
+    },
+    "rewritten_draft": null,
+    "final_evaluation": {
+      "content": "Charger laptop 65W bawaan seringnya terlalu makan tempat buat mobilitas harian. Anker Nano II 65W (A2663) punya dimensi 60 x 41 x 42 mm dan bobot 112 g, tapi komprominya ada di jumlah port yang cuma dua: 1 USB-C dan 1 USB-A. Di harga Rp449.000, ini bukan opsi termurah, tapi masuk akal kalau prioritasnya tas lebih ringkas tanpa motong kebutuhan daya laptop.\n\nhttps://shopee.co.id/Anker-Nano-II-65W-i.1234567.8901234",
+      "score": 95.0,
+      "verdict": "APPROVED_AUTO",
+      "findings": [],
+      "concerns": [],
+      "notes": "Draf sangat solid, ringkas, dan mengalir natural sesuai persona Teman Tongkrongan. Ulasan trade-off ukuran fisik, jumlah port, dan harga disajikan objektif berbasis bukti terverifikasi tanpa filler klise atau bait interaksi."
+    },
+    "metrics_original": {
+      "word_count": 63,
+      "sentence_count": 3,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 21.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "metrics_final": {
+      "word_count": 63,
+      "sentence_count": 3,
+      "paragraph_count": 2,
+      "avg_words_per_sentence": 21.0,
+      "emoji_count": 0,
+      "has_bullet_or_numbered_list": false
+    },
+    "duration_seconds": 46.64
+  }
+]

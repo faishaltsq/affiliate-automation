@@ -297,6 +297,7 @@ class Migration002PersonaStrategy(Migration):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category TEXT NOT NULL,
                 problem TEXT NOT NULL,
+                provenance TEXT DEFAULT '',
                 source_url TEXT DEFAULT '',
                 verified_at TIMESTAMP,
                 confidence REAL NOT NULL DEFAULT 0.5,
@@ -313,6 +314,8 @@ class Migration002PersonaStrategy(Migration):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pillar TEXT NOT NULL,
                 angle TEXT NOT NULL DEFAULT '',
+                provenance TEXT NOT NULL DEFAULT '',
+                audience_problem TEXT NOT NULL DEFAULT '',
                 source_ids_json TEXT DEFAULT '[]',
                 idea_state TEXT NOT NULL DEFAULT 'IDEA',
                 planned_date TEXT,
@@ -356,6 +359,7 @@ class Migration002PersonaStrategy(Migration):
                 parts_json TEXT DEFAULT '[]',
                 image_query TEXT DEFAULT '',
                 disclosure TEXT DEFAULT '',
+                editorial_metadata_json TEXT DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -374,6 +378,7 @@ class Migration002PersonaStrategy(Migration):
                 total_score REAL NOT NULL DEFAULT 0,
                 evaluator_version TEXT NOT NULL DEFAULT 'v1',
                 notes TEXT DEFAULT '',
+                content_hash TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """, "content_evaluations")
@@ -392,6 +397,7 @@ class Migration002PersonaStrategy(Migration):
                 attempts INTEGER NOT NULL DEFAULT 0,
                 published_id TEXT,
                 last_error TEXT DEFAULT '',
+                content_hash TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -484,13 +490,36 @@ class Migration002PersonaStrategy(Migration):
             )
         """, "experiment_assignments")
 
+class Migration003EditorialQuality(Migration):
+    """Phase 3 — editorial quality, content hashes, and memory."""
+
+    version = 3
+    name = "editorial_quality"
+
+    def upgrade(self, conn: sqlite3.Connection) -> None:
+        _add_column(conn, "content_evaluations", "content_hash", "TEXT DEFAULT ''")
+        _add_column(conn, "publication_jobs", "content_hash", "TEXT DEFAULT ''")
+        _add_column(conn, "content_drafts", "editorial_metadata_json", "TEXT DEFAULT '{}'")
+        _add_column(conn, "audience_signals", "provenance", "TEXT DEFAULT ''")
+        _add_column(conn, "content_ideas", "provenance", "TEXT DEFAULT ''")
+        _add_column(conn, "content_ideas", "audience_problem", "TEXT DEFAULT ''")
+
+class Migration004StructuredFindings(Migration):
+    """Phase 4 — structured critic findings."""
+
+    version = 4
+    name = "structured_findings"
+
+    def upgrade(self, conn: sqlite3.Connection) -> None:
+        _add_column(conn, "content_evaluations", "findings_json", "TEXT DEFAULT '[]'")
 
 MIGRATIONS: list[Migration] = [
     Migration000Baseline(),
     Migration001CoreSafety(),
     Migration002PersonaStrategy(),
+    Migration003EditorialQuality(),
+    Migration004StructuredFindings(),
 ]
-
 
 def pending_migrations(conn: sqlite3.Connection) -> list[Migration]:
     current = user_version(conn)

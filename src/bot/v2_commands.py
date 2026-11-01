@@ -38,6 +38,7 @@ class CommandResult:
     authorized: bool = True
     command: str = ""
     denied_reason: str = ""
+    image_url: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -46,8 +47,8 @@ class CommandResult:
             "authorized": self.authorized,
             "denied_reason": self.denied_reason,
             "text": self.text,
+            "image_url": self.image_url,
         }
-
 
 def _not_handled(text: str = "") -> CommandResult:
     return CommandResult(handled=False, text=text)
@@ -363,7 +364,8 @@ READONLY_HANDLERS = {
 def _cmd_approve(
     actor: Actor, args: str, msg_id: Optional[int], path=None
 ) -> CommandResult:
-    from src.content.quality_gate import get_evaluations
+    from src.content.quality_gate import compute_content_hash, get_evaluations
+    from src.content.writer import get_draft
     from src.core.storage import connect, transaction
 
     draft_id = (args or "").strip()
@@ -376,6 +378,11 @@ def _cmd_approve(
         return CommandResult(True, command="/approve", text=(
             f"Draf <code>{draft_id}</code> belum dievaluasi."
         ))
+    draft = get_draft(int(draft_id), path=path)
+    if not draft:
+        return CommandResult(True, command="/approve", text=(
+            f"Draf <code>{draft_id}</code> tidak ditemukan."
+        ))
     latest = evals[-1]
     if latest["verdict"] == "REJECTED":
         return CommandResult(True, command="/approve", text=(
@@ -383,6 +390,25 @@ def _cmd_approve(
             f"<code>{', '.join(latest['vetoes'])}</code>\n\n"
             "Veto keras tidak bisa di-override oleh persetujuan manual."
         ))
+    if latest["verdict"] == "REVISE_ONCE":
+        return CommandResult(True, command="/approve", text=(
+            f"⛔ Draf <code>{draft_id}</code> berstatus REVISE_ONCE.\n"
+            "Draf membutuhkan revisi sebelum bisa disetujui."
+        ))
+    if latest.get("vetoes"):
+        return CommandResult(True, command="/approve", text=(
+            f"⛔ Draf <code>{draft_id}</code> memiliki veto aktif: {', '.join(latest['vetoes'])}."
+        ))
+    eval_hash = latest.get("content_hash") or ""
+    if eval_hash:
+        current_hash = compute_content_hash(
+            draft.get("content") or "", draft.get("parts") or []
+        )
+        if eval_hash != current_hash:
+            return CommandResult(True, command="/approve", text=(
+                f"⛔ Konten draf <code>{draft_id}</code> berubah sejak evaluasi terakhir.\n"
+                "Evaluasi ulang diperlukan sebelum disetujui."
+            ))
     with connect(path) as conn:
         with transaction(conn):
             conn.execute(
@@ -557,6 +583,116 @@ def _cmd_rollback(
     ))
 
 
+def _cmd_deal(
+    actor: Actor,
+    args: str,
+    msg_id: Optional[int],
+    msg: Optional[dict] = None,
+    client=None,
+    path=None,
+) -> CommandResult:
+    """Generate an affiliate deal post from a TikTok Shop link and optional screenshot."""
+    import re
+    from src.commerce.deal_creator import (
+        create_deal_draft,
+        download_telegram_photo,
+        upload_deal_image,
+    )
+    from src.core.config import get_settings
+
+    raw_args = (args or "").strip()
+    url_match = re.search(r"https?://[^\s]+", raw_args)
+    if not url_match:
+        return CommandResult(
+            True,
+            command="/deal",
+            text=(
+                "<b>Cara pakai /deal</b>\n\n"
+                "Kirim screenshot keranjang / diskon dengan caption:\n"
+                "<code>/deal &lt;link_tiktokshop&gt; [nama barang / catatan]</code>\n\n"
+                "Atau reply foto yang sudah dikirim dengan:\n"
+                "<code>/deal &lt;link_tiktokshop&gt; [catatan]</code>\n\n"
+                "<i>Bot akan menyusun hook deal 'PLOT TWIST' + pertanyaan validasi warga Threads.</i>"
+            ),
+        )
+
+    link = url_match.group(0)
+    notes = raw_args.replace(link, "").strip()
+
+    photo = None
+    if msg:
+        photo = msg.get("photo")
+        if not photo and isinstance(msg.get("reply_to_message"), dict):
+            photo = msg["reply_to_message"].get("photo")
+
+    image_url = ""
+    file_id = ""
+    if photo and isinstance(photo, list):
+        file_id = photo[-1].get("file_id", "")
+        cfg = get_settings().telegram
+        if file_id and cfg.bot_token:
+            raw_bytes = download_telegram_photo(cfg.bot_token, file_id)
+            if raw_bytes:
+                image_url = upload_deal_image(raw_bytes) or ""
+
+    try:
+        draft_id, draft, decision = create_deal_draft(
+            url=link,
+            notes=notes,
+            image_url=image_url,
+            client=client,
+            path=path,
+        )
+    except Exception as exc:
+        log.error("Failed to create deal draft: %s", exc, exc_info=True)
+        return CommandResult(
+            True,
+            command="/deal",
+            text=f"⚠️ Gagal membuat draf deal: {redact_secrets(str(exc))[:200]}",
+        )
+
+    body = draft.content
+    img_status = (
+        "📸 <b>Screenshot:</b> Terlampir & di-upload"
+        if image_url
+        else ("📸 <b>Screenshot:</b> Diterima via Telegram" if file_id else "⚠️ <i>Tanpa screenshot (disarankan pakai screenshot keranjang)</i>")
+    )
+
+    response_text = (
+        f"<b>Draf Deal Baru Dibuat</b> (ID: <code>{draft_id}</code>)\n\n"
+        f"{body}\n\n"
+        f"<b>Penilaian:</b> {decision.verdict} (skor {decision.total_score:.0f})\n"
+        f"<b>Status:</b> <code>NEEDS_REVIEW</code>\n"
+        f"{img_status}\n\n"
+        f"Ketik <code>/approve {draft_id}</code> untuk publish ke Threads (@pochita9887)."
+    )
+
+    preview_img = image_url or file_id
+    return CommandResult(
+        True,
+        command="/deal",
+        text=response_text,
+        image_url=preview_img,
+    )
+
+
+def _cmd_remind_deal(
+    actor: Actor,
+    args: str,
+    msg_id: Optional[int],
+    msg: Optional[dict] = None,
+    path=None,
+) -> CommandResult:
+    """Manually trigger or test the deal reminder notification."""
+    from src.commerce.deal_reminder import format_reminder_text
+
+    return CommandResult(
+        True,
+        command="/remind",
+        text=format_reminder_text(),
+    )
+
+
 MUTATION_HANDLERS = {
     "/approve": _cmd_approve,
     "/revise": _cmd_revise,
@@ -565,6 +701,8 @@ MUTATION_HANDLERS = {
     "/resume": _cmd_resume,
     "/autopost": _cmd_autopost,
     "/rollback": _cmd_rollback,
+    "/deal": _cmd_deal,
+    "/remind": _cmd_remind_deal,
 }
 
 ALL_COMMANDS = sorted(
@@ -586,6 +724,8 @@ def _help_text() -> str:
         "/status — kesehatan, antrean, cakupan\n"
         "/pending — draf yang menunggu persetujuanmu\n"
         "<b>Operator saja</b>\n"
+        "/deal &lt;link&gt; [catatan] — buat draf deal Threads dari link & screenshot\n"
+        "/remind — kirim pengingat slot deal ke Topic 9\n"
         "/approve &lt;id&gt; — setujui draf\n"
         "/revise &lt;id&gt; &lt;alasan&gt; — minta revisi\n"
         "/reject &lt;id&gt; &lt;alasan&gt; — tolak & simpan alasan\n"
@@ -600,7 +740,7 @@ def v2_enabled() -> bool:
     return get_settings().flags.v2_telegram_commands_enabled
 
 
-def _dispatch(handler, command, actor, args, msg_id, client=None, path=None):
+def _dispatch(handler, command, actor, args, msg_id, client=None, path=None, msg=None):
     """Call a handler with only the arguments it declares.
 
     Handlers opt into `client` and `path` individually; introspecting the
@@ -618,8 +758,9 @@ def _dispatch(handler, command, actor, args, msg_id, client=None, path=None):
         kwargs["client"] = client
     if "path" in params:
         kwargs["path"] = path
+    if "msg" in params:
+        kwargs["msg"] = msg
     return handler(actor, args, msg_id, **kwargs)
-
 
 def handle_v2_command(
     msg: dict,
@@ -679,7 +820,7 @@ def handle_v2_command(
 
     try:
         result = _dispatch(handler, command, actor, args, msg_id,
-                           client=client, path=path)
+                           client=client, path=path, msg=msg)
     except Exception as exc:  # noqa: BLE001 — a broken command must not kill the bot
         log.error("V2 command %s failed: %s", command, exc, exc_info=True)
         result = CommandResult(

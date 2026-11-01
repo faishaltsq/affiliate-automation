@@ -126,7 +126,7 @@ MUTATION_COMMANDS = frozenset({
     "/approve", "/revise", "/reject", "/pause", "/resume", "/autopost",
     "/rollback", "/publish", "/post", "/post_text", "/post_photo", "/chain",
     "/thread", "/affiliate", "/clearqueue", "/sync", "/products_add",
-    "/products_remove", "/experiment_start",
+    "/products_remove", "/experiment_start", "/deal", "/remind",
 })
 
 READONLY_COMMANDS = frozenset({

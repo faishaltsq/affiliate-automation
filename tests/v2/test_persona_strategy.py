@@ -147,6 +147,34 @@ class TestVoiceVariation:
         assert voice_mod.structure_for_format("mini_thread") == "thread"
         assert voice_mod.structure_for_format("single_snappy") == "single"
 
+    def test_default_variation_never_picks_mini_thread(self):
+        rng = random.Random(42)
+        for _ in range(50):
+            v = voice_mod.random_variation(rng)
+            assert v.format != "mini_thread"
+            assert v.format in voice_mod.SINGLE_FORMATS
+
+    def test_should_allow_thread_rejects_relatable_and_opinions(self):
+        idea = type("I", (), {"pillar": "relatable", "premise": "1. step one 2. step two"})()
+        assert voice_mod.should_allow_thread(idea, pillar="relatable") is False
+        assert voice_mod.should_allow_thread(idea, pillar="opinions") is False
+
+    def test_should_allow_thread_rejects_mundane_observations(self):
+        idea = type("I", (), {"pillar": "practical_tips", "premise": "Kabel charger kusut di tas dan rusak"})()
+        assert voice_mod.should_allow_thread(idea, pillar="practical_tips") is False
+
+    def test_should_allow_thread_accepts_dense_practical_tips(self):
+        idea = type("I", (), {
+            "pillar": "practical_tips",
+            "premise": "Panduan troubleshooting: 1. Cek tegangan port. 2. Bersihkan konektor.",
+        })()
+        assert voice_mod.should_allow_thread(idea, pillar="practical_tips") is True
+
+    def test_decide_format_defaults_to_single(self):
+        idea = type("I", (), {"pillar": "relatable", "premise": "Kabel charger kusut"})()
+        v = voice_mod.decide_format(idea, pillar="relatable")
+        assert v.format in voice_mod.SINGLE_FORMATS
+
     def test_guides_are_non_empty(self):
         for opening in voice_mod.OPENINGS:
             assert voice_mod.opening_guide(opening).strip()
@@ -381,3 +409,40 @@ class TestIdeation:
         second = generate_ideas(count=3, rng=random.Random(21), path=db)
         overlap = {i.angle for i in first} & {i.angle for i in second}
         assert len(overlap) < 3, "ideation keeps repeating the same angles"
+    def test_filter_premise_rejection_gate(self):
+        from src.strategy.ideation import filter_premise
+        assert filter_premise("")[0] is False
+        assert filter_premise("pendek")[0] is False
+        # Unsafe
+        ok, reason = filter_premise("Kabel keliatan tembaga tapi masih aman dipakai")
+        assert ok is False and reason == "unsafe_practical_advice"
+        # Forced metaphor
+        ok, reason = filter_premise("Kabel nakal ini selalu ngambek kalau dicolok")
+        assert ok is False and reason == "forced_metaphor"
+        # Generic AI voice
+        ok, reason = filter_premise("Niat praktis kenyataannya jadi repot dan butuh sedikit perhatian")
+        assert ok is False and reason == "generic_ai_voice"
+        # Trivial observation
+        ok, reason = filter_premise("kabel charger yang selalu kusut di tas dan putus di ujung")
+        assert ok is False and reason == "trivial_observation"
+        # Valid premise
+        ok, _ = filter_premise("Adaptor 65W aman dipakai di HP 20W karena protokol USB PD")
+        assert ok is True
+
+    def test_is_duplicate_premise(self):
+        from src.strategy.ideation import is_duplicate_premise
+        past = ["Kabel USB-C murah sering nggak bisa transfer data"]
+        assert is_duplicate_premise("Kabel USB-C murah sering nggak bisa kirim data", past) is True
+        assert is_duplicate_premise("Beli monitor murah yang warnanya bikin mata perih", past) is False
+
+    def test_all_provenance_categories_present_in_seeds(self, db):
+        from src.audience.signals import PROVENANCE_CATEGORIES, SEED_SIGNALS
+        seed_provenances = {s.provenance for s in SEED_SIGNALS}
+        for prov in PROVENANCE_CATEGORIES:
+            assert prov in seed_provenances, f"Missing provenance category {prov}"
+
+    def test_generated_ideas_carry_provenance(self, db):
+        ideas = generate_ideas(count=3, rng=random.Random(42), path=db)
+        assert len(ideas) == 3
+        for idea in ideas:
+            assert idea.provenance != ""

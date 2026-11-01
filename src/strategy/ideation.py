@@ -62,12 +62,15 @@ class IdeaCandidate:
     pillar: str
     angle: str
     audience_problem: str
+    provenance: str = ""
     signal_id: Optional[int] = None
     rank_score: float = 0.0
     novelty: float = 0.0
     relevance: float = 0.0
     persona_fit: float = 0.0
     balance: float = 0.0
+    observation: str = ""
+    delivery_hint: str = ""
     id: Optional[int] = None
 
     def to_idea(self) -> ContentIdea:
@@ -106,7 +109,93 @@ def _recent_problems(limit: int = 20, path=None) -> set[str]:
             return set()
     return {r["audience_problem"] for r in rows if r["audience_problem"]}
 
+def _tokenize(text: str) -> set[str]:
+    import re
+    words = re.findall(r"\w+", text.lower())
+    stops = {"yang", "dan", "di", "ke", "dari", "ini", "itu", "untuk", "pada", "adalah", "bisa", "ada"}
+    return {w for w in words if len(w) > 2 and w not in stops}
 
+
+def jaccard_similarity(text_a: str, text_b: str) -> float:
+    set_a = _tokenize(text_a)
+    set_b = _tokenize(text_b)
+    if not set_a or not set_b:
+        return 0.0
+    intersection = len(set_a & set_b)
+    union = len(set_a | set_b)
+    return intersection / union if union > 0 else 0.0
+
+
+def is_duplicate_premise(candidate_text: str, recent_premises: list[str], threshold: float = 0.55) -> bool:
+    """Check if candidate premise is too similar to any premise from recent days."""
+    for past in recent_premises:
+        if jaccard_similarity(candidate_text, past) >= threshold:
+            return True
+    return False
+
+
+def _recent_premises_14_days(days: int = 14, path=None) -> list[str]:
+    """Retrieve premises used in ideas/drafts within the last N days."""
+    with connect(path) as conn:
+        try:
+            rows = conn.execute(
+                """
+                SELECT audience_problem FROM content_ideas 
+                WHERE created_at >= datetime('now', ?) AND audience_problem != ''
+                UNION
+                SELECT angle FROM content_ideas 
+                WHERE created_at >= datetime('now', ?) AND angle != ''
+                """,
+                (f"-{days} days", f"-{days} days"),
+            ).fetchall()
+            return [r[0] for r in rows if r[0]]
+        except Exception:
+            return []
+
+
+def filter_premise(premise: str, pillar: str = "") -> tuple[bool, str]:
+    """Pre-generation rejection gate.
+
+    Rejects ideas before writing if they are mundane, forced, or lack a clear point.
+    Returns (True, "") or (False, reason_code).
+    """
+    if not premise or len(premise.strip()) < 12:
+        return False, "empty_premise"
+
+    text = premise.lower()
+
+    # 1. Unsafe practical advice
+    unsafe_patterns = [
+        "tembaga keliatan", "tembaga terbuka", "kabel terkelupas",
+        "ditusuk jarum", "dicuci air", "masih aman dipakai",
+    ]
+    if any(p in text for p in unsafe_patterns):
+        return False, "unsafe_practical_advice"
+
+    # 2. Forced metaphor / anthropomorphism
+    forced_patterns = [
+        "nakal", "ngambek", "punya perasaan", "butuh pelukan",
+        "dia lelah", "dia marah", "kabel berontak",
+    ]
+    if any(p in text for p in forced_patterns):
+        return False, "forced_metaphor"
+
+    # 3. Generic AI clichés
+    cliche_patterns = [
+        "niat praktis kenyataannya", "butuh sedikit perhatian",
+        "menjadi saksi bisu", "di era serba digital",
+    ]
+    if any(p in text for p in cliche_patterns):
+        return False, "generic_ai_voice"
+
+    # 4. Mundane observation with no clear point / technical angle
+    if text.strip() in [
+        "kabel charger yang selalu kusut di tas dan putus di ujung",
+        "kabel kusut di tas",
+    ]:
+        return False, "trivial_observation"
+
+    return True, ""
 def score_idea(
     signal: AudienceSignal,
     angle: str,
@@ -180,9 +269,22 @@ def generate_ideas(
 
     used_angles = _recent_angles(path=path)
     used_problems = _recent_problems(path=path)
+    recent_14d = _recent_premises_14_days(days=14, path=path)
     from src.strategy.calendar import pillar_distribution
     pillar_counts = pillar_distribution(path=path)
 
+    # Filter out signals that fail pre-generation rejection gate or 14-day duplicate check
+    valid_signals = []
+    for s in signals:
+        ok, reason = filter_premise(s.problem, pillar=s.category)
+        if not ok:
+            continue
+        if is_duplicate_premise(s.problem, recent_14d):
+            continue
+        valid_signals.append(s)
+
+    if valid_signals:
+        signals = valid_signals
     # Pick a spread of signals: rotate through the list so the same pillar is
     # not always chosen. Sorting purely by confidence collapses every run onto
     # whichever pillar happens to carry the highest-confidence seeds.
@@ -220,9 +322,12 @@ def generate_ideas(
                 signal, angle, used_angles | used_angles_local,
                 used_problems, pillar_counts,
             )
+            obs = f"{signal.problem} ({angle})"
+            hint = "single_snappy" if ("observasi" in angle or len(signal.problem) < 40) else "short_paragraph"
             candidates.append(IdeaCandidate(
                 pillar=signal.category,
                 angle=angle,
+                provenance=getattr(signal, "provenance", ""),
                 audience_problem=signal.problem,
                 signal_id=signal.id,
                 rank_score=total,
@@ -230,6 +335,8 @@ def generate_ideas(
                 relevance=parts["relevance"],
                 persona_fit=parts["persona_fit"],
                 balance=parts["balance"],
+                observation=obs,
+                delivery_hint=hint,
             ))
             used_angles_local.add(angle)
             break
@@ -268,10 +375,11 @@ def save_idea(candidate: IdeaCandidate, planned_date: Optional[str] = None, path
         with transaction(conn):
             cur = conn.execute(
                 "INSERT INTO content_ideas "
-                "(pillar, angle, source_ids_json, idea_state, planned_date, rank_score) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "(pillar, angle, provenance, audience_problem, source_ids_json, idea_state, planned_date, rank_score) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     candidate.pillar, candidate.angle,
+                    candidate.provenance, candidate.audience_problem,
                     str([candidate.signal_id] if candidate.signal_id else []),
                     IDEA, planned_date, candidate.rank_score,
                 ),

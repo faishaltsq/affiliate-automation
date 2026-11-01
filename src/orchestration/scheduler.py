@@ -281,7 +281,7 @@ def status(path=None) -> dict:
     }
 
 
-def gate_draft(draft, path=None, client=None):
+def gate_draft(draft, path=None, client=None, persona=None):
     """Run the quality gate on a scheduled draft. Returns a GateDecision.
 
     This is the step that makes the scheduler's output reviewable rather than
@@ -300,6 +300,9 @@ def gate_draft(draft, path=None, client=None):
     if getattr(draft, "content", None):
         history = [h for h in history if h != draft.content]
 
+    var = getattr(draft, "variation", None)
+    format_name = var.get("format", "") if isinstance(var, dict) else ""
+
     return evaluate_draft(
         draft.content,
         evidence=getattr(draft, "evidence", "") or "",
@@ -308,6 +311,9 @@ def gate_draft(draft, path=None, client=None):
         draft_id=getattr(draft, "draft_id", None),
         client=client,
         path=path,
+        parts=getattr(draft, "parts", None),
+        format_name=format_name,
+        persona=persona,
     )
 
 
@@ -317,6 +323,8 @@ def run_once(
     path=None,
     dry_run: bool = True,
     client=None,
+    now: Optional[datetime] = None,
+    persona=None,
 ) -> dict:
     """One scheduling pass. Returns what it decided and why.
 
@@ -338,11 +346,12 @@ def run_once(
     Only the publish step is suppressed. Skipping generation in dry-run
     mode left the queue permanently empty and made shadow mode useless.
     """
-    from src.content.quality_gate import APPROVED_AUTO, NEEDS_REVIEW, REJECTED
+    from src.content.quality_gate import (
+        APPROVED_AUTO, NEEDS_REVIEW, REJECTED, REVISE_ONCE,
+    )
     from src.content.writer import set_draft_status
-    from src.core.models import EVALUATED, REJECTED
-
-    decision = should_post_now(path=path)
+    from src.core.models import EVALUATED
+    decision = should_post_now(now=now, path=path)
     result = {"decision": decision.describe(), "ran": decision.should_run,
               "dry_run": dry_run}
     if not decision.should_run:
@@ -354,7 +363,7 @@ def run_once(
         result["reason"] = "no acceptable draft produced; slot skipped safely"
         return result
     draft_id = getattr(draft, "draft_id", None) or getattr(draft, "id", None)
-    gate = gate_draft(draft, path=path, client=client)
+    gate = gate_draft(draft, path=path, client=client, persona=persona)
     result["verdict"] = gate.verdict
     result["score"] = gate.total_score
     result["draft_id"] = draft_id
@@ -367,6 +376,55 @@ def run_once(
         )
         result["vetoes"] = list(gate.vetoes)
         return result
+    if gate.verdict == REVISE_ONCE:
+        log.info(
+            "Draft %s scored %s (REVISE_ONCE); attempting one bounded revision pass.",
+            draft_id, gate.total_score,
+        )
+        concerns = ""
+        if hasattr(gate, "critic_response") and gate.critic_response:
+            concerns = getattr(gate.critic_response, "concerns", "")
+        if not concerns and hasattr(gate, "vetoes") and gate.vetoes:
+            concerns = ", ".join(gate.vetoes)
+        if not concerns:
+            concerns = "Perbaiki alur, hindari klise AI dan personifikasi berlebihan."
+
+        revised_draft = None
+        try:
+            revised_draft = writer_fn(decision.pillar, decision.slot_kind, revision_feedback=concerns)
+        except TypeError:
+            try:
+                from src.content.writer import write_draft
+                revised_draft = write_draft(
+                    pillar=decision.pillar,
+                    revision_feedback=concerns,
+                    client=client,
+                    path=path,
+                    persist=True,
+                )
+            except Exception:
+                revised_draft = None
+        except Exception as exc:
+            log.warning("Rewrite attempt failed: %s", exc)
+
+        if revised_draft is not None:
+            revised_gate = gate_draft(revised_draft, path=path, client=client, persona=persona)
+            if revised_gate.verdict in (APPROVED_AUTO, NEEDS_REVIEW):
+                draft = revised_draft
+                draft_id = getattr(draft, "draft_id", None) or getattr(draft, "id", None)
+                gate = revised_gate
+                result["verdict"] = gate.verdict
+                result["score"] = gate.total_score
+                result["draft_id"] = draft_id
+                result["revised"] = True
+            else:
+                log.info(
+                    "Revised draft %s also failed gate (%s); rejecting.",
+                    getattr(revised_draft, "draft_id", None), revised_gate.verdict,
+                )
+                gate = revised_gate
+                result["verdict"] = REJECTED
+                result["score"] = gate.total_score
 
     if gate.verdict not in (APPROVED_AUTO, NEEDS_REVIEW):
         if draft_id is not None:
@@ -408,7 +466,14 @@ def is_running() -> bool:
     return _running
 
 
-def default_writer(pillar: str, slot_kind: str, path=None, client=None):
+def default_writer(
+    pillar: str,
+    slot_kind: str,
+    path=None,
+    client=None,
+    revision_feedback: Optional[str] = None,
+    persona=None,
+):
     """The production writer: audience problem -> draft -> quality gate.
 
     Returns a DraftResult or None. None is a normal outcome meaning the slot is
@@ -416,8 +481,14 @@ def default_writer(pillar: str, slot_kind: str, path=None, client=None):
     """
     from src.content.writer import write_draft
 
-    return write_draft(pillar=pillar, persist=True, path=path, client=client)
-
+    return write_draft(
+        pillar=pillar,
+        revision_feedback=revision_feedback,
+        persist=True,
+        path=path,
+        client=client,
+        persona=persona,
+    )
 
 def default_enqueue(draft_id: int, content: str, path=None):
     from src.orchestration.publisher import enqueue
@@ -433,6 +504,7 @@ def run_loop(
     max_passes: Optional[int] = None,
     on_pass=None,
     review_required: Optional[bool] = None,
+    persona=None,
 ) -> dict:
     """Run the scheduler until shutdown is requested.
 
@@ -471,7 +543,7 @@ def run_loop(
         try:
             result = run_once(
                 writer_fn=lambda pillar, kind: default_writer(
-                    pillar, kind, path=path, client=client
+                    pillar, kind, path=path, client=client, persona=persona
                 ),
                 enqueue_fn=lambda did, content: default_enqueue(
                     did, content, path=path
@@ -479,6 +551,7 @@ def run_loop(
                 path=path,
                 dry_run=dry_run,
                 client=client,
+                persona=persona,
             )
             summary["passes"] = passes
             if result.get("job_id"):
@@ -529,9 +602,10 @@ def _drain_queue(path=None, review_required: Optional[bool] = None) -> int:
     approved is left in the queue untouched rather than claimed and dropped.
     """
     from src.adapters.threads import get_threads_adapter
+    from src.content.quality_gate import validate_draft_for_publishing
     from src.content.writer import get_draft, set_draft_status
     from src.orchestration.publisher import (
-        AdapterThreadsPublisher, claim_next_job, publish_job, release_job,
+        AdapterThreadsPublisher, claim_next_job, mark_failed, publish_job, release_job,
     )
 
     flags = get_settings().flags
@@ -551,21 +625,32 @@ def _drain_queue(path=None, review_required: Optional[bool] = None) -> int:
             break
         draft = get_draft(job.draft_id, path=path) or {}
 
-        if review_required and (draft.get("status") or "") != "APPROVED":
-            # Not approved: hand the job back to the queue and stop, so the
-            # next pass re-checks it after an operator acts. Releasing the
-            # lease is what keeps it claimable later.
-            release_job(job.id, path=path)
-            log.info(
-                "Job %s held: draft %s is not APPROVED (review required).",
-                job.id, job.draft_id,
-            )
-            break
+        val = validate_draft_for_publishing(
+            job.draft_id, review_required=review_required, path=path
+        )
+        if not val.eligible:
+            if val.reason in (
+                "needs_operator_approval",
+                "review_required_pending_approval",
+            ):
+                release_job(job.id, path=path)
+                log.info(
+                    "Job %s held: draft %s is pending approval (%s).",
+                    job.id, job.draft_id, val.reason,
+                )
+                break
+            else:
+                mark_failed(job.id, f"gate_veto: {val.reason}", path=path)
+                log.error("Job %s permanently dropped by quality gate: %s", job.id, val.reason)
+                continue
 
         content = draft.get("content") or ""
         parts = draft.get("parts") or []
+        meta = draft.get("editorial_metadata") or {}
+        image_url = meta.get("image_url") or draft.get("image_url") or ""
         outcome = publish_job(
-            job.id, bridge, content=content, parts=parts, path=path
+            job.id, bridge, content=content, parts=parts,
+            image_url=image_url, path=path
         )
         if outcome.succeeded:
             published += 1

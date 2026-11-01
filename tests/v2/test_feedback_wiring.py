@@ -187,3 +187,72 @@ class TestFeedbackPreservation:
         events = feedback_for_draft(7, path=db)
         assert len(events) == 1
         assert events[0]["reason"] == "terlalu promosi"
+
+class TestEditorialMetadataAndDiversity:
+    def test_save_draft_populates_editorial_metadata(self, db):
+        from src.content.writer import save_draft, DraftResult
+        from src.persona.editorial_memory import get_recent_editorial_metadata
+
+        draft = DraftResult(
+            content="Konten tes editorial",
+            parts=[],
+            structure="single",
+            pillar="practical_tips",
+            angle="langkah konkret",
+            audience_problem="baterai boros",
+            persona_version="2.0",
+            variation={"opening": "observasi", "format": "single_snappy", "goal": "edukasi"},
+            idea_id=1,
+        )
+        did = save_draft(draft, path=db)
+        assert did > 0
+
+        meta = get_recent_editorial_metadata(limit=1, path=db)
+        assert len(meta) == 1
+        assert meta[0]["opening"] == "observasi"
+        assert meta[0]["pillar"] == "practical_tips"
+        assert meta[0]["format"] == "single_snappy"
+
+    def test_can_use_opening_blocks_consecutive_duplicates(self, db):
+        from src.persona.editorial_memory import can_use_opening, record_draft_editorial_metadata
+        from src.content.writer import save_draft, DraftResult
+
+        for i in range(2):
+            d = DraftResult(
+                content=f"Draft {i}", parts=[], structure="single",
+                pillar="relatable", angle="a", audience_problem="p",
+                persona_version="2.0", variation={"opening": "observasi", "pillar": "relatable"},
+                idea_id=i+1,
+            )
+            save_draft(d, path=db)
+
+        # 2 consecutive 'observasi' openings should block a 3rd 'observasi'
+        assert can_use_opening("observasi", limit=2, path=db) is False
+        # Different opening is permitted
+        assert can_use_opening("kontras", limit=2, path=db) is True
+
+    def test_can_use_category_in_window_enforces_rotation(self, db):
+        from src.persona.editorial_memory import can_use_category_in_window
+        from src.content.writer import save_draft, DraftResult
+
+        for i in range(2):
+            d = DraftResult(
+                content=f"Draft {i}", parts=[], structure="single",
+                pillar="practical_tips", angle="a", audience_problem="p",
+                persona_version="2.0", variation={"opening": f"op_{i}", "pillar": "practical_tips"},
+                idea_id=i+1,
+            )
+            save_draft(d, path=db)
+
+        # practical_tips appeared 2 times in 2 posts; max_in_window=2 should block a 3rd
+        assert can_use_category_in_window("practical_tips", max_in_window=2, path=db) is False
+        assert can_use_category_in_window("relatable", max_in_window=2, path=db) is True
+
+    def test_new_critic_categories_in_feedback_guidance(self, db):
+        record_feedback(draft_id=1, actor_id="111", category="forced_metaphor",
+                        reason="personifikasi kabel nakal", path=db)
+        record_feedback(draft_id=2, actor_id="111", category="generic_ai_voice",
+                        reason="klise niatnya kenyataannya", path=db)
+        guidance = revision_guidance(path=db)
+        assert "personifikasi benda mati" in guidance
+        assert "klise AI" in guidance

@@ -27,9 +27,11 @@ from src.core.models import ContentDraft, DRAFT
 from src.core.storage import connect, transaction
 from src.logger import get_logger
 from src.persona.profile import get_active_persona, persona_prompt_block
+from src.persona.reference_library import get_editorial_reference_prompt
 from src.persona.voice import (
-    VoiceVariation, length_guide, mood_guide, opening_guide, goal_guide,
-    random_variation, structure_for_format, varied_variation,
+    VoiceVariation, decide_format, length_guide, mood_guide, opening_guide,
+    goal_guide, random_variation, should_allow_thread, structure_for_format,
+    varied_variation,
 )
 from src.strategy.ideation import IdeaCandidate, generate_ideas, save_idea
 
@@ -54,10 +56,11 @@ class DraftResult:
     variation: dict
     evidence: str = ""
     disclosure: str = ""
+    raw_content: str = ""
+    applied_edits: list[dict] = field(default_factory=list)
     idea_id: Optional[int] = None
     draft_id: Optional[int] = None
     created_at: str = field(default_factory=utc_iso)
-
     @property
     def idea_pillar(self) -> str:
         return self.pillar
@@ -70,9 +73,10 @@ def _writer_prompt(
     evidence: str,
     revision_feedback: Optional[str] = None,
     path=None,
+    persona=None,
 ) -> str:
-    persona = get_active_persona()
-    identity = persona_prompt_block(persona)
+    p = persona or get_active_persona(path=path)
+    identity = persona_prompt_block(p)
 
     var_lines = "\n".join([
         f"- Format: {variation.format}",
@@ -134,10 +138,35 @@ def _writer_prompt(
             "- Satu postingan utuh. Boleh satu kalimat atau beberapa paragraf pendek "
             "sesuai panjang yang diminta.\n"
         )
+    ref_block = get_editorial_reference_prompt()
+
+    # Affiliate drafts must ship their own disclosure: the gate rejects an
+    # undisclosed commercial post, and a writer that leaves the field empty
+    # turns every affiliate slot into a rewrite.
+    if idea.pillar == "affiliate":
+        from src.commerce.disclosure import DISCLOSURE_SHORT
+
+        disclosure_block = (
+            "\nKEWAJIBAN AFILIASI:\n"
+            f'- Isi field "disclosure" dengan teks ini persis: "{DISCLOSURE_SHORT}"\n'
+            "- Sebut nama produk dan angkanya HANYA dari blok bukti di atas.\n"
+        )
+    else:
+        disclosure_block = (
+            '\nIsi field "disclosure" dengan string kosong ("") '
+            "kecuali postingan ini memang berbayar.\n"
+        )
 
     return f"""Kamu adalah penulis konten untuk akun Threads berikut.
 
 {identity}
+
+PROSES KREATIF EDITORIAL (Sol-Inspired Conversational):
+1. Premis Audiens: Mulai dari masalah audiens nyata.
+2. Observasi Menarik: Pilih sudut pandang yang segar, santai, dan cerdas.
+3. Panjang Mengikuti Substansi: Tentukan panjang dari substansi, bukan dari kuota kata. Observasi sederhana tuntas dalam 15-20 kata; trade-off atau tips teknis nyata bisa 50-70 kata. Jangan paksakan kalimat pengisi.
+4. Uji Baca Bersuara (Read-Aloud): Kalimat harus mengalir alami seperti obrolan orang sungguhan, bukan esai tugas sekolah atau postingan LinkedIn.
+5. Bebas Klise AI: DILARANG penutup motivasi generik ('semangat beraktivitas', 'gunakan teknologi dengan bijak') atau lelucon formulaic basi.
 
 TUGAS:
 Tulis satu postingan untuk masalah audiens ini:
@@ -152,16 +181,24 @@ Tulis satu postingan untuk masalah audiens ini:
 VARIASI POSTINGAN INI (identitas tetap sama):
 {var_lines}
 
-ATURAN STRUKTUR:
+ATURAN STRUKTUR & GAYA BAHASA:
 {structure_rule}
 - Kalimat pertama langsung ke inti. Tanpa sapaan, tanpa 'lagi rame', tanpa meta-commentary.
-- DILARANG menutup dengan pertanyaan klise ('menurut kalian', 'gimana menurut kalian',
-  'ada yang ngerasain', 'kalian tim mana').
+- DILARANG membuka dengan pertanyaan retoris yang menunda poin ('Kenapa masih ...?', 'Pernah nggak sih ...?', 'Sadar nggak ...?'). Kalau ide itu berupa pertanyaan, ubah jadi pernyataan.
+- DILARANG menutup dengan pertanyaan klise ('menurut kalian', 'gimana menurut kalian', 'ada yang ngerasain', 'kalian tim mana').
 - DILARANG hashtag (#).
 - DILARANG mengaku pernah membeli, memakai, menguji, atau mengalami produk/kejadian.
 - DILARANG promosi, link, atau nama produk kecuali pilar affiliate dan sudah disetujui.
-- Bahasa Indonesia natural, aku/kalian, tidak kaku.
-{revision_block}
+- DILARANG personifikasi benda mati ('nakal', 'ngambek', 'lelah', 'butuh perhatian'). Benda mati tidak berakal.
+- DILARANG transisi klise AI ('niatnya biar praktis... kenyataannya...', 'di era serba digital', 'saksi bisu').
+- DILARANG penutup motivasi klise ('semangat beraktivitas', 'jadikan hari ini produktif').
+- DILARANG saran teknis/praktis berbahaya (kabel tembaga terbuka harus diganti/diisolasi, bukan dibiarkan).
+- Bahasa Indonesia natural santai ala kawan tongkrongan, tidak kaku buku teks, tidak terjemahan bahasa Inggris harfiah.
+- TIDAK WAJIB menggunakan kata 'aku' atau 'kalian'. Utamakan kalimat mengalir alami dan isi bermanfaat tanpa menyelipkan kata ganti secara mekanis.
+- FORMAT NYATA: Jika format 'multi_paragraph', WAJIB dipisahkan jeda baris ganda (\\n\\n) menjadi 2 paragraf nyata yang logis. Jangan gabungkan jadi 1 bongkahan teks tanpa jeda.
+
+{ref_block}
+{disclosure_block}
 OUTPUT: hanya JSON valid, tanpa markdown fence, tanpa teks lain.
 Skema:
 {schema}"""
@@ -301,10 +338,9 @@ def write_draft(
     rng=None,
     path=None,
     persist: bool = True,
+    persona=None,
 ) -> Optional[DraftResult]:
     """Generate one draft. Returns None when no acceptable draft exists.
-
-    None is a legitimate, expected outcome. It means: skip this slot. It never
     means: publish filler instead.
 
     An affiliate slot is downgraded to organic while affiliate output is
@@ -337,11 +373,14 @@ def write_draft(
                 signal = s
                 break
 
-    variation = varied_variation(_variation_history, r)
+    try:
+        allow_t = should_allow_thread(idea, evidence=evidence, pillar=pillar)
+        variation = varied_variation(_variation_history, r, allow_threads=allow_t)
+    except TypeError:
+        variation = varied_variation(_variation_history, r)
     prompt = _writer_prompt(
-        idea, signal, variation, evidence, revision_feedback, path=path
+        idea, signal, variation, evidence, revision_feedback, path=path, persona=persona
     )
-
     try:
         resp = llm.complete(
             [{"role": "user", "content": prompt}],
@@ -367,7 +406,6 @@ def write_draft(
     except LLMError as exc:
         log.warning("Writer produced unusable output (%s) — slot skipped, no filler.", exc)
         return None
-
     # The chosen variation decides the shape, not whatever the model felt like
     # returning. A single_snappy variation that comes back with `parts` is a
     # model that ignored the schema: reject it rather than silently publishing
@@ -386,7 +424,16 @@ def write_draft(
         )
         return None
 
-    persona = get_active_persona(path)
+    # Editorial cleanup & compression pass on valid structure
+    from src.content.editor import edit_and_clean_draft
+
+    raw_content = content
+    content, parts, eff_format, applied_edits = edit_and_clean_draft(
+        content, parts=parts, intended_format=variation.format
+    )
+    if eff_format != variation.format:
+        variation.format = eff_format
+    persona = persona or get_active_persona(path)
     result = DraftResult(
         content=content,
         parts=parts,
@@ -398,6 +445,8 @@ def write_draft(
         variation=variation.to_dict(),
         evidence=evidence,
         disclosure=disclosure,
+        raw_content=raw_content,
+        applied_edits=applied_edits,
     )
 
     _variation_history.append(variation.key())
@@ -411,22 +460,131 @@ def write_draft(
     return result
 
 
+def write_draft_with_rewrite_loop(
+    pillar: Optional[str] = None,
+    client: Optional[object] = None,
+    critic_client: Optional[object] = None,
+    evidence: str = "",
+    path=None,
+    persist: bool = True,
+    persona=None,
+) -> tuple[Optional[DraftResult], Optional[object]]:
+    """Generate a draft with a bounded 2-stage rewrite loop.
+
+    If Critic returns REVISE_ONCE on the first draft, the critic's concerns
+    are fed back to the writer for exactly one rewrite attempt.
+    """
+    from src.content.quality_gate import (
+        APPROVED_AUTO, NEEDS_REVIEW, REJECTED, REVISE_ONCE, evaluate_draft,
+    )
+
+    draft = write_draft(
+        pillar=pillar, client=client, evidence=evidence, path=path, persist=persist, persona=persona,
+    )
+    if draft is None:
+        return None, None
+    format_name1 = draft.variation.get("format", "") if isinstance(draft.variation, dict) else ""
+    eval1 = evaluate_draft(
+        draft.content,
+        parts=draft.parts,
+        evidence=evidence,
+        pillar=draft.pillar,
+        draft_id=draft.draft_id,
+        client=critic_client or client,
+        path=path,
+        persist=persist,
+        format_name=format_name1,
+        persona=persona,
+    )
+
+    if eval1.verdict in (APPROVED_AUTO, NEEDS_REVIEW) or eval1.verdict == REJECTED:
+        return draft, eval1
+
+    # Stage 2: REVISE_ONCE -> feed feedback back for 1 rewrite attempt
+    feedback_items = []
+    if hasattr(eval1, "findings") and eval1.findings:
+        for f in eval1.findings:
+            sev = f.get("severity", "")
+            code = f.get("code", "")
+            ev = f.get("evidence", "")
+            fix = f.get("suggested_fix", "")
+            feedback_items.append(f"[{sev}] {code}: '{ev}' -> Saran: {fix}")
+    elif hasattr(eval1, "concerns") and eval1.concerns:
+        feedback_items.extend(eval1.concerns)
+    if not feedback_items:
+        feedback_items = ["Perbaiki alur, hindari klise AI dan personifikasi berlebihan."]
+    concerns = "\n".join(feedback_items)
+
+    draft2 = write_draft(
+        pillar=draft.pillar,
+        client=client,
+        evidence=evidence,
+        revision_feedback=concerns,
+        path=path,
+        persist=persist,
+        persona=persona,
+    )
+    if draft2 is None:
+        return draft, eval1
+
+    format_name2 = draft2.variation.get("format", "") if isinstance(draft2.variation, dict) else ""
+    eval2 = evaluate_draft(
+        draft2.content,
+        parts=draft2.parts,
+        evidence=evidence,
+        pillar=draft2.pillar,
+        draft_id=draft2.draft_id,
+        client=critic_client or client,
+        path=path,
+        persist=persist,
+        format_name=format_name2,
+        persona=persona,
+    )
+    return draft2, eval2
 def save_draft(draft: DraftResult, path=None) -> int:
+    editorial_metadata = {
+        "premise": draft.audience_problem,
+        "pillar": draft.pillar,
+        "angle": draft.angle,
+        "format": draft.variation.get("format", "") if isinstance(draft.variation, dict) else "",
+        "opening": draft.variation.get("opening", "") if isinstance(draft.variation, dict) else "",
+        "mood": draft.variation.get("mood", "") if isinstance(draft.variation, dict) else "",
+        "goal": draft.variation.get("goal", "") if isinstance(draft.variation, dict) else "",
+        "payoff": draft.variation.get("goal", "") if isinstance(draft.variation, dict) else "",
+        "structure": draft.structure,
+    }
     with connect(path) as conn:
         with transaction(conn):
-            cur = conn.execute(
-                """
-                INSERT INTO content_drafts
-                    (idea_id, content, structure, persona_version, draft_version,
-                     status, parts_json, image_query, disclosure)
-                VALUES (?, ?, ?, ?, 1, ?, ?, '', ?)
-                """,
-                (
-                    draft.idea_id, draft.content, draft.structure,
-                    draft.persona_version, DRAFT,
-                    json.dumps(draft.parts, ensure_ascii=False), draft.disclosure,
-                ),
-            )
+            cols = [r["name"] for r in conn.execute("PRAGMA table_info(content_drafts)").fetchall()]
+            if "editorial_metadata_json" in cols:
+                cur = conn.execute(
+                    """
+                    INSERT INTO content_drafts
+                        (idea_id, content, structure, persona_version, draft_version,
+                         status, parts_json, image_query, disclosure, editorial_metadata_json)
+                    VALUES (?, ?, ?, ?, 1, ?, ?, '', ?, ?)
+                    """,
+                    (
+                        draft.idea_id, draft.content, draft.structure,
+                        draft.persona_version, DRAFT,
+                        json.dumps(draft.parts, ensure_ascii=False), draft.disclosure,
+                        json.dumps(editorial_metadata, ensure_ascii=False),
+                    ),
+                )
+            else:
+                cur = conn.execute(
+                    """
+                    INSERT INTO content_drafts
+                        (idea_id, content, structure, persona_version, draft_version,
+                         status, parts_json, image_query, disclosure)
+                    VALUES (?, ?, ?, ?, 1, ?, ?, '', ?)
+                    """,
+                    (
+                        draft.idea_id, draft.content, draft.structure,
+                        draft.persona_version, DRAFT,
+                        json.dumps(draft.parts, ensure_ascii=False), draft.disclosure,
+                    ),
+                )
             return int(cur.lastrowid)
 
 
@@ -439,6 +597,7 @@ def get_draft(draft_id: int, path=None) -> Optional[dict]:
         return None
     out = dict(row)
     out["parts"] = json.loads(out.get("parts_json") or "[]")
+    out["editorial_metadata"] = json.loads(out.get("editorial_metadata_json") or "{}")
     return out
 
 

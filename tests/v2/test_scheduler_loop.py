@@ -29,12 +29,16 @@ from src.strategy.calendar import build_calendar
 
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
+    from src.core import config as cfg
+    monkeypatch.setenv("V2_QUIET_START_HOUR", "0")
+    monkeypatch.setenv("V2_QUIET_END_HOUR", "0")
+    cfg.reset_settings_cache()
     writer_mod.reset_variation_history()
     sched._running = True
     yield
     writer_mod.reset_variation_history()
     sched._running = True
-
+    cfg.reset_settings_cache()
 
 @pytest.fixture()
 def db(tmp_path):
@@ -74,8 +78,8 @@ def critic(monkeypatch):
     """Make the scheduler's gate use its own client, as production does."""
     real_gate = sched.gate_draft
 
-    def _gate(draft, path=None, client=None):
-        return real_gate(draft, path=path, client=_critic_llm())
+    def _gate(draft, path=None, client=None, *args, **kwargs):
+        return real_gate(draft, path=path, client=_critic_llm(), **kwargs)
 
     monkeypatch.setattr(sched, "gate_draft", _gate)
 
@@ -201,7 +205,7 @@ class TestDrainQueue:
     })()
     SCHED = type("C", (), {
         "main_posts_per_day": 1, "max_extra_posts_per_week": 3,
-        "quiet_start_hour": 23, "quiet_end_hour": 6,
+        "quiet_start_hour": 0, "quiet_end_hour": 0,
         "poll_interval_seconds": 300, "paused": False,
     })()
 
